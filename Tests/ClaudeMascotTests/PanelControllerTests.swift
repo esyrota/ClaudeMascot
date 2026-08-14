@@ -235,3 +235,77 @@ func failedUploadRetriesAfterBackoffWithoutWedging() async {
   #expect(controller.displayed == .working)
   #expect(panel.uploadCount == 2)
 }
+
+@Test @MainActor
+func startingHoldShowsBootAnimationThenHandsOffToDesiredState() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600, startingHold: 5),
+    clock: clock
+  )
+
+  // A state can already be known (e.g. from the state file) before boot
+  // finishes; it must not pre-empt the boot animation.
+  controller.handle(.working)
+  await controller.tick()
+  #expect(controller.displayed == .starting)
+
+  clock.advance(4)
+  await controller.tick()
+  #expect(controller.displayed == .starting)  // still within the hold
+
+  clock.advance(1)  // total 5s: hold expires
+  await controller.tick()
+  #expect(controller.displayed == .working)
+}
+
+@Test @MainActor
+func offPowersDownImmediatelyWithoutWaitingForIdleEscalation() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  await controller.tick()  // initial idle upload
+  controller.handle(.working)
+  await controller.tick()
+  #expect(controller.displayed == .working)
+
+  // SessionEnd, mid-session -- must not wait out the 600s offAfter.
+  controller.handle(.off)
+  await controller.tick()
+
+  #expect(controller.isPanelOff == true)
+  #expect(panel.calls.last == .setPower(false))
+  // Never resolves or uploads an asset for `.off`.
+  #expect(panel.calls.contains(.upload(.off)) == false)
+}
+
+@Test @MainActor
+func newStateAfterOffWakesThePanel() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  controller.handle(.off)
+  await controller.tick()
+  #expect(controller.isPanelOff == true)
+
+  controller.handle(.idle)
+  await controller.tick()
+
+  #expect(controller.isPanelOff == false)
+  #expect(controller.displayed == .idle)
+}
+
+@Test @MainActor
+func zeroStartingHoldSkipsBootAnimation() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  await controller.tick()
+  #expect(controller.displayed == .idle)
+  #expect(panel.calls == [.upload(.idle)])
+}

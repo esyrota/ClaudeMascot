@@ -26,6 +26,11 @@ struct PanelTimings: Sendable {
   var doneHold: TimeInterval = 30
   var sleepAfter: TimeInterval = 5 * 60
   var offAfter: TimeInterval = 10 * 60
+  /// How long `.starting` is shown right after launch, regardless of the
+  /// actually-desired state. `0` (the default) disables it outright, which
+  /// is what every existing test relies on to see its expected state upload
+  /// immediately rather than a boot animation first.
+  var startingHold: TimeInterval = 0
 }
 
 /// The panel state machine: `done` hold, idle escalation (`idle` ->
@@ -70,6 +75,11 @@ final class PanelController: ObservableObject {
   /// Backoff gate: `tick()` performs no new I/O attempt before this time.
   private var nextRetryAt: TimeInterval?
 
+  /// When the machine was created, i.e. when the boot animation should have
+  /// started. `nil` once `timings.startingHold` has elapsed, so `tick()`
+  /// stops paying the (harmless but pointless) clock comparison forever.
+  private var bootAt: TimeInterval?
+
   private static let retryBackoff: TimeInterval = 2
 
   init(
@@ -85,6 +95,7 @@ final class PanelController: ObservableObject {
     self.clock = clock
     self.persistRevert = persistRevert
     self.idleSince = clock()
+    self.bootAt = timings.startingHold > 0 ? clock() : nil
   }
 
   /// Records a newly requested state (from `StateStore`, directly or via a
@@ -157,11 +168,20 @@ final class PanelController: ObservableObject {
   // MARK: - Target derivation
 
   private func shouldBeOff(now: TimeInterval) -> Bool {
+    // `.off` (SessionEnd) blanks the panel immediately; idle escalation
+    // blanks it only after sitting idle for `offAfter`.
+    if desired == .off { return true }
     guard desired == .idle, let idleSince else { return false }
     return now - idleSince >= timings.offAfter
   }
 
   private func currentTarget(now: TimeInterval) -> PanelState {
+    if let bootAt {
+      if now - bootAt < timings.startingHold {
+        return .starting
+      }
+      self.bootAt = nil
+    }
     if desired == .idle, let idleSince, now - idleSince >= timings.sleepAfter {
       return .sleeping
     }

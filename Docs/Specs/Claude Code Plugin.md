@@ -13,14 +13,14 @@ disturb a session.
 
 ## Hook mapping
 
-| Event | State | Meaning |
-|---|---|---|
-| `SessionStart` | `idle` | session opened |
-| `UserPromptSubmit` | `thinking` | working on your prompt |
-| `PreToolUse` | `working` | running a tool |
-| `Notification` | `waiting` | wants input or permission |
-| `Stop` | `done` | turn finished — celebration, min 30s |
-| `SessionEnd` | `idle` | session closed |
+| Event              | State      | Meaning                                      |
+| ------------------ | ---------- | -------------------------------------------- |
+| `SessionStart`     | `idle`     | session opened                               |
+| `UserPromptSubmit` | `thinking` | working on your prompt                       |
+| `PreToolUse`       | `working`  | running a tool                               |
+| `Notification`     | `waiting`  | wants input or permission                    |
+| `Stop`             | `done`     | turn finished — celebration, min 30s         |
+| `SessionEnd`       | `off`      | session closed — panel goes dark immediately |
 
 All hooks are `async: true` so they never block a turn.
 

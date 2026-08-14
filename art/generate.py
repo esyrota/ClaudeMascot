@@ -85,6 +85,7 @@ def mascot(
     d,
     by: int = HOME_Y,
     *,
+    dx: int = 0,
     arms=(0, 0),
     blink: bool = False,
     legs=(0, 0, 0, 0),
@@ -93,6 +94,8 @@ def mascot(
     """
     Draw the whole mascot as one flat-coloured silhouette, per the official mark.
 
+    dx     -- horizontal shift of the whole figure; negative slides it off the
+              left edge, for a walk-in entrance.
     arms   -- (left_dy, right_dy); negative raises an arm. None hides it.
     legs   -- per-leg shortening, in pixels; a shortened leg reads as lifted.
     squash -- compresses the torso from the top for stomp anticipation.
@@ -100,24 +103,24 @@ def mascot(
     top = by + squash
     h = TORSO_H - squash
 
-    rect(d, TORSO_X, top, TORSO_W, h, MASCOT)
+    rect(d, TORSO_X + dx, top, TORSO_W, h, MASCOT)
 
     left_dy, right_dy = arms
-    for dy, ax in ((left_dy, 0), (right_dy, TORSO_X + TORSO_W)):
+    for dy, ax in ((left_dy, 0 + dx), (right_dy, TORSO_X + TORSO_W + dx)):
         if dy is None:
             continue
         rect(d, ax, top + ARM_TOP + dy, ARM_W, ARM_H, MASCOT)
 
     # Four legs hanging off the bottom edge, in two pairs with a wide middle gap.
     for lx, lift in zip(LEG_XS, legs):
-        rect(d, lx, by + LEG_TOP, LEG_W, max(0, LEG_H - lift), MASCOT)
+        rect(d, lx + dx, by + LEG_TOP, LEG_W, max(0, LEG_H - lift), MASCOT)
 
     ey = top + EYE_TOP
     for ex in EYE_XS:
         if blink:
-            rect(d, ex, ey + EYE_H // 2, EYE_W, 1, EYE)
+            rect(d, ex + dx, ey + EYE_H // 2, EYE_W, 1, EYE)
         else:
-            rect(d, ex, ey, EYE_W, EYE_H, EYE)
+            rect(d, ex + dx, ey, EYE_W, EYE_H, EYE)
 
 
 # --------------------------------------------------------------------------
@@ -234,13 +237,61 @@ def sleeping():
     return out
 
 
+def starting():
+    """Boot animation: mascot shuffles in from off-panel, then waves hello."""
+    out = []
+    # The silhouette is nearly full-width, so a long off-panel slide spends
+    # most frames as an unreadable fragment at 32px -- keep the entrance short
+    # (barely off-edge to home) and follow it with a wave, which reads as
+    # "arrived" much better than more travel would.
+    cycles = [(0, 2, 2, 0), (1, 1, 1, 1)]
+    entrance = [-10, -6, -3, 0]
+    for i, dx in enumerate(entrance):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        swing = 1 if i % 2 == 0 else -1
+        mascot(
+            d, HOME_Y + (i % 2), dx=dx,
+            arms=(swing, -swing), legs=cycles[i % 2],
+        )
+        out.append((im, 130))
+
+    # Settle, then one friendly wave of the right arm before easing into idle.
+    wave = [0, -8, -10, -8, -3, 0]
+    for i, lift in enumerate(wave):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, arms=(0, lift), blink=(i == len(wave) - 1))
+        out.append((im, 160))
+    return out
+
+
+def off():
+    """
+    Fully dark frame.
+
+    Not actually uploaded in normal operation -- SessionEnd tells the panel
+    to power off directly (a real BLE power-off, not a black image), which
+    `PanelController` intercepts before it ever resolves an asset for
+    `.off`. This exists only so the state <-> asset mapping stays total
+    (every `PanelState` resolves to *something*), which is what
+    `AnimationLibrary`'s tests assert. Deliberately skipped below in the
+    MIN_COLORS palette dance the real, on-panel states need -- that dance
+    exists to dodge a decoder quirk on actual hardware, which is moot for a
+    frame hardware will never receive.
+    """
+    return [(frame(), 1000)]
+
+
 STATES = {
+    "starting": starting,
     "idle": idle,
     "sleeping": sleeping,
     "thinking": thinking,
     "working": working,
     "waiting": waiting,
     "done": done,
+    "off": off,
 }
 
 
@@ -303,6 +354,10 @@ if __name__ == "__main__":
         frames = fn()
         produced[name] = frames
         path = save(name, frames)
+        if name == "off":
+            # Never uploaded to real hardware -- see off()'s docstring.
+            print(f"{path.name:14s} {len(frames)} frames  (fallback asset, palette check skipped)")
+            continue
         n = min(len(pad_palette(im).getcolors(maxcolors=1 << 20)) for im, _ in frames)
         assert n >= MIN_COLORS, f"{name}: only {n} colors, need >= {MIN_COLORS}"
         print(f"{path.name:14s} {len(frames)} frames  {n:2d} colors  {path.stat().st_size:5d} bytes")

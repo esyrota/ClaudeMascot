@@ -39,10 +39,13 @@ app. The Terminal windows are a symptom of not being one.
 ### Behaviour
 - Watch `~/.idotmatrix/state` for a single state word and drive the panel from it.
   Keeps hooks trivial and decoupled. Use a `DispatchSource` file watcher, not polling.
-- States: `idle`, `thinking`, `working`, `waiting`, `done`, `sleeping`
+- States: `idle`, `thinking`, `working`, `waiting`, `done`, `sleeping`, plus two the
+  app drives itself rather than a hook: `starting` (boot animation, shown once on
+  launch) and `off` (written by `SessionEnd`, blanks the panel immediately)
 - `done` holds a minimum of **30s** before reverting to `idle`, unless another state
   arrives first
 - Idle escalation: `idle` → `sleeping` at 5m → **panel off** at 10m
+- `off` short-circuits straight to panel-off, without waiting out that escalation
 - No 15-minute quit — a resident native app is cheap, and reconnecting is the slow
   part. It keeps the BLE connection.
 - Reconnect automatically if the panel drops off.

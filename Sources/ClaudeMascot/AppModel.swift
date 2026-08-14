@@ -56,7 +56,10 @@ final class AppModel: ObservableObject {
       panel: adapter,
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
-        offAfter: TimeInterval(settings.offAfterMinutes * 60)
+        offAfter: TimeInterval(settings.offAfterMinutes * 60),
+        // Matches starting.gif's total frame duration (art/generate.py) so
+        // the boot animation plays exactly once before handing off.
+        startingHold: 1.48
       ),
       brightness: { settings.brightness },
       persistRevert: { [stateStore] state in stateStore.write(state) }
