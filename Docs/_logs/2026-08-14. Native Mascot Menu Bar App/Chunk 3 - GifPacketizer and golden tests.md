@@ -14,7 +14,7 @@ Port the iDotMatrix GIF upload framing from Python to Swift, and prove it correc
 against the golden fixtures produced in Chunk 2.
 
 This is the highest-risk chunk in the project and also the most testable: the
-packetiser is a pure function from `Data` to `[[UInt8]]` with no I/O, no Bluetooth and
+packetiser is a pure function from `Data` to `[Data]` with no I/O, no Bluetooth and
 no UI. If the bytes match the fixtures, the protocol port is done and everything
 downstream is plumbing.
 
@@ -39,7 +39,7 @@ enum GifPacketizer {
     /// Frames raw GIF bytes for upload.
     /// Returns outer 4K chunks, each split into BLE-sized writes.
     static func packets(for gifData: Data, gifType: UInt8 = 12,
-                        timeSign: Int = 1) -> [[Data]]
+                        timeSign: Int = 1) -> `[Data]`
 
     /// Flattened convenience: every BLE write in send order.
     static func flatPackets(for gifData: Data, gifType: UInt8 = 12,
