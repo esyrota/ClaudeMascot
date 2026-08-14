@@ -1,0 +1,13 @@
+{
+  "name": "claude-mascot",
+  "owner": {
+    "name": "Eugene Syrota"
+  },
+  "plugins": [
+    {
+      "name": "claude-mascot",
+      "source": "./plugin",
+      "description": "Mirrors Claude Code's session lifecycle onto a 32x32 iDotMatrix LED panel. Requires the ClaudeMascot menu bar app from this repository."
+    }
+  ]
+}

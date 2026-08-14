@@ -33,6 +33,19 @@ chmod +x "$APP_MACOS/$APP_NAME"
 echo "Copying Info.plist..."
 cp "Sources/ClaudeMascot/Resources/Info.plist" "$APP_CONTENTS/Info.plist"
 
+# Copy the animations INTO the bundle. AnimationLibrary looks these up via
+# Bundle.main ("Contents/Resources/Animations"), so without this step the app
+# builds and signs fine but cannot find a single animation at runtime.
+echo "Copying animations..."
+cp -R "Sources/ClaudeMascot/Resources/Animations" "$APP_RESOURCES/Animations"
+
+ANIM_COUNT=$(find "$APP_RESOURCES/Animations" -maxdepth 1 -name '*.gif' | wc -l | tr -d ' ')
+if [ "$ANIM_COUNT" -lt 6 ]; then
+  echo "ERROR: expected at least 6 animations in the bundle, found $ANIM_COUNT" >&2
+  exit 1
+fi
+echo "  $ANIM_COUNT animations bundled"
+
 # Ad-hoc sign the app
 echo "Code signing..."
 codesign --force --deep --sign - "$APP_BUNDLE"

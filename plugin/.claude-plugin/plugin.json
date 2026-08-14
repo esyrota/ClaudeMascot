@@ -1,0 +1,6 @@
+{
+  "name": "claude-mascot",
+  "version": "1.0.0",
+  "description": "Mirrors Claude Code's lifecycle onto an iDotMatrix LED panel. Writes session state to ~/.idotmatrix/state. Requires the ClaudeMascot menu bar app and iDotMatrix hardware to function.",
+  "dependencies": []
+}

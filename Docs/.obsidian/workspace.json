@@ -1,0 +1,245 @@
+{
+  "main": {
+    "id": "1e6baa3401b28477",
+    "type": "split",
+    "children": [
+      {
+        "id": "f12d4934639ace70",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b4b26aad17ae25ed",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Welcome.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Welcome"
+            }
+          }
+        ]
+      },
+      {
+        "id": "d5a77a0846397f7c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "477fe54490f36cbb",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "74002bc2a29b7d93",
+    "type": "split",
+    "children": [
+      {
+        "id": "a6d20419884f7acd",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "53a4cac7cc593f57",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "68fc725eaaf81472",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "b9bbc41faa306624",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a34011a6471827c1",
+    "type": "split",
+    "children": [
+      {
+        "id": "0aee881d498fb92a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d057d71ae143c4a0",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Welcome.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "88e59b225e0e9fef",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Welcome.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "5703a698a47fff92",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "d88c41f225fb8859",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "68a336890b2b6a7a",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Welcome.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "b4b26aad17ae25ed",
+  "lastOpenFiles": [
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Plan.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 8 - Plugin and final gates.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 7 - App assembly menu bar and settings.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 6 - Animation resources.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 5 - StateStore and PanelController.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 4 - BLEClient.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 3 - GifPacketizer and golden tests.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 3 - Context.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 2 - Golden fixtures from Python.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 1 - Package scaffold and bundler.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App/Analysis.md",
+    "_logs/2026-08-14. Native Mascot Menu Bar App",
+    "_logs",
+    "Specs/Menu Bar App.md",
+    "Specs/Claude Code Plugin.md",
+    "Specs/BLE Protocol.md",
+    "Specs/Art Pipeline.md",
+    "Specs",
+    "Reference/macOS Bluetooth TCC.md",
+    "Reference/Panel Quirks.md",
+    "Reference/Library Quirks.md",
+    "Reference",
+    "Home.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Plan.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 8 - Plugin and final gates.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 7 - App assembly menu bar and settings.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 6 - Animation resources.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 5 - StateStore and PanelController.md",
+    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App",
+    "Docs/_logs",
+    "Docs/Specs",
+    "Docs/Reference",
+    "Docs"
+  ]
+}

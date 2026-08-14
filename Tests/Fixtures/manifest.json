@@ -8,8 +8,7 @@
       509,
       509,
       436
-    ],
-    "source_path": "mascot/idle.gif"
+    ]
   },
   "sleeping": {
     "gif_bytes": 1641,
@@ -21,8 +20,7 @@
       509,
       509,
       130
-    ],
-    "source_path": "mascot/sleeping.gif"
+    ]
   },
   "thinking": {
     "gif_bytes": 1531,
@@ -34,8 +32,7 @@
       509,
       509,
       20
-    ],
-    "source_path": "mascot/thinking.gif"
+    ]
   },
   "working": {
     "gif_bytes": 1611,
@@ -47,8 +44,7 @@
       509,
       509,
       100
-    ],
-    "source_path": "mascot/working.gif"
+    ]
   },
   "waiting": {
     "gif_bytes": 1851,
@@ -60,8 +56,7 @@
       509,
       509,
       340
-    ],
-    "source_path": "mascot/waiting.gif"
+    ]
   },
   "done": {
     "gif_bytes": 1788,
@@ -73,7 +68,6 @@
       509,
       509,
       277
-    ],
-    "source_path": "mascot/done.gif"
+    ]
   }
 }

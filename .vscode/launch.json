@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:ClaudeMascot}",
+            "name": "Debug ClaudeMascot",
+            "target": "ClaudeMascot",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug ClaudeMascot"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:ClaudeMascot}",
+            "name": "Release ClaudeMascot",
+            "target": "ClaudeMascot",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release ClaudeMascot"
+        }
+    ]
+}

@@ -67,12 +67,16 @@ import Foundation
       }
     }
 
-    // Try Bundle.main
+    // Try Bundle.main. Hand-imported art in Animations/custom/ wins over the
+    // generated art beside it, mirroring the override-folder precedence above
+    // and the Python tooling, which writes imports into that subfolder.
     if let bundlePath = Bundle.main.path(forResource: "Animations", ofType: nil) {
       let bundleURL = URL(fileURLWithPath: bundlePath)
-      let fileURL = bundleURL.appendingPathComponent(filename)
-      if fileExists(at: fileURL) {
-        return fileURL
+      for candidate in [
+        bundleURL.appendingPathComponent("custom").appendingPathComponent(filename),
+        bundleURL.appendingPathComponent(filename),
+      ] where fileExists(at: candidate) {
+        return candidate
       }
     }
 

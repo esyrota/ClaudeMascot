@@ -1,4 +1,7 @@
 .build/
+ClaudeMascot.app/
+venv/
 .DS_Store
 *.xcuserstate
-ClaudeMascot.app/
+art/preview.png
+art/**/*_preview.png
