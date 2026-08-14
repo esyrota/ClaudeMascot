@@ -1,6 +1,9 @@
 {
   "name": "claude-mascot",
-  "version": "1.0.0",
-  "description": "Mirrors Claude Code's lifecycle onto an iDotMatrix LED panel. Writes session state to ~/.idotmatrix/state. Requires the ClaudeMascot menu bar app and iDotMatrix hardware to function.",
+  "version": "2.0.0",
+  "description": "Relays Claude Code's session lifecycle events to a Unix domain socket for the ClaudeMascot menu bar app to display on an iDotMatrix LED panel. Requires the ClaudeMascot app and iDotMatrix hardware to function.",
+  "author": {
+    "name": "Eugene Syrota"
+  },
   "dependencies": []
 }
