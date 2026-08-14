@@ -25,7 +25,10 @@ The relay extracts these from Claude Code's full hook payload and forwards only 
 
 ## Hook map
 
-Nine events. `PreToolUse` and `PostToolUse` use `"matcher": "*"` to catch tool-specific notification payloads; the others match all calls.
+Nine events. `PreToolUse` and `PostToolUse` are the only tool-scoped events, so they
+carry `"matcher": "*"` — every tool, no filtering — at the group level, as a sibling of
+`hooks` rather than inside the hook entry, where it would be ignored. The other seven
+events are not tool-scoped and take no matcher.
 
 | Event | Async | Event → App state |
 |-------|-------|-------------------|
