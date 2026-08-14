@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_tasks/Interaction between App and Plugin.md",
+                "file": "_logs/2026-08-15. App Plugin Interaction/Task.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Interaction between App and Plugin"
+              "title": "Task"
             }
           }
         ]
@@ -190,8 +190,22 @@
   },
   "active": "477fe54490f36cbb",
   "lastOpenFiles": [
+    "Reference/Hook Relay Quirks.md",
+    "_logs/2026-08-15. App Plugin Interaction/Analysis.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 9 - Docs and final gates.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 8 - First-run panel.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 7 - Plugin installer.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 6 - Bundle plugin into app.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 5 - Relay and hook manifest.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 4 - Wire server into app.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 3 - Drop the file transport.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 2 - Socket server.md",
+    "_logs/2026-08-15. App Plugin Interaction/Chunk 1 - Event model and policy.md",
+    "_logs/2026-08-15. App Plugin Interaction/Plan.md",
+    "_logs/2026-08-15. App Plugin Interaction",
+    "_tasks/Debounce short tool calls.md",
     "Specs/Art Pipeline.md",
-    "_tasks/Interaction between App and Plugin.md",
+    "_logs/2026-08-15. App Plugin Interaction/Task.md",
     "_tasks",
     "Specs/Menu Bar App.md",
     "Specs/Claude Code Plugin.md",
@@ -204,27 +218,13 @@
     "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 6 - Animation resources.md",
     "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 5 - StateStore and PanelController.md",
     "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 4 - BLEClient.md",
-    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 3 - GifPacketizer and golden tests.md",
-    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 3 - Context.md",
-    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 2 - Golden fixtures from Python.md",
-    "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 1 - Package scaffold and bundler.md",
-    "_logs/2026-08-14. Native Mascot Menu Bar App/Analysis.md",
     "_logs/2026-08-14. Native Mascot Menu Bar App",
     "_logs",
     "Specs",
-    "Reference/macOS Bluetooth TCC.md",
-    "Reference/Panel Quirks.md",
-    "Reference/Library Quirks.md",
     "Reference",
-    "Home.md",
-    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
-    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Plan.md",
-    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 8 - Plugin and final gates.md",
-    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 7 - App assembly menu bar and settings.md",
     "Docs/_logs/2026-08-14. Native Mascot Menu Bar App",
     "Docs/_logs",
     "Docs/Specs",
-    "Docs/Reference",
-    "Docs"
+    "Docs/Reference"
   ]
 }

@@ -1,6 +1,6 @@
 # Claude Code Plugin
 
-A dumb relay for Claude Code's lifecycle events. The plugin forwards nine hook events to the menu bar app's Unix domain socket; all policy lives in the app so the plugin freezes at 1.0 and never needs reinstalling when animations or states change.
+A dumb relay for Claude Code's lifecycle events. The plugin forwards nine hook events to the menu bar app's Unix domain socket; all policy lives in the app, so the plugin is frozen at 2.0.0 and never needs reinstalling when animations or states change. (1.0.0 was the retired state-file design; the socket transport is a breaking change, hence the major bump.)
 
 ## Transport
 
@@ -48,11 +48,11 @@ events are not tool-scoped and take no matcher.
 
 ## Policy: why it lives in the app
 
-`permission_mode` (`ask` / `allow` / `deny`) is forwarded but not consulted by the app. It reports the session's *configured* mode, not whether Claude is currently waiting. Using it to key `.waiting` would show the mascot waiting on every tool call in the default `ask` mode, which is wrong — only `Notification` means the panel should wait.
+`permission_mode` (`ask` / `allow`) is forwarded but not consulted by the app. It reports the session's *configured* mode, not whether Claude is currently waiting. Using it to key `.waiting` would show the mascot waiting on every tool call in the default `ask` mode, which is wrong — only `Notification` means the panel should wait. It is forwarded anyway because it is free and a future policy may want it.
 
 `SubagentStop` is a real Claude Code event but deliberately unmapped to any state. The app ignores it, returning `nil`, so the panel state does not change.
 
-Unknown events (any Claude Code adds in the future) are also ignored, never falling back to `.idle`. This differs from the state file watcher, which falls back to `.idle` because a corrupted *state file* must resolve to something. An unrecognised *event* carries no signal.
+Unknown events (any Claude Code adds in the future) are also ignored, never falling back to `.idle`. The retired state-file watcher *did* fall back to `.idle`, because a corrupted file had to resolve to something; an event stream has no such obligation. A fallback here would let an unrecognised event reset the panel mid-turn.
 
 All policy — the event table, state machine rules, defaults, escalation timings — lives in `EventPolicy.swift` in the app's source tree. The plugin is a shell script that never learns what any event *means*. This makes the plugin permanent and distribution-ready: the app bundle carries a frozen copy under `Contents/Resources/ClaudeCodePlugin`, and changes to animation or state logic never require a plugin rebuild or reinstall.
 
@@ -62,4 +62,15 @@ The app installs the plugin automatically on first launch. The first-run panel s
 
 Hooks load at session start, so the user must restart Claude Code for the plugin to take effect.
 
-The plugin is installed to the user's cache like any other plugin — `~/.claude/plugins/cache/…` — but the marketplace definition lives in the app bundle, so the app can move to `/Applications` or anywhere else without losing the plugin's source.
+The plugin is *copied* into the user's cache like any other plugin —
+`~/.claude/plugins/cache/claude-mascot/claude-mascot/<version>/` — while the marketplace
+definition is referenced in place inside the app bundle. Two consequences follow, and
+both are load-bearing:
+
+- `${CLAUDE_PLUGIN_ROOT}` resolves to the **cache copy**, not the bundle, so the relay
+  has no relative route back to the app. The socket path is therefore hardcoded on both
+  sides and is the only cross-process contract left.
+- Moving the app **does** invalidate the registered marketplace path, because it is a
+  reference rather than a copy. `PluginInstaller.needsReregistration()` compares
+  `Bundle.main.bundleURL` against the path recorded at install time, and Options offers
+  a **Re-register** button when they differ.
