@@ -19,7 +19,6 @@ protocol PanelDriving {
   func upload(_ state: PanelState) async throws
 }
 
-
 /// Durations driving the state machine's `done` hold and idle escalation.
 /// Injected rather than hardcoded so tests can use durations measured in
 /// fake seconds and finish instantly.

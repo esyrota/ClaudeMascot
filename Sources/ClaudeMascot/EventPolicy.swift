@@ -8,11 +8,12 @@ enum EventPolicy {
   /// ours to act on.
   ///
   /// `nil` means "ignore this event" — it must NOT fall back to `.idle`.
-  /// This differs deliberately from `PanelState.init(fileContents:)`, which
-  /// falls back to `.idle` because a malformed *state file* has to resolve
-  /// to something. An unrecognised *event* (including `SubagentStop`, which
-  /// is real but deliberately unhandled, and any name Claude Code has not
-  /// yet defined) simply carries no signal for the panel.
+  /// The retired state file had to resolve malformed contents to *some*
+  /// state, so it fell back to `.idle`; an event stream has no such
+  /// obligation. An unrecognised event (including `SubagentStop`, which is
+  /// real but deliberately unhandled, and any name Claude Code has not yet
+  /// defined) simply carries no signal for the panel, and a fallback here
+  /// would let it reset the panel mid-turn.
   ///
   /// `event.mode` (`permission_mode`) is intentionally never consulted
   /// here. It reports the session's *configured* mode (`ask`/`allow`), not

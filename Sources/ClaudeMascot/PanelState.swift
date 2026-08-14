@@ -22,13 +22,3 @@ import Foundation
 enum PanelState: String, CaseIterable, Sendable, Equatable {
   case starting, idle, sleeping, thinking, working, waiting, done, off
 }
-
-extension PanelState {
-  /// Validates raw state-file contents. Anything unrecognised — a typo in a
-  /// hook, a partially-written file, stray whitespace — falls back to
-  /// `.idle` rather than wedging the app or crashing.
-  init(fileContents raw: String) {
-    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    self = PanelState(rawValue: trimmed) ?? .idle
-  }
-}
