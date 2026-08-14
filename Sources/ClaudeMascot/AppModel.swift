@@ -1,10 +1,13 @@
+import AppKit
 import Combine
 import Foundation
 
-/// Owns the pieces (`Settings`, `BLEClient`, `AnimationLibrary`) plus the
-/// `PanelController`/`PanelAdapter` that tie them together, and is the only
-/// place any of that wiring happens:
+/// Owns the pieces (`Settings`, `BLEClient`, `AnimationLibrary`, `HookServer`)
+/// plus the `PanelController`/`PanelAdapter` that tie them together, and is
+/// the only place any of that wiring happens:
 ///
+/// - accepts hook events from the plugin relay via `HookServer`, maps them
+///   through `EventPolicy`, and drives `PanelController` accordingly
 /// - drives `PanelController.tick()` from a repeating timer **owned here**
 ///   (never inside `PanelController`, which is deliberately timer-free so
 ///   it stays unit-testable with a fake clock)
@@ -21,11 +24,15 @@ final class AppModel: ObservableObject {
   /// The panel's current state as driven by hooks (initially idle, updated by
   /// `HookServer` once wired in chunk 4).
   @Published private(set) var currentState: PanelState = .idle
+  /// Error from `hookServer.start()` if the socket failed to bind. Nil if
+  /// startup succeeded or has not been attempted.
+  @Published private(set) var hookServerError: String?
 
   let settings: AppSettings
   let bleClient: BLEClient
   let animationLibrary: AnimationLibrary
   let panelController: PanelController
+  let hookServer: HookServer
 
   private var cancellables: Set<AnyCancellable> = []
   private var tickTask: Task<Void, Never>?
@@ -38,12 +45,21 @@ final class AppModel: ObservableObject {
     settings: AppSettings = AppSettings(),
     bleClient: BLEClient = BLEClient(),
     animationLibrary: AnimationLibrary = AnimationLibrary(),
+    hookServer: HookServer = HookServer(),
     tickInterval: Duration = .seconds(1)
   ) {
     self.settings = settings
     self.bleClient = bleClient
     self.animationLibrary = animationLibrary
+    self.hookServer = hookServer
     self.tickInterval = tickInterval
+
+    // Clean up old state directory (can be deleted once no installed build
+    // predates the socket).
+    try? FileManager.default.removeItem(
+      at: FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".idotmatrix")
+    )
 
     let initialFolder = settings.animationFolderURL
     animationLibrary.overrideFolder = initialFolder
@@ -78,6 +94,48 @@ final class AppModel: ObservableObject {
     bleClient.objectWillChange
       .sink { [weak self] in self?.objectWillChange.send() }
       .store(in: &cancellables)
+
+    // Forward HookServer changes.
+    hookServer.objectWillChange
+      .sink { [weak self] in self?.objectWillChange.send() }
+      .store(in: &cancellables)
+
+    // Subscribe to hook events and apply policy.
+    hookServer.$lastEvent
+      .dropFirst()
+      .sink { [weak self] event in
+        guard let self else { return }
+        guard let event else { return }
+        guard self.enabled else { return }
+
+        guard let state = EventPolicy.state(for: event) else {
+          // Event is not ours to act on; ignore entirely.
+          return
+        }
+
+        self.currentState = state
+        self.panelController.handle(state)
+        Task { await self.panelController.tick() }
+      }
+      .store(in: &cancellables)
+
+    // Start the hook server.
+    do {
+      try hookServer.start()
+    } catch {
+      hookServerError = error.localizedDescription
+    }
+
+    // Register for clean shutdown.
+    NotificationCenter.default.addObserver(
+      forName: NSApplication.willTerminateNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.hookServer.stop()
+      }
+    }
 
     if enabled {
       bleClient.start()
