@@ -33,6 +33,7 @@ final class AppModel: ObservableObject {
   let animationLibrary: AnimationLibrary
   let panelController: PanelController
   let hookServer: HookServer
+  let pluginInstaller: PluginInstaller
 
   private var cancellables: Set<AnyCancellable> = []
   private var tickTask: Task<Void, Never>?
@@ -46,12 +47,14 @@ final class AppModel: ObservableObject {
     bleClient: BLEClient = BLEClient(),
     animationLibrary: AnimationLibrary = AnimationLibrary(),
     hookServer: HookServer = HookServer(),
+    pluginInstaller: PluginInstaller = PluginInstaller(),
     tickInterval: Duration = .seconds(1)
   ) {
     self.settings = settings
     self.bleClient = bleClient
     self.animationLibrary = animationLibrary
     self.hookServer = hookServer
+    self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
 
     // Clean up old state directory (can be deleted once no installed build
@@ -97,6 +100,12 @@ final class AppModel: ObservableObject {
 
     // Forward HookServer changes.
     hookServer.objectWillChange
+      .sink { [weak self] in self?.objectWillChange.send() }
+      .store(in: &cancellables)
+
+    // Forward PluginInstaller changes (Settings' Plugin section reads
+    // `pluginInstaller.outcome` through `appModel`).
+    pluginInstaller.objectWillChange
       .sink { [weak self] in self?.objectWillChange.send() }
       .store(in: &cancellables)
 

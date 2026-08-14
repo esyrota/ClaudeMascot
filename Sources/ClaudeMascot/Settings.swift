@@ -19,6 +19,12 @@ final class AppSettings: ObservableObject {
   @AppStorage("offAfterMinutes") var offAfterMinutes: Int = 10
   @AppStorage("panelIdentifier") var panelIdentifier: String = ""
 
+  /// Whether the first-run panel (`FirstRunView`) has already been shown
+  /// and dismissed — by installing the plugin, declining, or closing the
+  /// window. Once true, `ClaudeMascotApp` never opens it again; Settings'
+  /// Plugin section is where the user goes to change their mind.
+  @AppStorage("hasCompletedFirstRun") var hasCompletedFirstRun: Bool = false
+
   /// Best-effort cache of the user's intent, in case `SMAppService` can't
   /// be queried. The authoritative value is always `launchAtLogin`'s
   /// getter, which reflects the live `.status`.
