@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 5
 estimated_tools: 8
 estimated_tokens: 22000
-estimated_risk: 'low'
+estimated_risk: low
+actual_tokens: 37000
+actual_tools: 21
+actual_time: 2
+outcome: success
 ---
 
 # Chunk 6 — Bundle plugin into app

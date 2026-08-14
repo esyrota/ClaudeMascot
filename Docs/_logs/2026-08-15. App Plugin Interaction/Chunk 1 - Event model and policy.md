@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 8
 estimated_tools: 12
 estimated_tokens: 45000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 52000
+actual_tools: 10
+actual_time: 1
+outcome: success
 ---
 
 # Chunk 1 — Event model and policy

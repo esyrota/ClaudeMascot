@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 12
 estimated_tools: 14
 estimated_tokens: 50000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 183000
+actual_tools: 35
+actual_time: 7
+outcome: success-after-fixup
 ---
 
 # Chunk 8 — First-run panel

@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 10
 estimated_tools: 12
 estimated_tokens: 45000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 74000
+actual_tools: 30
+actual_time: 3
+outcome: success-with-deviations
 ---
 
 # Chunk 7 — Plugin installer

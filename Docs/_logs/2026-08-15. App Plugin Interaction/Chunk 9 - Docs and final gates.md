@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 12
 estimated_tools: 16
 estimated_tokens: 40000
-estimated_risk: 'low'
+estimated_risk: low
+actual_tokens: 51000
+actual_tools: 27
+actual_time: 3
+outcome: partial-reported-correctly
 ---
 
 # Chunk 9 — Docs and final gates

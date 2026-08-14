@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 7
 estimated_tools: 10
 estimated_tokens: 30000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 44000
+actual_tools: 10
+actual_time: 2
+outcome: success
 ---
 
 # Chunk 4 — Wire server into app

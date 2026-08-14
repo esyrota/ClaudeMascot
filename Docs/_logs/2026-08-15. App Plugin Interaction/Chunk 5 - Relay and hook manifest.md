@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 10
 estimated_tools: 14
 estimated_tokens: 35000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 105000
+actual_tools: 41
+actual_time: 5
+outcome: success-after-fixup
 ---
 
 # Chunk 5 — Relay and hook manifest

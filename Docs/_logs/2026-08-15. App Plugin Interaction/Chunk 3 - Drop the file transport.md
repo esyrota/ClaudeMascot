@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 10
 estimated_tools: 14
 estimated_tokens: 40000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 57000
+actual_tools: 31
+actual_time: 3
+outcome: success-with-deviations
 ---
 
 # Chunk 3 — Drop the file transport

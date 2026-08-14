@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 15
 estimated_tools: 18
 estimated_tokens: 65000
-estimated_risk: 'high'
+estimated_risk: high
+actual_tokens: 75000
+actual_tools: 21
+actual_time: 4
+outcome: success
 ---
 
 # Chunk 2 — Socket server
