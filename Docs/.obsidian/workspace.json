@@ -31,10 +31,14 @@
             "id": "477fe54490f36cbb",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Task"
             }
           }
         ]
@@ -115,7 +119,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Welcome.md",
+                "file": "_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -134,7 +138,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Welcome.md",
+                "file": "_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -177,7 +181,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Welcome.md",
+                "file": "_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -204,8 +208,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "b4b26aad17ae25ed",
+  "active": "477fe54490f36cbb",
   "lastOpenFiles": [
+    "Welcome.md",
     "_logs/2026-08-14. Native Mascot Menu Bar App/Task.md",
     "_logs/2026-08-14. Native Mascot Menu Bar App/Plan.md",
     "_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 8 - Plugin and final gates.md",
@@ -235,7 +240,6 @@
     "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 8 - Plugin and final gates.md",
     "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 7 - App assembly menu bar and settings.md",
     "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 6 - Animation resources.md",
-    "Docs/_logs/2026-08-14. Native Mascot Menu Bar App/Chunk 5 - StateStore and PanelController.md",
     "Docs/_logs/2026-08-14. Native Mascot Menu Bar App",
     "Docs/_logs",
     "Docs/Specs",

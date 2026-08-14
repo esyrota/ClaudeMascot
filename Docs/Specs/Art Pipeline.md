@@ -7,17 +7,17 @@ The Python tooling that authors the animations. **Unchanged** by the move to
 
 | Script | Purpose |
 |---|---|
-| `mascot/generate.py` | Draws the six states programmatically, writes `mascot/*.gif` + a 6× contact sheet `preview.png` |
-| `mascot/import_gif.py` | Converts an arbitrary GIF into a panel-ready state animation in `mascot/custom/` |
-| `mascot/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
+| `art/generate.py` | Draws the six states programmatically, writes `mascot/*.gif` + a 6× contact sheet `preview.png` |
+| `art/import_gif.py` | Converts an arbitrary GIF into a panel-ready state animation in `Animations/custom/` |
+| `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
 
-`mascot/custom/<state>.gif` takes priority over `mascot/<state>.gif`, so re-running
+`Animations/custom/<state>.gif` takes priority over `Animations/<state>.gif`, so re-running
 the generator never clobbers hand-imported art. [[Menu Bar App]] must preserve this
 precedence.
 
 ## Mascot geometry
 
-Taken from the official Claude Code mark (`gifs/claudecode-color.svg`), not eyeballed.
+Taken from the official Claude Code mark (`art/sources/claudecode-color.svg`), not eyeballed.
 The path is a 24×24 viewBox; scaling by **4/3** lands every x stop on an integer at
 32px:
 

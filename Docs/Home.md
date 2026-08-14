@@ -30,15 +30,17 @@ wrong diagnosis to find.
 
 | Piece | Location | Status |
 |---|---|---|
-| Art generator | `mascot/generate.py` | working, 6 states |
-| GIF importer | `mascot/import_gif.py` | working |
-| Golden-fixture export | `mascot/export_golden.py` | working — pins the BLE protocol for the Swift port |
+| Art generator | `art/generate.py` | working, 6 states |
+| GIF importer | `art/import_gif.py` | working |
+| Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol for the Swift port |
 | Menu bar app | `~/work/ClaudeMascot` | **built, all gates green, awaiting hardware test** |
 | Plugin | `plugin/` | built, awaiting a Claude Code restart to verify |
-| Daemon | `mascot/daemon.py` | still the live system; retire only after the app is proven |
-| On-demand launcher | `mascot/ensure.sh` | still live; retire with the daemon |
-| Hooks | `.claude/settings.local.json` | still live; replaced by [[Claude Code Plugin]] once verified |
-| Colour test card | `mascot/testcard.py` | diagnostic, keep |
+| Python daemon | `legacy/` | **retired and non-functional** — it imported the `idotmatrix` library, which is gone with the old checkout |
+| Colour test card | `art/testcard.py` | diagnostic, keep |
+
+Everything now lives in this one repository; the `idotmatrix-api-client` checkout it grew
+out of has been removed. The protocol survived the move: `art/export_golden.py` carries a
+self-contained port of the packet framing, and `Tests/Fixtures/` pins it byte-for-byte.
 
 Build state as of 2026-08-14: see
 [[Analysis]] in `_logs/2026-08-14. Native Mascot Menu Bar App/`.

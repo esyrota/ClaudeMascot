@@ -1,7 +1,7 @@
 # Menu Bar App
 
-A native macOS menu bar app that owns the panel. Replaces `mascot/daemon.py`,
-`mascot/ensure.sh` and `mascot/start.sh`, and removes Terminal from the picture
+A native macOS menu bar app that owns the panel. Replaces `legacy/daemon.py`,
+`legacy/ensure.sh` and `mascot/start.sh`, and removes Terminal from the picture
 entirely.
 
 **Stack:** Swift 6 + SwiftUI `MenuBarExtra`, CoreBluetooth, `SMAppService`.
