@@ -1,6 +1,7 @@
 import Combine
 import CoreBluetooth
 import Foundation
+import os
 
 /// This SDK does not mark `CBPeripheral`/`CBService` `Sendable`, so handing
 /// the instances CoreBluetooth passes to a `nonisolated` delegate callback
@@ -29,7 +30,6 @@ enum BLEError: Error, Sendable, Equatable {
   case notConnected
   case characteristicMissing
   case writeFailed
-  case timeout
   case deviceNotFound
 }
 
@@ -61,6 +61,7 @@ final class BLEClient: NSObject, ObservableObject {
   private static let writeCharacteristicUUID = CBUUID(
     string: "0000fa02-0000-1000-8000-00805f9b34fb")
   private static let deviceNamePrefix = "IDM-"
+  private static let log = Logger(subsystem: "com.eugene.claudemascot", category: "ble")
   private static let identifierDefaultsKey = "panelIdentifier"
   private static let scanTimeoutSeconds: Double = 6
   private static let maxReconnectDelaySeconds = 30
@@ -293,6 +294,9 @@ final class BLEClient: NSObject, ObservableObject {
 
   private func handleFailToConnect(_ failed: CBPeripheral, error: Error?) {
     guard failed === peripheral else { return }
+    if let error {
+      Self.log.error("connect failed: \(error.localizedDescription, privacy: .public)")
+    }
     peripheral = nil
     lastError = .deviceNotFound
     guard isStarted else {
@@ -305,6 +309,7 @@ final class BLEClient: NSObject, ObservableObject {
 
   private func handleDisconnect(_ disconnected: CBPeripheral, error: Error?) {
     guard disconnected === peripheral else { return }
+    if let error { Self.log.error("disconnected: \(error.localizedDescription, privacy: .public)") }
     peripheral = nil
     writeCharacteristic = nil
     failPendingWrite(with: BLEError.notConnected)
@@ -332,6 +337,10 @@ final class BLEClient: NSObject, ObservableObject {
     _ discovered: CBPeripheral, service: CBService, error: Error?
   ) {
     guard discovered === peripheral else { return }
+    if let error {
+      Self.log.error(
+        "characteristic discovery failed: \(error.localizedDescription, privacy: .public)")
+    }
     pendingServiceCount = max(0, pendingServiceCount - 1)
 
     if writeCharacteristic == nil,

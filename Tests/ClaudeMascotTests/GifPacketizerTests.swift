@@ -18,7 +18,6 @@ private struct ManifestEntry: Decodable {
   let outerChunks: Int
   let blePackets: Int
   let packetLengths: [Int]
-  let sourcePath: String
 
   enum CodingKeys: String, CodingKey {
     case gifBytes = "gif_bytes"
@@ -26,7 +25,6 @@ private struct ManifestEntry: Decodable {
     case outerChunks = "outer_chunks"
     case blePackets = "ble_packets"
     case packetLengths = "packet_lengths"
-    case sourcePath = "source_path"
   }
 }
 
