@@ -19,6 +19,7 @@ protocol PanelDriving {
   func upload(_ state: PanelState) async throws
 }
 
+
 /// Durations driving the state machine's `done` hold and idle escalation.
 /// Injected rather than hardcoded so tests can use durations measured in
 /// fake seconds and finish instantly.
@@ -55,16 +56,11 @@ final class PanelController: ObservableObject {
   private let timings: PanelTimings
   private let brightness: () -> Int
   private let clock: () -> TimeInterval
-  /// Called when the machine reverts `done` -> `idle` on its own, so the
-  /// caller can persist it (typically `StateStore.write(.idle)`). This is
-  /// the write side of the self-write seam; the read side (recognising the
-  /// resulting file event as our own) lives in `StateStore`.
-  private let persistRevert: (PanelState) -> Void
 
   /// The latest state requested via `handle(_:)`. What the machine is
   /// trying to show, before idle escalation or the done hold reshape it
   /// into an actual upload target.
-  private var desired: PanelState = .idle
+  private(set) var desired: PanelState = .idle
 
   /// When the current `done` began, so the hold can be timed. `nil` unless
   /// `desired == .done`.
@@ -86,21 +82,19 @@ final class PanelController: ObservableObject {
     panel: any PanelDriving,
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
-    clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
-    persistRevert: @escaping (PanelState) -> Void = { _ in }
+    clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }
   ) {
     self.panel = panel
     self.timings = timings
     self.brightness = brightness
     self.clock = clock
-    self.persistRevert = persistRevert
     self.idleSince = clock()
     self.bootAt = timings.startingHold > 0 ? clock() : nil
   }
 
-  /// Records a newly requested state (from `StateStore`, directly or via a
-  /// hook-driven file change). Pure bookkeeping — no I/O happens here;
-  /// `tick()` is what actually drives the panel.
+  /// Records a newly requested state (from hooks via `HookServer`). Pure
+  /// bookkeeping — no I/O happens here; `tick()` is what actually drives
+  /// the panel.
   func handle(_ newState: PanelState) {
     let now = clock()
 
@@ -140,7 +134,6 @@ final class PanelController: ObservableObject {
       desired = .idle
       self.doneEnteredAt = nil
       idleSince = now
-      persistRevert(.idle)
     }
 
     if let nextRetryAt, now < nextRetryAt {

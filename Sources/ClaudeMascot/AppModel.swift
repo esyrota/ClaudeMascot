@@ -1,28 +1,28 @@
 import Combine
 import Foundation
 
-/// Owns the four pieces (`Settings`, `StateStore`, `BLEClient`,
-/// `AnimationLibrary`) plus the `PanelController`/`PanelAdapter` that tie
-/// them together, and is the only place any of that wiring happens:
+/// Owns the pieces (`Settings`, `BLEClient`, `AnimationLibrary`) plus the
+/// `PanelController`/`PanelAdapter` that tie them together, and is the only
+/// place any of that wiring happens:
 ///
-/// - forwards `StateStore.$state` into `PanelController.handle(_:)`, then
-///   `tick()`, so a state-file change is reflected as soon as possible
 /// - drives `PanelController.tick()` from a repeating timer **owned here**
 ///   (never inside `PanelController`, which is deliberately timer-free so
 ///   it stays unit-testable with a fake clock)
-/// - wires `PanelController`'s `persistRevert` to `StateStore.write(_:)`
 /// - implements the `enabled` master switch: off stops the BLE client and
 ///   ignores state changes; on starts it and re-applies the current state
 /// - applies live-tunable settings (brightness, animation folder) as they
 ///   change; idle timings are baked into `PanelController`'s timings once,
 ///   at launch, since `PanelController` treats them as immutable
+/// - surfaces the panel's current state (set by `HookServer` in chunk 4)
 @MainActor
 final class AppModel: ObservableObject {
   /// Master switch mirrored by the menu bar's "Enabled" toggle.
   @Published var enabled: Bool = true
+  /// The panel's current state as driven by hooks (initially idle, updated by
+  /// `HookServer` once wired in chunk 4).
+  @Published private(set) var currentState: PanelState = .idle
 
   let settings: AppSettings
-  let stateStore: StateStore
   let bleClient: BLEClient
   let animationLibrary: AnimationLibrary
   let panelController: PanelController
@@ -36,13 +36,11 @@ final class AppModel: ObservableObject {
 
   init(
     settings: AppSettings = AppSettings(),
-    stateStore: StateStore = StateStore(),
     bleClient: BLEClient = BLEClient(),
     animationLibrary: AnimationLibrary = AnimationLibrary(),
     tickInterval: Duration = .seconds(1)
   ) {
     self.settings = settings
-    self.stateStore = stateStore
     self.bleClient = bleClient
     self.animationLibrary = animationLibrary
     self.tickInterval = tickInterval
@@ -61,20 +59,10 @@ final class AppModel: ObservableObject {
         // the boot animation plays exactly once before handing off.
         startingHold: 1.48
       ),
-      brightness: { settings.brightness },
-      persistRevert: { [stateStore] state in stateStore.write(state) }
+      brightness: { settings.brightness }
     )
 
     self.enabled = settings.autoConnect
-
-    // Drive the machine from state-file changes, but only while enabled.
-    stateStore.$state
-      .sink { [weak self] state in
-        guard let self, self.enabled else { return }
-        self.panelController.handle(state)
-        Task { await self.panelController.tick() }
-      }
-      .store(in: &cancellables)
 
     // React to the master switch.
     $enabled
@@ -86,11 +74,7 @@ final class AppModel: ObservableObject {
       .store(in: &cancellables)
 
     // Forward child ObservableObject changes so views only need to observe
-    // `AppModel` itself (status text depends on both `stateStore.state`
-    // and `bleClient.state`).
-    stateStore.objectWillChange
-      .sink { [weak self] in self?.objectWillChange.send() }
-      .store(in: &cancellables)
+    // `AppModel` itself (status text depends on `bleClient.state`).
     bleClient.objectWillChange
       .sink { [weak self] in self?.objectWillChange.send() }
       .store(in: &cancellables)
@@ -107,7 +91,7 @@ final class AppModel: ObservableObject {
   private func applyEnabledChange(_ isEnabled: Bool) {
     if isEnabled {
       bleClient.start()
-      panelController.handle(stateStore.state)
+      panelController.handle(currentState)
       Task { await panelController.tick() }
     } else {
       bleClient.stop()

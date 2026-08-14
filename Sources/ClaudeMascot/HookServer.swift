@@ -18,11 +18,11 @@ enum HookServerError: Error, Equatable {
 /// hook event, decodes a single newline-terminated `HookEvent` JSON line from
 /// it, and publishes the result.
 ///
-/// Replaces `StateStore`'s file watcher (see Plan.md, "Architecture
-/// decisions"): the plugin relay is a client of this socket rather than a
-/// writer of a shared file, so there is no self-write echo to suppress.
+/// Replaces the retired `~/.idotmatrix/state` file watcher: the plugin relay
+/// is a client of this socket rather than a writer of a shared file, so there
+/// is no self-write echo to suppress.
 ///
-/// Isolation follows `StateStore`'s convention: `@MainActor` rather than an
+/// Isolation follows this project's convention: `@MainActor` rather than an
 /// `actor`, with every `DispatchSource` scheduled on `DispatchQueue.main` so
 /// its callbacks land on the main thread and can use
 /// `MainActor.assumeIsolated` instead of hopping through a `Task`.

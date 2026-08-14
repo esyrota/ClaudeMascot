@@ -42,7 +42,7 @@ struct MenuBarView: View {
   }
 
   private var statusLine: String {
-    "\(appModel.stateStore.state.rawValue) · \(connectionDescription)"
+    "\(appModel.currentState.rawValue) · \(connectionDescription)"
   }
 
   private var connectionDescription: String {
