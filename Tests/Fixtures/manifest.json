@@ -1,0 +1,79 @@
+{
+  "idle": {
+    "gif_bytes": 1438,
+    "crc32": 824766381,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      436
+    ],
+    "source_path": "mascot/idle.gif"
+  },
+  "sleeping": {
+    "gif_bytes": 1641,
+    "crc32": 481239945,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      130
+    ],
+    "source_path": "mascot/sleeping.gif"
+  },
+  "thinking": {
+    "gif_bytes": 1531,
+    "crc32": 3167249326,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      20
+    ],
+    "source_path": "mascot/thinking.gif"
+  },
+  "working": {
+    "gif_bytes": 1611,
+    "crc32": 46302738,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      100
+    ],
+    "source_path": "mascot/working.gif"
+  },
+  "waiting": {
+    "gif_bytes": 1851,
+    "crc32": 974360225,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      340
+    ],
+    "source_path": "mascot/waiting.gif"
+  },
+  "done": {
+    "gif_bytes": 1788,
+    "crc32": 1488381759,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      277
+    ],
+    "source_path": "mascot/done.gif"
+  }
+}
