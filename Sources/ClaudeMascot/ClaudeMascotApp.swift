@@ -3,18 +3,18 @@ import SwiftUI
 
 @main
 struct ClaudeMascotApp: App {
+  @StateObject private var appModel = AppModel()
+
   var body: some Scene {
-    MenuBarExtra("Claude Mascot", systemImage: "display") {
-      VStack(spacing: 0) {
-        Button(action: {
-          NSApplication.shared.terminate(nil)
-        }) {
-          Text("Quit")
-        }
-        .keyboardShortcut("q")
-      }
-      .padding(8)
+    MenuBarExtra {
+      MenuBarView(appModel: appModel)
+    } label: {
+      MenuIcon.image
     }
     .menuBarExtraStyle(.window)
+
+    Settings {
+      SettingsView(appModel: appModel)
+    }
   }
 }
