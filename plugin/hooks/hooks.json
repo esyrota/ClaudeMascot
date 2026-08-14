@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/set-state.sh idle",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh SessionStart",
             "async": true
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/set-state.sh thinking",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh UserPromptSubmit",
             "async": true
           }
         ]
@@ -24,10 +24,23 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/set-state.sh working",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh PreToolUse",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh PostToolUse",
             "async": true
           }
         ]
@@ -38,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/set-state.sh waiting",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh Notification",
             "async": true
           }
         ]
@@ -49,7 +62,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/set-state.sh done",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh Stop",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh SubagentStop",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh PreCompact",
             "async": true
           }
         ]
@@ -60,8 +95,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/set-state.sh idle",
-            "async": true
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/relay.sh SessionEnd",
+            "async": false
           }
         ]
       }

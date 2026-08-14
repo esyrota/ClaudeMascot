@@ -26,6 +26,11 @@ struct PanelTimings: Sendable {
   var doneHold: TimeInterval = 30
   var sleepAfter: TimeInterval = 5 * 60
   var offAfter: TimeInterval = 10 * 60
+  /// How long `.starting` is shown right after launch, regardless of the
+  /// actually-desired state. `0` (the default) disables it outright, which
+  /// is what every existing test relies on to see its expected state upload
+  /// immediately rather than a boot animation first.
+  var startingHold: TimeInterval = 0
 }
 
 /// The panel state machine: `done` hold, idle escalation (`idle` ->
@@ -50,16 +55,11 @@ final class PanelController: ObservableObject {
   private let timings: PanelTimings
   private let brightness: () -> Int
   private let clock: () -> TimeInterval
-  /// Called when the machine reverts `done` -> `idle` on its own, so the
-  /// caller can persist it (typically `StateStore.write(.idle)`). This is
-  /// the write side of the self-write seam; the read side (recognising the
-  /// resulting file event as our own) lives in `StateStore`.
-  private let persistRevert: (PanelState) -> Void
 
   /// The latest state requested via `handle(_:)`. What the machine is
   /// trying to show, before idle escalation or the done hold reshape it
   /// into an actual upload target.
-  private var desired: PanelState = .idle
+  private(set) var desired: PanelState = .idle
 
   /// When the current `done` began, so the hold can be timed. `nil` unless
   /// `desired == .done`.
@@ -70,26 +70,30 @@ final class PanelController: ObservableObject {
   /// Backoff gate: `tick()` performs no new I/O attempt before this time.
   private var nextRetryAt: TimeInterval?
 
+  /// When the machine was created, i.e. when the boot animation should have
+  /// started. `nil` once `timings.startingHold` has elapsed, so `tick()`
+  /// stops paying the (harmless but pointless) clock comparison forever.
+  private var bootAt: TimeInterval?
+
   private static let retryBackoff: TimeInterval = 2
 
   init(
     panel: any PanelDriving,
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
-    clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
-    persistRevert: @escaping (PanelState) -> Void = { _ in }
+    clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }
   ) {
     self.panel = panel
     self.timings = timings
     self.brightness = brightness
     self.clock = clock
-    self.persistRevert = persistRevert
     self.idleSince = clock()
+    self.bootAt = timings.startingHold > 0 ? clock() : nil
   }
 
-  /// Records a newly requested state (from `StateStore`, directly or via a
-  /// hook-driven file change). Pure bookkeeping — no I/O happens here;
-  /// `tick()` is what actually drives the panel.
+  /// Records a newly requested state (from hooks via `HookServer`). Pure
+  /// bookkeeping — no I/O happens here; `tick()` is what actually drives
+  /// the panel.
   func handle(_ newState: PanelState) {
     let now = clock()
 
@@ -129,7 +133,6 @@ final class PanelController: ObservableObject {
       desired = .idle
       self.doneEnteredAt = nil
       idleSince = now
-      persistRevert(.idle)
     }
 
     if let nextRetryAt, now < nextRetryAt {
@@ -157,11 +160,20 @@ final class PanelController: ObservableObject {
   // MARK: - Target derivation
 
   private func shouldBeOff(now: TimeInterval) -> Bool {
+    // `.off` (SessionEnd) blanks the panel immediately; idle escalation
+    // blanks it only after sitting idle for `offAfter`.
+    if desired == .off { return true }
     guard desired == .idle, let idleSince else { return false }
     return now - idleSince >= timings.offAfter
   }
 
   private func currentTarget(now: TimeInterval) -> PanelState {
+    if let bootAt {
+      if now - bootAt < timings.startingHold {
+        return .starting
+      }
+      self.bootAt = nil
+    }
     if desired == .idle, let idleSince, now - idleSince >= timings.sleepAfter {
       return .sleeping
     }

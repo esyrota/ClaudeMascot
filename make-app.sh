@@ -46,6 +46,32 @@ if [ "$ANIM_COUNT" -lt 6 ]; then
 fi
 echo "  $ANIM_COUNT animations bundled"
 
+# Copy the Claude Code plugin INTO the bundle. The plugin payload must be signed
+# with the app, so it is copied before codesign rather than installed separately.
+echo "Copying plugin..."
+mkdir -p "$APP_RESOURCES/ClaudeCodePlugin/.claude-plugin"
+cp "packaging/marketplace.json" "$APP_RESOURCES/ClaudeCodePlugin/.claude-plugin/marketplace.json"
+cp -R "plugin" "$APP_RESOURCES/ClaudeCodePlugin/plugin"
+
+# Verify the plugin payload landed and the relay is executable
+if [ ! -f "$APP_RESOURCES/ClaudeCodePlugin/.claude-plugin/marketplace.json" ]; then
+  echo "ERROR: marketplace manifest not bundled" >&2
+  exit 1
+fi
+if [ ! -f "$APP_RESOURCES/ClaudeCodePlugin/plugin/.claude-plugin/plugin.json" ]; then
+  echo "ERROR: plugin manifest not bundled" >&2
+  exit 1
+fi
+if [ ! -f "$APP_RESOURCES/ClaudeCodePlugin/plugin/hooks/hooks.json" ]; then
+  echo "ERROR: hooks manifest not bundled" >&2
+  exit 1
+fi
+if [ ! -x "$APP_RESOURCES/ClaudeCodePlugin/plugin/hooks/relay.sh" ]; then
+  echo "ERROR: relay hook not executable in bundle" >&2
+  exit 1
+fi
+echo "  plugin payload bundled"
+
 # Ad-hoc sign the app
 echo "Code signing..."
 codesign --force --deep --sign - "$APP_BUNDLE"

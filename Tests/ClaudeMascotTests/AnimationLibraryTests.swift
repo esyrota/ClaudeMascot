@@ -25,7 +25,7 @@ final class AnimationLibraryTests: XCTestCase {
 
   @MainActor
   func testBundledFallbackResolvesForAllStates() throws {
-    // Create a mock bundled directory with all six states
+    // Create a mock bundled directory with all states
     let tmpID = UUID().uuidString
     let bundledDir = FileManager.default.temporaryDirectory
       .appendingPathComponent(tmpID)
@@ -54,7 +54,7 @@ final class AnimationLibraryTests: XCTestCase {
     let mockBundle = Bundle(path: bundledDir.path)
     library.bundleOverride = mockBundle
 
-    // All six states should resolve
+    // All states should resolve
     for state in PanelState.allCases {
       let url = library.url(for: state)
       XCTAssertNotNil(url, "Should find animation for state: \(state.rawValue)")

@@ -6,41 +6,63 @@ conversation is doing: thinking, running tools, waiting on you, finished.
 **Device:** `IDM-E618C5` — CoreBluetooth UUID `95FFE74B-E5D9-125E-E136-8D25E959FA39`
 (per-host identifier, not a MAC; a different machine sees a different one).
 
-## Where things are going
+## How it fits together
 
-Today this runs as a Python daemon launched through Terminal.app, which litters the
-desktop with Terminal windows. That is a workaround for a macOS permission rule, not
-a design choice — see [[macOS Bluetooth TCC]]. The fix is a real app bundle.
+A native menu bar app owns the hardware and all the decisions; a Claude Code plugin
+forwards raw lifecycle events to it over a Unix domain socket and interprets nothing.
 
-- [[Menu Bar App]] — the target: a native Swift menu bar app that owns the hardware
-- [[Claude Code Plugin]] — the six lifecycle hooks, packaged installably
-- [[BLE Protocol]] — what has to be ported from the Python library
-- [[Art Pipeline]] — the Python tooling that authors the animations (stays as-is)
+```
+claude ──hooks──> relay.sh ──socket──> ClaudeMascot.app ──BLE──> panel
+```
+
+- [[Menu Bar App]] — the app: BLE, animations, state machine, first-run install
+- [[Claude Code Plugin]] — the relay: nine events, four fields, zero policy
+- [[BLE Protocol]] — the packet framing, pinned byte-for-byte by golden fixtures
+- [[Art Pipeline]] — the Python tooling that authors the animations (build-time only)
+
+The split is forced by a permission rule, not taste: only an app bundle can hold
+Bluetooth permission — see [[macOS Bluetooth TCC]].
+
+**Policy lives entirely in the app.** The plugin never learns what an event *means*, so
+changing animations or state mappings never requires touching or reinstalling it.
 
 ## Hard-won facts
 
-Read these before changing anything visual or touching Bluetooth. Each one cost a
-wrong diagnosis to find.
+Read these before changing anything visual, touching Bluetooth, or editing the relay.
+Each one cost a wrong diagnosis to find.
 
 - [[macOS Bluetooth TCC]] — why a plain script cannot use Bluetooth here
 - [[Panel Quirks]] — colour and palette behaviour that is not documented anywhere
 - [[Library Quirks]] — sharp edges in `markusressel/idotmatrix-api-client`
+- [[Hook Relay Quirks]] — shell and socket traps that produce working-looking bugs
 
 ## Current state
 
 | Piece | Location | Status |
 |---|---|---|
-| Art generator | `art/generate.py` | working, 6 states |
+| Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer |
+| Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
+| Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
+| Art generator | `art/generate.py` | working, 8 states |
 | GIF importer | `art/import_gif.py` | working |
-| Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol for the Swift port |
-| Menu bar app | `~/work/ClaudeMascot` | **built, all gates green, awaiting hardware test** |
-| Plugin | `plugin/` | built, awaiting a Claude Code restart to verify |
-| Python daemon | `legacy/` | **retired and non-functional** — it imported the `idotmatrix` library, which is gone with the old checkout |
+| Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol |
+| Python daemon | `legacy/` | **retired and non-functional** |
 | Colour test card | `art/testcard.py` | diagnostic, keep |
 
-Everything now lives in this one repository; the `idotmatrix-api-client` checkout it grew
-out of has been removed. The protocol survived the move: `art/export_golden.py` carries a
-self-contained port of the packet framing, and `Tests/Fixtures/` pins it byte-for-byte.
+Installation is now a single step: build and run the app. It offers to install the
+plugin on first launch, and the repo is no longer a marketplace.
 
-Build state as of 2026-08-14: see
-[[Analysis]] in `_logs/2026-08-14. Native Mascot Menu Bar App/`.
+## Log
+
+- `_logs/2026-08-14. Native Mascot Menu Bar App/` — the Python → Swift port
+- `_logs/2026-08-15. App Plugin Interaction/` — state file → socket relay, first-run
+  installer, plugin bundled into the app. See its [[Analysis]] for what the run cost.
+
+## Deferred
+
+- `_tasks/Debounce short tool calls.md` — suppress sub-1s tool calls so `PostToolUse`
+  cannot make the panel flicker; also fixes event ordering as a side effect.
+- Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
+  change — only artwork and a policy edit.
+- `PluginInstaller.outcome` resets each launch, so Options reports "Plugin not
+  installed" until the user interacts with it. Cosmetic but misleading.

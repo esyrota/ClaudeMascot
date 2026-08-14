@@ -64,15 +64,13 @@ private final class MockPanel: PanelDriving {
 private func makeController(
   panel: MockPanel,
   timings: PanelTimings = PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600),
-  clock: FakeClock,
-  persistRevert: @escaping (PanelState) -> Void = { _ in }
+  clock: FakeClock
 ) -> PanelController {
   PanelController(
     panel: panel,
     timings: timings,
     brightness: { 40 },
-    clock: { clock() },
-    persistRevert: persistRevert
+    clock: { clock() }
   )
 }
 
@@ -80,8 +78,7 @@ private func makeController(
 func doneHoldsThenRevertsToIdle() async {
   let clock = FakeClock()
   let panel = MockPanel()
-  var reverted: [PanelState] = []
-  let controller = makeController(panel: panel, clock: clock) { reverted.append($0) }
+  let controller = makeController(panel: panel, clock: clock)
 
   await controller.tick()  // initial idle upload
   controller.handle(.done)
@@ -91,20 +88,17 @@ func doneHoldsThenRevertsToIdle() async {
   clock.advance(29)
   await controller.tick()
   #expect(controller.displayed == .done)
-  #expect(reverted.isEmpty)
 
   clock.advance(1)  // total 30s: hold expires
   await controller.tick()
   #expect(controller.displayed == .idle)
-  #expect(reverted == [.idle])
 }
 
 @Test @MainActor
 func newStateDuringDoneHoldPreemptsIt() async {
   let clock = FakeClock()
   let panel = MockPanel()
-  var reverted: [PanelState] = []
-  let controller = makeController(panel: panel, clock: clock) { reverted.append($0) }
+  let controller = makeController(panel: panel, clock: clock)
 
   await controller.tick()
   controller.handle(.done)
@@ -116,7 +110,6 @@ func newStateDuringDoneHoldPreemptsIt() async {
   await controller.tick()
 
   #expect(controller.displayed == .working)
-  #expect(reverted.isEmpty)  // pre-empted, not a hold expiry
 
   // The pre-empted hold must not resurface later.
   clock.advance(30)
@@ -191,30 +184,6 @@ func repeatedExternalStateDoesNotReupload() async {
 }
 
 @Test @MainActor
-func selfWriteEchoDoesNotRetrigger() async {
-  let clock = FakeClock()
-  let panel = MockPanel()
-  let controller = makeController(panel: panel, clock: clock)
-
-  await controller.tick()
-  controller.handle(.done)
-  await controller.tick()
-  clock.advance(30)
-  await controller.tick()  // triggers the done -> idle self-revert
-  #expect(controller.displayed == .idle)
-
-  let uploadsBeforeEcho = panel.uploadCount
-
-  // Simulate StateStore forwarding the watch event provoked by the
-  // controller's own `idle` write (the seam described in Plan.md).
-  controller.handle(.idle)
-  await controller.tick()
-
-  #expect(panel.uploadCount == uploadsBeforeEcho)
-  #expect(controller.displayed == .idle)
-}
-
-@Test @MainActor
 func failedUploadRetriesAfterBackoffWithoutWedging() async {
   let clock = FakeClock()
   let panel = MockPanel()
@@ -234,4 +203,78 @@ func failedUploadRetriesAfterBackoffWithoutWedging() async {
   await controller.tick()  // retries and succeeds
   #expect(controller.displayed == .working)
   #expect(panel.uploadCount == 2)
+}
+
+@Test @MainActor
+func startingHoldShowsBootAnimationThenHandsOffToDesiredState() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600, startingHold: 5),
+    clock: clock
+  )
+
+  // A state can already be known (e.g. from the state file) before boot
+  // finishes; it must not pre-empt the boot animation.
+  controller.handle(.working)
+  await controller.tick()
+  #expect(controller.displayed == .starting)
+
+  clock.advance(4)
+  await controller.tick()
+  #expect(controller.displayed == .starting)  // still within the hold
+
+  clock.advance(1)  // total 5s: hold expires
+  await controller.tick()
+  #expect(controller.displayed == .working)
+}
+
+@Test @MainActor
+func offPowersDownImmediatelyWithoutWaitingForIdleEscalation() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  await controller.tick()  // initial idle upload
+  controller.handle(.working)
+  await controller.tick()
+  #expect(controller.displayed == .working)
+
+  // SessionEnd, mid-session -- must not wait out the 600s offAfter.
+  controller.handle(.off)
+  await controller.tick()
+
+  #expect(controller.isPanelOff == true)
+  #expect(panel.calls.last == .setPower(false))
+  // Never resolves or uploads an asset for `.off`.
+  #expect(panel.calls.contains(.upload(.off)) == false)
+}
+
+@Test @MainActor
+func newStateAfterOffWakesThePanel() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  controller.handle(.off)
+  await controller.tick()
+  #expect(controller.isPanelOff == true)
+
+  controller.handle(.idle)
+  await controller.tick()
+
+  #expect(controller.isPanelOff == false)
+  #expect(controller.displayed == .idle)
+}
+
+@Test @MainActor
+func zeroStartingHoldSkipsBootAnimation() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  await controller.tick()
+  #expect(controller.displayed == .idle)
+  #expect(panel.calls == [.upload(.idle)])
 }

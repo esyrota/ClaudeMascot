@@ -8,6 +8,8 @@ struct SettingsView: View {
   @ObservedObject var appModel: AppModel
   @ObservedObject var settings: AppSettings
 
+  @State private var isBusy: Bool = false
+
   init(appModel: AppModel) {
     self.appModel = appModel
     self.settings = appModel.settings
@@ -88,9 +90,60 @@ struct SettingsView: View {
           }
         }
       }
+
+      Section("Plugin") {
+        HStack {
+          Text(pluginStatusText)
+            .foregroundStyle(pluginStatusColor)
+
+          Spacer()
+
+          if isBusy {
+            ProgressView()
+              .controlSize(.small)
+          }
+
+          Button("Uninstall Plugin") {
+            uninstallPlugin()
+          }
+          .disabled(isBusy)
+        }
+
+        if appModel.pluginInstaller.needsReregistration() {
+          HStack {
+            Text("Claude Mascot has moved since the plugin was installed.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button("Re-register") {
+              reregisterPlugin()
+            }
+            .disabled(isBusy)
+          }
+        }
+      }
     }
     .padding(20)
     .frame(width: 420)
+  }
+
+  private var pluginStatusText: String {
+    switch appModel.pluginInstaller.outcome {
+    case .notInstalled: return "Plugin not installed"
+    case .installed: return "Plugin installed"
+    case .claudeNotFound: return "claude CLI not found"
+    case .failed(let step, _): return "Failed at \(step)"
+    }
+  }
+
+  private var pluginStatusColor: Color {
+    switch appModel.pluginInstaller.outcome {
+    case .notInstalled: return .secondary
+    case .installed: return .green
+    case .claudeNotFound, .failed: return .red
+    }
   }
 
   private func chooseAnimationFolder() {
@@ -115,5 +168,21 @@ struct SettingsView: View {
     guard appModel.enabled else { return }
     appModel.bleClient.stop()
     appModel.bleClient.start()
+  }
+
+  private func uninstallPlugin() {
+    isBusy = true
+    Task {
+      await appModel.pluginInstaller.uninstall()
+      isBusy = false
+    }
+  }
+
+  private func reregisterPlugin() {
+    isBusy = true
+    Task {
+      await appModel.pluginInstaller.install()
+      isBusy = false
+    }
   }
 }
