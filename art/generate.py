@@ -47,6 +47,13 @@ MASCOT = (255, 68, 4)
 # deepened the only way the hardware allows, by pulling green and blue down with red
 # still pinned at 255. It reads as a deeper red-orange rather than a true shadow.
 MASCOT_DARK = (255, 24, 0)
+# A second, much softer shade, for art whose own shading is subtle. appear.gif's
+# shade is a genuine dark side -- its source drops from 246-255 down to 111-123, so
+# MASCOT_DARK's big step is faithful. The sweep's is a 15% step (216,112,80 ->
+# 184,104,72), and sending that to MASCOT_DARK turned a gentle roll of the body into
+# a hard two-tone band. This sits about a third of the way down instead. Same rule as
+# ever: red stays pinned at 255, or the panel renders it blue-violet.
+MASCOT_SHADE = (255, 50, 2)
 EYE = (0, 0, 0)
 BG = (0, 0, 0)
 # Props are kept at full value for the same reason.
@@ -252,11 +259,13 @@ def sleeping():
 # The hand-drawn states
 # --------------------------------------------------------------------------
 
-def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 0)) -> list:
+def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 0),
+             repair=None) -> list:
     """
     Read a hand-drawn GIF frame by frame and repaint it for the panel.
 
-    `recolour(rgb) -> rgb` maps the source palette onto the panel's.
+    `recolour(rgb) -> rgb` maps the source palette onto the panel's, and the optional
+    `repair(index, image)` gets to fix the resampled frame first.
 
     `native` is the art's own pixel-art resolution, which is not always the file's:
     a 200x200 export of 19x19 art is resampled back to 19x19 by taking one pixel per
@@ -265,7 +274,9 @@ def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 
 
     `scale` then blows each native pixel up to a whole number of panel pixels and
     `at` places the result, so imported art can be landed exactly on the geometry the
-    drawn states use. Anything falling outside the panel is cropped.
+    drawn states use. Anything falling outside the panel is cropped. `at` is either a
+    fixed (dx, dy) or a callable taking the resampled frame, which lets the crop
+    follow the figure instead of standing still -- see `working_at()`.
 
     There is no frame subsampling: the source durations are the animation.
     (`art/import_gif.py` subsamples, crops to a power-of-two window and flattens to a
@@ -277,7 +288,6 @@ def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 
     im = Image.open(src)
     if im.size[0] != im.size[1]:
         raise SystemExit(f"{src.name}: expected a square canvas, got {im.size[0]}x{im.size[1]}")
-    dx, dy = at
 
     out = []
     for index in range(im.n_frames):
@@ -288,7 +298,11 @@ def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 
         # Flattening the transparency onto black is all that is left to do.
         flat = Image.alpha_composite(Image.new("RGBA", im.size, (0, 0, 0, 255)),
                                      im.convert("RGBA")).convert("RGB")
-        source = flat.resize((native, native), Image.NEAREST).load()
+        small = flat.resize((native, native), Image.NEAREST)
+        if repair is not None:
+            repair(index, small)
+        source = small.load()
+        dx, dy = at(source, native) if callable(at) else at
         dst_im = frame()
         dst = dst_im.load()
         for y in range(native):
@@ -338,33 +352,83 @@ def appear():
 # what WORKING_AT places. Importing it at 1:1 instead would put a half-size mascot on
 # the panel, and cutting to it from any other state would visibly shrink the figure.
 #
-# The one cost of 2x: at that size the sweep wants 38 columns and the panel has 32, so
-# WORKING_AT's -4 is a compromise struck on the horizontal. It puts the crouched,
-# sweeping frames -- five sixths of the animation -- fully on the panel with the whole
-# broom legible, and pays for it in the standing frames at either end, where the figure
-# sits flush left and 2px of its left arm run off the edge. Pulling that back to -2
-# makes every frame's silhouette pixel-identical to idle.gif but clips the top of the
-# broom, leaving a 4px smudge in the corner where the prop should be.
+# The one cost of 2x is horizontal: at that size the sweep wants 38 columns and the
+# panel has 32. No fixed offset fits both the figure and its broom, so `working_at()`
+# tracks the figure instead -- see there.
 WORKING_SRC = SOURCES / "claude-claude-code-1.gif"
-WORKING_NATIVE, WORKING_SCALE, WORKING_AT = 19, 2, (-4, 2)
+WORKING_NATIVE, WORKING_SCALE = 19, 2
+WORKING_BODY, WORKING_SHADE_SRC, WORKING_PAPER = (216, 112, 80), (184, 104, 72), (0, 0, 0)
 WORKING_PALETTE = {
-    (0, 0, 0): BG,                  # background, and the eyes
-    (216, 112, 80): MASCOT,
-    (184, 104, 72): MASCOT_DARK,    # the drawn shading down one side
+    WORKING_PAPER: BG,              # background, and the eyes
+    WORKING_BODY: MASCOT,
+    WORKING_SHADE_SRC: MASCOT_SHADE,  # the drawn shading down one side
     (136, 136, 136): PROP,          # the broom
 }
+
+# The source's standing frames are redrawn rather than held, and two of those wobbles
+# stop reading as life and start reading as damage once they are doubled onto a 32px
+# panel: frames 1-4 widen the mascot's LEFT eye to two cells while the right stays at
+# one, and frames 1-4 and 32-33 draw the legs a cell short, filling the row where the
+# four gaps belong. Both are repaired against frame 0 -- the same pose, drawn right.
+#
+# Each entry names the cells on the 19x19 grid, the colour they must currently hold,
+# and the colour to paint. Checking the current colour means a changed source fails
+# the build loudly instead of being silently mispainted somewhere else.
+WORKING_REPAIRS = [
+    ((1, 2, 3, 4), ((5, 10),), WORKING_PAPER, WORKING_BODY),
+    ((1, 2, 3, 4, 32, 33), ((4, 13), (6, 13), (7, 13), (9, 13)),
+     WORKING_BODY, WORKING_PAPER),
+]
+
+
+def working_class(rgb):
+    """Snap a source pixel to the panel palette, nearest colour wins.
+
+    A handful of anti-aliased pixels from the 200x200 export survive on cell
+    boundaries; this puts each back on the side it came from.
+    """
+    return min(WORKING_PALETTE.items(),
+               key=lambda kv: sum((a - b) ** 2 for a, b in zip(rgb, kv[0])))[1]
+
+
+def working_repair(index, im) -> None:
+    """Fix the source's two standing-frame wobbles -- see WORKING_REPAIRS."""
+    px = im.load()
+    for frames, cells, expect, paint in WORKING_REPAIRS:
+        if index not in frames:
+            continue
+        for x, y in cells:
+            if working_class(px[x, y]) != working_class(expect):
+                raise SystemExit(
+                    f"{WORKING_SRC.name} frame {index}: cell ({x},{y}) holds "
+                    f"{px[x, y]}, expected {expect} -- the art changed, recheck "
+                    f"WORKING_REPAIRS")
+            px[x, y] = paint
+
+
+def working_at(source, native):
+    """
+    Pin the mascot's left edge to the panel's, frame by frame.
+
+    Doubled, the sweep spans 38 columns against the panel's 32, so a single fixed
+    offset always gives something up: centring the figure clips the broom down to a
+    smudge, and pushing the broom on clips the figure's own left arm while it stands.
+    Tracking the figure costs neither. Its left edge only ever takes two values -- it
+    steps right as it crouches -- so this is one 4px pan twice a loop, both times
+    inside a pose change big enough to hide it. In exchange every silhouette is whole
+    and the broom is fully on the panel through the entire sweep; the only thing still
+    cropped is the tip of the handle in the three frames where it is in mid-air.
+    """
+    body = {MASCOT, MASCOT_SHADE}
+    left = min(x for y in range(native) for x in range(native)
+               if working_class(source[x, y]) in body)
+    return (-WORKING_SCALE * left, 2)
 
 
 def sweep():
     """Working: the mascot sweeps the floor with a broom while Claude works."""
-    def recolour(rgb):
-        # A handful of anti-aliased pixels from the 200x200 export survive on cell
-        # boundaries; nearest-colour snaps each back to the side it came from.
-        return min(WORKING_PALETTE.items(),
-                   key=lambda kv: sum((a - b) ** 2 for a, b in zip(rgb, kv[0])))[1]
-
-    return imported(WORKING_SRC, recolour, native=WORKING_NATIVE,
-                    scale=WORKING_SCALE, at=WORKING_AT)
+    return imported(WORKING_SRC, working_class, native=WORKING_NATIVE,
+                    scale=WORKING_SCALE, at=working_at, repair=working_repair)
 
 
 def off():
