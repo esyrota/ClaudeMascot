@@ -1,0 +1,126 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "text": "# Settings window wireframes\n\nThree layout alternatives for the cleaned-up Settings window (Launch at login, Auto-connect, Brightness, Sleep after, Panel off after, Device, Plugin — animation folder removed). See Task.md in this folder for the decisions these must satisfy.",
+      "x": -200,
+      "y": -260,
+      "width": 1400,
+      "height": 120
+    },
+
+    {
+      "id": "img-a",
+      "type": "file",
+      "file": "_logs/2026-08-16. Settings Window Cleanup/wireframe-a.svg",
+      "x": -200,
+      "y": -100,
+      "width": 500,
+      "height": 522
+    },
+    {
+      "id": "label-a",
+      "type": "text",
+      "text": "## A — Single grouped Form",
+      "x": -200,
+      "y": -140,
+      "width": 500,
+      "height": 30
+    },
+    {
+      "id": "rationale-a",
+      "type": "text",
+      "text": "**Layout:** `Form { }.formStyle(.grouped)`, one scroll pane, four sections (General / Panel / Device / Plugin) as native rounded LabeledContent groups. Window widened to 500pt so no button title truncates.\n\n**Why this is a real alternative:** it is the most direct native mapping of the current section list — nothing is regrouped or hidden behind navigation. The whole state of the app (toggles, panel timings, device, plugin) is visible in one glance and one scroll.\n\n**Trade-offs:** four stacked boxes make for a tall window (~520pt) that will need scrolling on smaller displays once notifications or a future setting are added. The Device and Plugin sections, which are the ones a user actually *acts on* (Rescan, Install), are pushed to the bottom, below settings that are set once and forgotten.\n\n**Best if:** the app wants Settings to read like a single flat preference sheet — closest to what SettingsView.swift already does today, just corrected (no folder picker, no raw UUID, probed plugin state) and native-chrome'd.",
+      "x": -700,
+      "y": -100,
+      "width": 460,
+      "height": 620
+    },
+
+    {
+      "id": "img-b",
+      "type": "file",
+      "file": "_logs/2026-08-16. Settings Window Cleanup/wireframe-b.svg",
+      "x": 380,
+      "y": -100,
+      "width": 460,
+      "height": 260
+    },
+    {
+      "id": "label-b",
+      "type": "text",
+      "text": "## B — Tabbed panes (System Settings style)",
+      "x": 380,
+      "y": -140,
+      "width": 460,
+      "height": 30
+    },
+    {
+      "id": "rationale-b",
+      "type": "text",
+      "text": "**Layout:** `TabView` with toolbar-style tabs — General | Panel | Plugin — mirroring how macOS System Settings itself paginates. Shown here on the Panel tab, which also folds the Device status row into it (idle timings and the physical panel's connection live together, since both are about \"the panel\" as a thing).\n\n**Why this is a real alternative:** it is the only one of the three that does not put every control in view at once — each tab is short, so the window can stay compact (~460×300) regardless of tab. It reads as more \"of a piece\" with native macOS preference windows generally.\n\n**Trade-offs:** three tabs for roughly nine total controls is arguably over-partitioning — a user has to click to find Plugin status, whereas in A/C it's one scroll away. Folding Device into the Panel tab is a judgment call: it saves a tab, but a device row logically belongs with connection status, not brightness/timing.\n\n**Best if:** this Settings window is expected to grow (more panel options, more plugin config) and tabs are wanted as headroom now, before it's needed.",
+      "x": 880,
+      "y": -100,
+      "width": 460,
+      "height": 560
+    },
+
+    {
+      "id": "img-c",
+      "type": "file",
+      "file": "_logs/2026-08-16. Settings Window Cleanup/wireframe-c.svg",
+      "x": 1400,
+      "y": -100,
+      "width": 480,
+      "height": 418
+    },
+    {
+      "id": "label-c",
+      "type": "text",
+      "text": "## C — Merged sections, status rows with indicator dots",
+      "x": 1400,
+      "y": -140,
+      "width": 480,
+      "height": 30
+    },
+    {
+      "id": "rationale-c",
+      "type": "text",
+      "text": "**Layout:** two boxed sections instead of four. \"Preferences\" merges General + Panel (login, auto-connect, brightness, sleep, panel-off — everything that's a knob you set and forget). \"Status\" merges Device + Plugin as compact rows: a small coloured dot, a bold title (\"Device\" / \"Plugin\"), a secondary caption line (\"Not connected\" / \"Plugin not installed\"), and the action button — closer to how Bluetooth/AirDrop status rows read in real System Settings panes.\n\n**Why this is a real alternative:** it draws the line differently — not by original section identity (A) and not by navigation (B), but by *kind*: things you configure vs. things that report live state. That distinction is genuinely useful here, since Device and Plugin are the two rows whose text changes at runtime while Preferences is static.\n\n**Trade-offs:** the dot-plus-caption idiom needs a second line per row, so \"Status\" is not much shorter than A's separate Device+Plugin boxes were — the win is conceptual grouping and one fewer section header, not vertical space. Window is a middle ground at 480pt.\n\n**Best if:** the goal is to visually separate \"set it once\" settings from \"is it working right now\" state, which is arguably the more honest grouping of what's actually in this window.",
+      "x": 1900,
+      "y": -100,
+      "width": 480,
+      "height": 620
+    },
+
+    {
+      "id": "specs",
+      "type": "text",
+      "text": "## Specs referenced\n\n- [[Menu Bar App]] — \"Settings window\" section lists the knobs (Launch at login, Auto-connect, Brightness, Device, Idle timings, Plugin) and is the section that needs editing once the animation folder line is deleted from both the doc and the code.\n- [[Claude Code Plugin]] — backs the Plugin section's install/uninstall/re-register behaviour and the `installed_plugins.json` probe described in Task.md.\n- `Docs/_logs/2026-08-16. Settings Window Cleanup/Task.md` — the decisions all three alternatives must obey (no folder picker, probed plugin status, connection text not UUID, native chrome).",
+      "x": -200,
+      "y": 480,
+      "width": 700,
+      "height": 220
+    },
+
+    {
+      "id": "recommendation",
+      "type": "text",
+      "text": "## Recommendation\n\n**A — single grouped Form.**\n\nIt is the smallest deviation from the current SettingsView.swift structure (same four sections, same order), which keeps the diff for this cleanup focused on what Task.md actually asked for — deleting the folder section, probing plugin state, and showing connection instead of UUID — rather than also re-architecting the window's information design. B's tabs solve a scale problem (\"too many controls to see at once\") that a nine-control window doesn't have yet; introducing navigation now is speculative complexity. C's merged status rows are a genuinely nice idiom but cost a second text line per row for a section that's already short — a win that matters more once there's a third status row (there isn't).\n\nIf the window is expected to grow substantially (more plugin config, more panel behaviour), revisit B then — the tab affordance earns its keep at that point, not before.",
+      "x": -200,
+      "y": 760,
+      "width": 1200,
+      "height": 240
+    }
+  ],
+  "edges": [
+    { "id": "e-a-1", "fromNode": "img-a", "fromSide": "left", "toNode": "rationale-a", "toSide": "right" },
+    { "id": "e-b-1", "fromNode": "img-b", "fromSide": "right", "toNode": "rationale-b", "toSide": "left" },
+    { "id": "e-c-1", "fromNode": "img-c", "fromSide": "right", "toNode": "rationale-c", "toSide": "left" },
+    { "id": "e-spec-a", "fromNode": "specs", "fromSide": "top", "toNode": "rationale-a", "toSide": "bottom" },
+    { "id": "e-spec-b", "fromNode": "specs", "fromSide": "top", "toNode": "rationale-b", "toSide": "bottom" },
+    { "id": "e-spec-c", "fromNode": "specs", "fromSide": "top", "toNode": "rationale-c", "toSide": "bottom" },
+    { "id": "e-rec", "fromNode": "specs", "fromSide": "bottom", "toNode": "recommendation", "toSide": "top" }
+  ]
+}
