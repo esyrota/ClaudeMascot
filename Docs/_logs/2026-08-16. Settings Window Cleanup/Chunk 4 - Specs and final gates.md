@@ -3,6 +3,10 @@ model: 'Haiku'
 estimated_time: 8
 estimated_tools: 14
 estimated_tokens: 30000
+actual_tokens: 35401
+actual_tools: 13
+actual_time: 1.4
+outcome: 'success'
 estimated_risk: 'low'
 ---
 
