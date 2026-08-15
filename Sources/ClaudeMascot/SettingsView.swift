@@ -9,6 +9,13 @@ struct SettingsView: View {
 
   @State private var isBusy: Bool = false
 
+  /// Minute options for "Dim the panel", in menu order. `1` is the only
+  /// value that reads singular ("For 1 minute").
+  private static let dimOptions: [Int] = [1, 2, 3, 5, 10, 20, 30, 45, 60]
+
+  /// Minute options for "Turn the panel off", in menu order.
+  private static let offOptions: [Int] = [5, 10, 20, 30, 45, 60, 90, 120]
+
   init(appModel: AppModel) {
     self.appModel = appModel
     self.settings = appModel.settings
@@ -16,18 +23,20 @@ struct SettingsView: View {
 
   var body: some View {
     Form {
-      Section("General") {
+      Section {
         Toggle(
-          "Launch at login",
+          "Launch Claude Mascot at login",
           isOn: Binding(
             get: { settings.launchAtLogin },
             set: { settings.launchAtLogin = $0 }
           ))
-        Toggle("Auto-connect", isOn: $settings.autoConnect)
+        Toggle("Connect to the panel automatically", isOn: $settings.autoConnect)
+      } header: {
+        sectionHeader("General")
       }
 
-      Section("Panel") {
-        LabeledContent("Brightness") {
+      Section {
+        LabeledContent("Panel brightness") {
           HStack {
             Slider(
               value: Binding(
@@ -40,26 +49,40 @@ struct SettingsView: View {
           }
         }
 
-        LabeledContent("Sleep after") {
-          Stepper(
-            "\(settings.sleepAfterMinutes) min", value: $settings.sleepAfterMinutes, in: 1...60)
+        LabeledContent("Dim the panel when inactive") {
+          Picker("", selection: $settings.sleepAfterMinutes) {
+            ForEach(Self.dimOptions, id: \.self) { minutes in
+              Text(pickerLabel(minutes)).tag(minutes)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
         }
 
-        LabeledContent("Panel off after") {
-          Stepper(
-            "\(settings.offAfterMinutes) min", value: $settings.offAfterMinutes, in: 1...120)
+        LabeledContent("Turn the panel off when inactive") {
+          Picker("", selection: $settings.offAfterMinutes) {
+            ForEach(Self.offOptions, id: \.self) { minutes in
+              Text(pickerLabel(minutes)).tag(minutes)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
         }
+      } header: {
+        sectionHeader("Panel")
       }
 
-      Section("Device") {
+      Section {
         LabeledContent(connectionStatusText) {
           Button("Rescan") {
             rescan()
           }
         }
+      } header: {
+        sectionHeader("Device")
       }
 
-      Section("Plugin") {
+      Section {
         LabeledContent {
           HStack {
             if isBusy {
@@ -89,13 +112,31 @@ struct SettingsView: View {
               .foregroundStyle(.secondary)
           }
         }
+      } header: {
+        sectionHeader("Plugin")
       }
     }
     .formStyle(.grouped)
-    .frame(width: 500)
+    .frame(width: 500, height: 600)
     .task {
+      settings.sleepAfterMinutes = nearestOption(settings.sleepAfterMinutes, in: Self.dimOptions)
+      settings.offAfterMinutes = nearestOption(settings.offAfterMinutes, in: Self.offOptions)
       appModel.pluginInstaller.refreshOutcome()
     }
+  }
+
+  private func sectionHeader(_ title: String) -> some View {
+    Text(title)
+      .font(.title3.weight(.semibold))
+      .foregroundStyle(.primary)
+  }
+
+  private func pickerLabel(_ minutes: Int) -> String {
+    minutes == 1 ? "For 1 minute" : "For \(minutes) minutes"
+  }
+
+  private func nearestOption(_ value: Int, in options: [Int]) -> Int {
+    options.min(by: { abs($0 - value) < abs($1 - value) }) ?? value
   }
 
   private var connectionStatusText: String {
