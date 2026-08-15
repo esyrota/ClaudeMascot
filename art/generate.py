@@ -9,7 +9,8 @@ Shape: ONE silhouette -- a torso block with arms protruding from either side, an
 hanging off the bottom edge. The geometry is taken from art/sources/appear.gif (see
 `GEOMETRY SOURCE` below), which is hand-drawn art, not generated here -- every drawn
 state matches its silhouette exactly so any state can cut to any other without the
-figure changing size or shape.
+figure changing size or shape. The second hand-drawn state, working.gif, is the one
+exception: its mascot is drawn smaller, to clear floor space for the broom.
 
 Style: the mascot is one flat colour with pure black eyes, plus a deeper orange used
 only for shading a turn. No highlight band, no floor.
@@ -181,23 +182,6 @@ def thinking():
     return out
 
 
-def working():
-    """Walking Claude: the four legs cycle in diagonal pairs, body bobbing."""
-    out = []
-    # Now that the figure is 24px wide there are 4 clear columns either side, so the
-    # walk drifts a little instead of marching perfectly in place.
-    cycles = [(0, 2, 2, 0), (1, 1, 1, 1), (2, 0, 0, 2), (1, 1, 1, 1)]
-    drift = [0, 1, 2, 1, 0, -1, -2, -1]
-    for i in range(8):
-        im = frame()
-        d = ImageDraw.Draw(im)
-        swing = 1 if i % 4 in (0, 1) else -1
-        mascot(d, HOME_Y - (i % 2), dx=drift[i], arms=(swing, -swing),
-               blink=(i == 5), legs=cycles[i % 4])
-        out.append((im, 130))
-    return out
-
-
 def waiting():
     """Flag Waver: waving for your attention, flag held up over one shoulder."""
     out = []
@@ -265,13 +249,38 @@ def sleeping():
 
 
 # --------------------------------------------------------------------------
-# The one hand-drawn state
+# The hand-drawn states
 # --------------------------------------------------------------------------
 
-# appear.gif is already native 32x32 pixel art, so it is imported whole: no resize,
-# no crop, no frame subsampling (art/import_gif.py does all three, because it exists
-# for oversized anti-aliased source art -- this file needs none of it). The only
-# change is the palette.
+def imported(src: Path, recolour) -> list:
+    """
+    Read a native 32x32 pixel-art GIF frame by frame, repainting it for the panel.
+
+    Both hand-drawn sources are already at panel resolution, so they are taken whole:
+    no resize, no crop, no frame subsampling (art/import_gif.py does all three,
+    because it exists for oversized anti-aliased source art -- these files need none
+    of it). The only change is the palette, via `recolour(rgb) -> rgb`.
+    """
+    im = Image.open(src)
+    if im.size != (SIZE, SIZE):
+        raise SystemExit(f"{src.name}: expected {SIZE}x{SIZE}, got {im.size[0]}x{im.size[1]}")
+
+    out = []
+    for index in range(im.n_frames):
+        im.seek(index)
+        source = im.convert("RGB").load()
+        dst_im = frame()
+        dst = dst_im.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                dst[x, y] = recolour(source[x, y])
+        out.append((dst_im, im.info.get("duration") or 140))
+    return out
+
+
+# appear.gif's colours arrive in three well-separated families -- pure black, a shade
+# family at max channel 111-123, and a body family at 246-255 -- with nothing in
+# between, so a threshold on the brightest channel maps them exactly.
 #
 # Its colours arrive in three well-separated families -- pure black, a shade family
 # at max channel 111-123, and a body family at 246-255 -- with nothing in between, so
@@ -287,30 +296,42 @@ APPEAR_TAIL_MS = 2500
 
 def appear():
     """Entrance: the mascot rises out of nothing, settles, and looks around."""
-    im = Image.open(APPEAR_SRC)
-    if im.size != (SIZE, SIZE):
-        raise SystemExit(f"{APPEAR_SRC.name}: expected {SIZE}x{SIZE}, got {im.size[0]}x{im.size[1]}")
+    def recolour(rgb):
+        value = max(rgb)
+        if value < SHADE_MIN:
+            return BG                       # background, and the eyes
+        return MASCOT_DARK if value < BODY_MIN else MASCOT
 
-    out = []
-    for index in range(im.n_frames):
-        im.seek(index)
-        src = im.convert("RGB").load()
-        dst_im = frame()
-        dst = dst_im.load()
-        for y in range(SIZE):
-            for x in range(SIZE):
-                value = max(src[x, y])
-                if value < SHADE_MIN:
-                    dst[x, y] = BG          # background, and the eyes
-                elif value < BODY_MIN:
-                    dst[x, y] = MASCOT_DARK
-                else:
-                    dst[x, y] = MASCOT
-        out.append((dst_im, im.info.get("duration") or 140))
-
+    out = imported(APPEAR_SRC, recolour)
     last, _ = out[-1]
     out[-1] = (last, APPEAR_TAIL_MS)
     return out
+
+
+# working.gif is drawn on white paper rather than on black, so a brightness threshold
+# would read its background as the brightest thing in the frame. It has an exact
+# five-entry palette instead (it was cleaned up to one on import from the artist's
+# screen capture), so it maps colour for colour -- and an unexpected colour is a
+# corrupted source, not something to guess at.
+WORKING_SRC = SOURCES / "working.gif"
+WORKING_PALETTE = {
+    (252, 252, 252): BG,            # paper
+    (211, 106, 76): MASCOT,
+    (184, 93, 66): MASCOT_DARK,     # the drawn shading down one side
+    (130, 130, 130): PROP,          # the broom
+    (8, 4, 4): EYE,
+}
+
+
+def sweep():
+    """Working: the mascot picks up a broom and sweeps the floor while Claude works."""
+    def recolour(rgb):
+        try:
+            return WORKING_PALETTE[rgb]
+        except KeyError:
+            raise SystemExit(f"{WORKING_SRC.name}: unexpected colour {rgb}")
+
+    return imported(WORKING_SRC, recolour)
 
 
 def off():
@@ -335,7 +356,7 @@ STATES = {
     "idle": idle,
     "sleeping": sleeping,
     "thinking": thinking,
-    "working": working,
+    "working": sweep,
     "waiting": waiting,
     "done": done,
     "off": off,

@@ -3,15 +3,16 @@
 The Python tooling that authors the animations. Build-time only: [[Menu Bar App]]
 consumes the finished GIFs and never generates or resizes art itself.
 
-Eight states, one per `PanelState`. Seven are drawn programmatically; `starting` is
-imported from hand-drawn art, and **its silhouette is the reference the other seven are
-built to match**.
+Eight states, one per `PanelState`. Six are drawn programmatically; `starting` and
+`working` are imported from hand-drawn art. **`starting`'s silhouette is the reference
+the drawn six are built to match** — see the one deliberate exception under
+[[#The sweep (`working.gif`)]].
 
 ## Tools
 
 | Script | Purpose |
 |---|---|
-| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + a 6× contact sheet `preview.png`. Draws seven states; imports the eighth (see below) |
+| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + a 6× contact sheet `preview.png`. Draws six states; imports two (see below) |
 | `art/import_gif.py` | Converts an *oversized* arbitrary GIF into a panel-ready animation in `Animations/custom/` — coalesce, crop, downscale, subsample |
 | `art/export_golden.py` | Re-frames the bundled GIFs into `Tests/Fixtures/`; run after any art change — see [[BLE Protocol]] |
 | `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
@@ -22,9 +23,9 @@ own override folder, is `AnimationLibrary.swift`.
 
 ## Mascot geometry
 
-Read straight off the resting pose (last frame) of `art/sources/appear.gif`, the one
-hand-drawn animation. Every generated state matches it exactly, so any state can cut to
-any other without the figure changing size or shape:
+Read straight off the resting pose (last frame) of `art/sources/appear.gif`. Every
+generated state matches it exactly, so any state can cut to any other without the
+figure changing size or shape:
 
 | Part | 32px coordinates |
 |---|---|
@@ -59,14 +60,18 @@ Two consequences worth knowing before editing a state:
 - ≥ `MIN_COLORS` (9) distinct colours per frame, padded invisibly via blue-channel
   nudges on body pixels
 
+## Importing the hand-drawn states
+
+Both hand-drawn sources are already native 32×32 pixel art, so `generate.py`'s
+`imported()` takes them whole — no resize, no crop, and **no frame subsampling**
+(`import_gif.py` does all three, for oversized anti-aliased source art; these files
+need none of it). Only the palette changes, per source.
+
 ## The entrance (`starting.gif`)
 
-The only hand-drawn state. `generate.py` imports `art/sources/appear.gif` whole — it is
-already native 32×32 pixel art, so no resize, no crop, and **no frame subsampling**
-(`import_gif.py` does all three, for oversized anti-aliased source art; this file needs
-none of it). Only the palette changes, via a threshold on the brightest channel: the
-source's colours arrive in three well-separated families — black, shade at 111–123,
-body at 246–255 — with nothing in between.
+Imported from `art/sources/appear.gif`. Its palette maps via a threshold on the
+brightest channel: the source's colours arrive in three well-separated families —
+black, shade at 111–123, body at 246–255 — with nothing in between.
 
 Pillow merges byte-identical consecutive frames on save and adds their time to the one
 before, so the written file has fewer frames than the source (44 → 32) with the total
@@ -76,6 +81,31 @@ The last frame is given a long dwell (`APPEAR_TAIL_MS`) so the panel, which loop
 whatever GIF it holds, shows a mascot standing still rather than a restarted entrance
 if the hand-off runs late. `PanelTimings.startingHold` is set to the **motion length
 alone**, which `generate.py` prints on every run — keep the two in sync.
+
+## The sweep (`working.gif`)
+
+Imported from `art/sources/working.gif`: the mascot flings a broom up, catches it,
+bends over and sweeps the floor, then straightens up — 33 frames, 4.3s, on the
+recording's own irregular timings, which carry the animation and must not be
+re-evened.
+
+Two things differ from the entrance:
+
+- **It is drawn on white paper, not on black.** A brightness threshold would read the
+  background as the brightest thing in the frame, so it maps colour for colour through
+  an exact five-entry palette (paper, body, shade, grey broom, black eyes) and treats
+  an unexpected colour as a corrupt source rather than guessing. The broom's mid-grey
+  becomes `PROP` white — a mid-grey would render blue-violet, see [[Panel Quirks]].
+- **Its mascot is smaller than the [[#Mascot geometry]] above** — a 12px-wide torso
+  sitting 4px lower, not 16px at `HOME_Y` — so cutting to or from `working` does jump.
+  That is the artist's call: the broom needs clear floor to sweep across, and there is
+  none at full size. It is the only state that deviates.
+
+The source GIF was cleaned up from a 128×128 screen capture: each 4×4 block is a
+majority vote over the five drawn colours, which discards the h264 ringing that lives
+on block edges, and consecutive identical frames are merged with their durations
+summed. The capture itself is not kept — `art/sources/working.gif` is the source of
+truth, exactly as `appear.gif` is.
 
 ## Importing external gifs
 
