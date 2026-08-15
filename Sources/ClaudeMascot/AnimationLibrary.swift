@@ -1,36 +1,16 @@
 import Foundation
 
-/// Resolves animation GIFs for panel states, respecting user overrides.
+/// Resolves animation GIFs for panel states.
 @MainActor final class AnimationLibrary {
-  /// Optional user folder that overrides the bundled art.
-  var overrideFolder: URL?
-
   /// For testing: allows overriding the bundle to load animations from.
   var bundleOverride: Bundle?
 
   /// Resolves the URL for an animation in this precedence order:
-  /// 1. `<overrideFolder>/custom/<state>.gif`
-  /// 2. `<overrideFolder>/<state>.gif`
-  /// 3. bundled `Animations/<state>.gif`
+  /// 1. bundled `Animations/custom/<state>.gif`
+  /// 2. bundled `Animations/<state>.gif`
   /// Returns `nil` if nothing is found.
   func url(for state: PanelState) -> URL? {
     let filename = "\(state.rawValue).gif"
-
-    // Check override folder custom subdirectory
-    if let override = overrideFolder {
-      let customPath = override.appendingPathComponent("custom").appendingPathComponent(filename)
-      if fileExists(at: customPath) {
-        return customPath
-      }
-    }
-
-    // Check override folder root
-    if let override = overrideFolder {
-      let overridePath = override.appendingPathComponent(filename)
-      if fileExists(at: overridePath) {
-        return overridePath
-      }
-    }
 
     // Check bundled animations
     if let bundledURL = bundledURL(for: filename) {
@@ -68,8 +48,8 @@ import Foundation
     }
 
     // Try Bundle.main. Hand-imported art in Animations/custom/ wins over the
-    // generated art beside it, mirroring the override-folder precedence above
-    // and the Python tooling, which writes imports into that subfolder.
+    // generated art beside it, mirroring the Python tooling, which writes
+    // imports into that subfolder.
     if let bundlePath = Bundle.main.path(forResource: "Animations", ofType: nil) {
       let bundleURL = URL(fileURLWithPath: bundlePath)
       for candidate in [

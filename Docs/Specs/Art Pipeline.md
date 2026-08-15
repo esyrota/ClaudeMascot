@@ -3,17 +3,19 @@
 The Python tooling that authors the animations. Build-time only: [[Menu Bar App]]
 consumes the finished GIFs and never generates or resizes art itself.
 
-Eight states, one per `PanelState`. Seven are drawn programmatically; `starting` is
-imported from hand-drawn art, and **its silhouette is the reference the other seven are
-built to match**.
+Eight states, one per `PanelState`. Six are drawn programmatically; `starting` and
+`working` are imported from hand-drawn art. **`starting`'s silhouette is the reference
+the drawn six are built to match** — see the one deliberate exception under
+[[#The sweep (`working.gif`)]].
 
 ## Tools
 
 | Script | Purpose |
 |---|---|
-| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + a 6× contact sheet `preview.png`. Draws seven states; imports the eighth (see below) |
+| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + a 6× contact sheet `preview.png`. Draws six states; imports two (see below) |
 | `art/import_gif.py` | Converts an *oversized* arbitrary GIF into a panel-ready animation in `Animations/custom/` — coalesce, crop, downscale, subsample |
 | `art/export_golden.py` | Re-frames the bundled GIFs into `Tests/Fixtures/`; run after any art change — see [[BLE Protocol]] |
+| `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |
 | `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
 
 `Animations/custom/<state>.gif` takes priority over `Animations/<state>.gif`, so re-running
@@ -22,9 +24,9 @@ own override folder, is `AnimationLibrary.swift`.
 
 ## Mascot geometry
 
-Read straight off the resting pose (last frame) of `art/sources/appear.gif`, the one
-hand-drawn animation. Every generated state matches it exactly, so any state can cut to
-any other without the figure changing size or shape:
+Read straight off the resting pose (last frame) of `art/sources/appear.gif`. Every
+generated state matches it exactly, so any state can cut to any other without the
+figure changing size or shape:
 
 | Part | 32px coordinates |
 |---|---|
@@ -50,23 +52,34 @@ Two consequences worth knowing before editing a state:
 ## Style rules
 
 - One flat colour for every mascot pixel — `MASCOT = (255, 68, 4)`
-- `MASCOT_DARK = (255, 24, 0)` shades a turn, and appears only in `appear.gif`. Its
-  source art uses `(120, 50, 16)`, a mid-tone the panel renders blue-violet, so it is
-  deepened the only way the hardware allows: green and blue down, red pinned at 255.
-  It therefore reads as a deeper red-orange, not a true shadow
+- Two shades, because the two hand-drawn sources shade by different amounts. Both
+  deepen the hue rather than dimming it — green and blue down, red pinned at 255 —
+  which is the only way the hardware allows, so both read as a deeper red-orange
+  rather than a true shadow:
+  - `MASCOT_DARK = (255, 24, 0)` for `appear.gif`, whose own shade genuinely is dark
+    (its source drops from 246–255 to `(120, 50, 16)`)
+  - `MASCOT_SHADE = (255, 50, 2)` for the sweep, whose shading is only a 15% step
+    (`(216,112,80)` → `(184,104,72)`). Sending that to `MASCOT_DARK` turned a gentle
+    roll of the body into a hard two-tone band
 - Pure black eyes, no floor, no highlight or shade bands
 - Max channel must stay at 255 — see [[Panel Quirks]] before changing the colour
 - ≥ `MIN_COLORS` (9) distinct colours per frame, padded invisibly via blue-channel
   nudges on body pixels
 
+## Importing the hand-drawn states
+
+`generate.py`'s `imported()` takes both sources whole — no crop, and **no frame
+subsampling**: the source durations *are* the animation. What it does do is resample
+each frame to the art's own pixel grid, which is not always the file's, then blow that
+grid up by a whole number of panel pixels and place it. `import_gif.py` is the
+different tool for a different job: art we are importing blind, cropped to a
+power-of-two window and flattened to one colour.
+
 ## The entrance (`starting.gif`)
 
-The only hand-drawn state. `generate.py` imports `art/sources/appear.gif` whole — it is
-already native 32×32 pixel art, so no resize, no crop, and **no frame subsampling**
-(`import_gif.py` does all three, for oversized anti-aliased source art; this file needs
-none of it). Only the palette changes, via a threshold on the brightest channel: the
-source's colours arrive in three well-separated families — black, shade at 111–123,
-body at 246–255 — with nothing in between.
+Imported from `art/sources/appear.gif`. Its palette maps via a threshold on the
+brightest channel: the source's colours arrive in three well-separated families —
+black, shade at 111–123, body at 246–255 — with nothing in between.
 
 Pillow merges byte-identical consecutive frames on save and adds their time to the one
 before, so the written file has fewer frames than the source (44 → 32) with the total
@@ -76,6 +89,76 @@ The last frame is given a long dwell (`APPEAR_TAIL_MS`) so the panel, which loop
 whatever GIF it holds, shows a mascot standing still rather than a restarted entrance
 if the hand-off runs late. `PanelTimings.startingHold` is set to the **motion length
 alone**, which `generate.py` prints on every run — keep the two in sync.
+
+## The sweep (`working.gif`)
+
+Imported from `art/sources/claude-claude-code-1.gif` — the mascot's own loading
+animation, exported at 200×200: it flings a broom up, catches it, bends over and
+sweeps the floor, then straightens up. 36 frames, 3.7s, on the source's own irregular
+timings, which carry the animation and must not be re-evened.
+
+Its palette maps by nearest colour rather than by threshold, because the export left a
+handful of anti-aliased pixels on cell boundaries. The broom's mid-grey becomes `PROP`
+white: a mid-grey would render blue-violet, see [[Panel Quirks]].
+
+**The art is 19×19, not 200×200** — one native pixel every 10.53 file pixels — and at
+that resolution it is exactly [[#Mascot geometry]] at *half* scale: an 8×6 torso,
+2-tall arms, 1×1 eyes, four 1×2 legs. So it is resampled to 19×19 and doubled, which
+lands the figure on the same silhouette every drawn state uses. Importing at 1:1
+instead would put a half-size mascot on the panel and cutting to it from any other
+state would visibly shrink the figure.
+
+### The crop tracks the figure
+
+Doubled, the sweep spans 38 columns against the panel's 32, and no *fixed* offset
+fits both the figure and its prop: centring the mascot clips the broom to a smudge,
+and pushing the broom on clips the mascot's own left arm while it stands. So
+`working_at()` pins the figure's left edge to the panel's, frame by frame. Its left
+edge only ever takes two values — it steps right as it crouches — so this is one 4px
+pan twice a loop, both times inside a pose change big enough to hide it. Every
+silhouette then survives whole and the broom is fully on-panel through the sweep; the
+only thing still cropped is the tip of the handle in the three frames where it is in
+mid-air.
+
+### Two repairs to the source
+
+The source's standing frames are redrawn rather than held, and two of those wobbles
+stop reading as life and start reading as damage once doubled onto 32px. `frame 0` is
+the same pose drawn correctly, so `WORKING_REPAIRS` fixes both against it:
+
+| Frames | Wobble |
+|---|---|
+| 1–4 | the **left eye** is two cells wide while the right stays at one |
+| 1–4, 32–33 | the **legs** are a cell short, filling the row where the four gaps belong |
+
+Each repair names the cells, the colour they must currently hold, and the colour to
+paint. The check on the current colour is the point: if the source art is ever
+replaced, the build fails loudly instead of silently painting over something else.
+
+Still unrepaired, and visible in the same frames: the mascot's **arms sit at different
+heights** there (left at eye level, right two cells lower). Fixing it means moving a
+limb rather than patching four cells, so it is left alone.
+
+## The app icon
+
+`art/make_icon.py` builds `AppIcon.icns` from `art/sources/logo.gif` — the mascot as a
+32×32 silhouette with its eyes knocked out as transparency. `make-app.sh` copies the
+`.icns` into the bundle and fails the build if it is missing; `Info.plist` names it via
+`CFBundleIconFile`. It is not regenerated automatically, so re-run the script after
+changing `logo.gif`.
+
+`LSUIElement` keeps the app out of the Dock, but Finder, Spotlight and the app's own
+alerts all still show the icon.
+
+Two decisions worth keeping:
+
+- **The dark rounded plate is load-bearing.** The artwork is a single colour, so
+  without a ground the icon is a floating shape that disappears against a light Finder
+  background.
+- **Scaling follows the art, not the canvas.** At 128px and up the figure is blown up
+  by a whole number of pixels (NEAREST) so its edges stay square; at 64px and below a
+  32px-wide figure carries more detail than the icon can hold, so it is filtered down
+  and the softness is deliberate.
 
 ## Importing external gifs
 

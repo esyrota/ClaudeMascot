@@ -9,7 +9,8 @@ Shape: ONE silhouette -- a torso block with arms protruding from either side, an
 hanging off the bottom edge. The geometry is taken from art/sources/appear.gif (see
 `GEOMETRY SOURCE` below), which is hand-drawn art, not generated here -- every drawn
 state matches its silhouette exactly so any state can cut to any other without the
-figure changing size or shape.
+figure changing size or shape. The second hand-drawn state, working.gif, is the one
+exception: its mascot is drawn smaller, to clear floor space for the broom.
 
 Style: the mascot is one flat colour with pure black eyes, plus a deeper orange used
 only for shading a turn. No highlight band, no floor.
@@ -46,6 +47,13 @@ MASCOT = (255, 68, 4)
 # deepened the only way the hardware allows, by pulling green and blue down with red
 # still pinned at 255. It reads as a deeper red-orange rather than a true shadow.
 MASCOT_DARK = (255, 24, 0)
+# A second, much softer shade, for art whose own shading is subtle. appear.gif's
+# shade is a genuine dark side -- its source drops from 246-255 down to 111-123, so
+# MASCOT_DARK's big step is faithful. The sweep's is a 15% step (216,112,80 ->
+# 184,104,72), and sending that to MASCOT_DARK turned a gentle roll of the body into
+# a hard two-tone band. This sits about a third of the way down instead. Same rule as
+# ever: red stays pinned at 255, or the panel renders it blue-violet.
+MASCOT_SHADE = (255, 50, 2)
 EYE = (0, 0, 0)
 BG = (0, 0, 0)
 # Props are kept at full value for the same reason.
@@ -181,23 +189,6 @@ def thinking():
     return out
 
 
-def working():
-    """Walking Claude: the four legs cycle in diagonal pairs, body bobbing."""
-    out = []
-    # Now that the figure is 24px wide there are 4 clear columns either side, so the
-    # walk drifts a little instead of marching perfectly in place.
-    cycles = [(0, 2, 2, 0), (1, 1, 1, 1), (2, 0, 0, 2), (1, 1, 1, 1)]
-    drift = [0, 1, 2, 1, 0, -1, -2, -1]
-    for i in range(8):
-        im = frame()
-        d = ImageDraw.Draw(im)
-        swing = 1 if i % 4 in (0, 1) else -1
-        mascot(d, HOME_Y - (i % 2), dx=drift[i], arms=(swing, -swing),
-               blink=(i == 5), legs=cycles[i % 4])
-        out.append((im, 130))
-    return out
-
-
 def waiting():
     """Flag Waver: waving for your attention, flag held up over one shoulder."""
     out = []
@@ -265,17 +256,71 @@ def sleeping():
 
 
 # --------------------------------------------------------------------------
-# The one hand-drawn state
+# The hand-drawn states
 # --------------------------------------------------------------------------
 
-# appear.gif is already native 32x32 pixel art, so it is imported whole: no resize,
-# no crop, no frame subsampling (art/import_gif.py does all three, because it exists
-# for oversized anti-aliased source art -- this file needs none of it). The only
-# change is the palette.
-#
-# Its colours arrive in three well-separated families -- pure black, a shade family
-# at max channel 111-123, and a body family at 246-255 -- with nothing in between, so
-# a threshold on the brightest channel maps them exactly.
+def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 0),
+             repair=None) -> list:
+    """
+    Read a hand-drawn GIF frame by frame and repaint it for the panel.
+
+    `recolour(rgb) -> rgb` maps the source palette onto the panel's, and the optional
+    `repair(index, image)` gets to fix the resampled frame first.
+
+    `native` is the art's own pixel-art resolution, which is not always the file's:
+    a 200x200 export of 19x19 art is resampled back to 19x19 by taking one pixel per
+    native cell. That doubles as the cleanest de-anti-aliasing available, because the
+    blend pixels only ever live on cell boundaries.
+
+    `scale` then blows each native pixel up to a whole number of panel pixels and
+    `at` places the result, so imported art can be landed exactly on the geometry the
+    drawn states use. Anything falling outside the panel is cropped. `at` is either a
+    fixed (dx, dy) or a callable taking the resampled frame, which lets the crop
+    follow the figure instead of standing still -- see `working_at()`.
+
+    There is no frame subsampling: the source durations are the animation.
+    (`art/import_gif.py` subsamples, crops to a power-of-two window and flattens to a
+    single colour -- it is for art imported blind, not for art drawn for this panel.)
+    """
+    from PIL import GifImagePlugin
+    GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_FIRST
+
+    im = Image.open(src)
+    if im.size[0] != im.size[1]:
+        raise SystemExit(f"{src.name}: expected a square canvas, got {im.size[0]}x{im.size[1]}")
+
+    out = []
+    for index in range(im.n_frames):
+        im.seek(index)
+        # PIL applies GIF disposal as it iterates, so the frame it yields is already
+        # complete. Compositing onto a running canvas as well makes every frame
+        # accumulate and smears the animation into a trail -- a bug that shipped once.
+        # Flattening the transparency onto black is all that is left to do.
+        flat = Image.alpha_composite(Image.new("RGBA", im.size, (0, 0, 0, 255)),
+                                     im.convert("RGBA")).convert("RGB")
+        small = flat.resize((native, native), Image.NEAREST)
+        if repair is not None:
+            repair(index, small)
+        source = small.load()
+        dx, dy = at(source, native) if callable(at) else at
+        dst_im = frame()
+        dst = dst_im.load()
+        for y in range(native):
+            for x in range(native):
+                colour = recolour(source[x, y])
+                for sy in range(scale):
+                    for sx in range(scale):
+                        px, py = x * scale + sx + dx, y * scale + sy + dy
+                        if 0 <= px < SIZE and 0 <= py < SIZE:
+                            dst[px, py] = colour
+        out.append((dst_im, im.info.get("duration") or 140))
+    return out
+
+
+# appear.gif is already native 32x32, so it needs no resampling. Its colours arrive in
+# three well-separated families -- pure black, a shade family at max channel 111-123,
+# and a body family at 246-255 -- with nothing in between, so a threshold on the
+# brightest channel maps them exactly.
 APPEAR_SRC = SOURCES / "appear.gif"
 SHADE_MIN, BODY_MIN = 64, 180
 # The panel holds the last frame of a GIF for its own duration before looping. Giving
@@ -287,30 +332,103 @@ APPEAR_TAIL_MS = 2500
 
 def appear():
     """Entrance: the mascot rises out of nothing, settles, and looks around."""
-    im = Image.open(APPEAR_SRC)
-    if im.size != (SIZE, SIZE):
-        raise SystemExit(f"{APPEAR_SRC.name}: expected {SIZE}x{SIZE}, got {im.size[0]}x{im.size[1]}")
+    def recolour(rgb):
+        value = max(rgb)
+        if value < SHADE_MIN:
+            return BG                       # background, and the eyes
+        return MASCOT_DARK if value < BODY_MIN else MASCOT
 
-    out = []
-    for index in range(im.n_frames):
-        im.seek(index)
-        src = im.convert("RGB").load()
-        dst_im = frame()
-        dst = dst_im.load()
-        for y in range(SIZE):
-            for x in range(SIZE):
-                value = max(src[x, y])
-                if value < SHADE_MIN:
-                    dst[x, y] = BG          # background, and the eyes
-                elif value < BODY_MIN:
-                    dst[x, y] = MASCOT_DARK
-                else:
-                    dst[x, y] = MASCOT
-        out.append((dst_im, im.info.get("duration") or 140))
-
+    out = imported(APPEAR_SRC, recolour)
     last, _ = out[-1]
     out[-1] = (last, APPEAR_TAIL_MS)
     return out
+
+
+# The sweep comes from the mascot's own loading animation, exported at 200x200. Its
+# art is 19x19 -- one native pixel every 10.53 file pixels -- and at that resolution
+# it is EXACTLY the geometry above at half scale: an 8x6 torso, 2-tall arms, 1x1 eyes
+# and four 1x2 legs. Doubling it therefore lands on the same 16x12 torso, 4x4 arms and
+# 2x4 legs every drawn state uses, with the feet flush on the bottom row, which is
+# what WORKING_AT places. Importing it at 1:1 instead would put a half-size mascot on
+# the panel, and cutting to it from any other state would visibly shrink the figure.
+#
+# The one cost of 2x is horizontal: at that size the sweep wants 38 columns and the
+# panel has 32. No fixed offset fits both the figure and its broom, so `working_at()`
+# tracks the figure instead -- see there.
+WORKING_SRC = SOURCES / "claude-claude-code-1.gif"
+WORKING_NATIVE, WORKING_SCALE = 19, 2
+WORKING_BODY, WORKING_SHADE_SRC, WORKING_PAPER = (216, 112, 80), (184, 104, 72), (0, 0, 0)
+WORKING_PALETTE = {
+    WORKING_PAPER: BG,              # background, and the eyes
+    WORKING_BODY: MASCOT,
+    WORKING_SHADE_SRC: MASCOT_SHADE,  # the drawn shading down one side
+    (136, 136, 136): PROP,          # the broom
+}
+
+# The source's standing frames are redrawn rather than held, and two of those wobbles
+# stop reading as life and start reading as damage once they are doubled onto a 32px
+# panel: frames 1-4 widen the mascot's LEFT eye to two cells while the right stays at
+# one, and frames 1-4 and 32-33 draw the legs a cell short, filling the row where the
+# four gaps belong. Both are repaired against frame 0 -- the same pose, drawn right.
+#
+# Each entry names the cells on the 19x19 grid, the colour they must currently hold,
+# and the colour to paint. Checking the current colour means a changed source fails
+# the build loudly instead of being silently mispainted somewhere else.
+WORKING_REPAIRS = [
+    ((1, 2, 3, 4), ((5, 10),), WORKING_PAPER, WORKING_BODY),
+    ((1, 2, 3, 4, 32, 33), ((4, 13), (6, 13), (7, 13), (9, 13)),
+     WORKING_BODY, WORKING_PAPER),
+]
+
+
+def working_class(rgb):
+    """Snap a source pixel to the panel palette, nearest colour wins.
+
+    A handful of anti-aliased pixels from the 200x200 export survive on cell
+    boundaries; this puts each back on the side it came from.
+    """
+    return min(WORKING_PALETTE.items(),
+               key=lambda kv: sum((a - b) ** 2 for a, b in zip(rgb, kv[0])))[1]
+
+
+def working_repair(index, im) -> None:
+    """Fix the source's two standing-frame wobbles -- see WORKING_REPAIRS."""
+    px = im.load()
+    for frames, cells, expect, paint in WORKING_REPAIRS:
+        if index not in frames:
+            continue
+        for x, y in cells:
+            if working_class(px[x, y]) != working_class(expect):
+                raise SystemExit(
+                    f"{WORKING_SRC.name} frame {index}: cell ({x},{y}) holds "
+                    f"{px[x, y]}, expected {expect} -- the art changed, recheck "
+                    f"WORKING_REPAIRS")
+            px[x, y] = paint
+
+
+def working_at(source, native):
+    """
+    Pin the mascot's left edge to the panel's, frame by frame.
+
+    Doubled, the sweep spans 38 columns against the panel's 32, so a single fixed
+    offset always gives something up: centring the figure clips the broom down to a
+    smudge, and pushing the broom on clips the figure's own left arm while it stands.
+    Tracking the figure costs neither. Its left edge only ever takes two values -- it
+    steps right as it crouches -- so this is one 4px pan twice a loop, both times
+    inside a pose change big enough to hide it. In exchange every silhouette is whole
+    and the broom is fully on the panel through the entire sweep; the only thing still
+    cropped is the tip of the handle in the three frames where it is in mid-air.
+    """
+    body = {MASCOT, MASCOT_SHADE}
+    left = min(x for y in range(native) for x in range(native)
+               if working_class(source[x, y]) in body)
+    return (-WORKING_SCALE * left, 2)
+
+
+def sweep():
+    """Working: the mascot sweeps the floor with a broom while Claude works."""
+    return imported(WORKING_SRC, working_class, native=WORKING_NATIVE,
+                    scale=WORKING_SCALE, at=working_at, repair=working_repair)
 
 
 def off():
@@ -335,7 +453,7 @@ STATES = {
     "idle": idle,
     "sleeping": sleeping,
     "thinking": thinking,
-    "working": working,
+    "working": sweep,
     "waiting": waiting,
     "done": done,
     "off": off,

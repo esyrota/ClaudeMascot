@@ -53,6 +53,12 @@ final class PluginInstaller: ObservableObject {
   /// cheap and the location cannot change within a single run of the app.
   private var cachedClaudeURL: URL?
 
+  /// Where `refreshOutcome()` looks for install records. Defaults to the real
+  /// `~/.claude/plugins/installed_plugins.json`; tests point this at a temp
+  /// file so the probe can be exercised without touching the user's actual
+  /// Claude Code configuration.
+  private let installedPluginsURL: URL
+
   /// The marketplace directory inside the running app bundle:
   /// `<app bundle>/Contents/Resources/ClaudeCodePlugin`, containing
   /// `.claude-plugin/marketplace.json` and `plugin/`. Derived from
@@ -62,6 +68,66 @@ final class PluginInstaller: ObservableObject {
     Bundle.main.bundleURL
       .appendingPathComponent("Contents/Resources/ClaudeCodePlugin")
   }
+
+  /// - Parameter installedPluginsURL: Location of `installed_plugins.json`,
+  ///   overridable for tests. Defaults to the real path under the user's
+  ///   home directory.
+  init(
+    installedPluginsURL: URL = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent(".claude/plugins/installed_plugins.json")
+  ) {
+    self.installedPluginsURL = installedPluginsURL
+    refreshOutcome()
+  }
+
+  /// Re-derives `outcome` from `installed_plugins.json` rather than asking
+  /// `claude plugin list`: a LaunchServices-launched app inherits a minimal
+  /// `PATH` and may not be able to find the `claude` binary at all (the same
+  /// constraint `locateClaude()` exists to work around), while the file is a
+  /// synchronous, sub-millisecond local read that cannot fail that way.
+  ///
+  /// Never overwrites `.failed` or `.claudeNotFound` — a failure the user
+  /// just saw must not silently vanish the next time the Settings window
+  /// opens. A missing file, unreadable file, or malformed JSON is treated as
+  /// `.notInstalled`; this never throws.
+  func refreshOutcome() {
+    switch outcome {
+    case .failed, .claudeNotFound:
+      return
+    case .notInstalled, .installed:
+      break
+    }
+
+    guard let data = try? Data(contentsOf: installedPluginsURL),
+      let file = try? JSONDecoder().decode(InstalledPluginsFile.self, from: data)
+    else {
+      outcome = .notInstalled
+      return
+    }
+
+    let records = file.plugins[Self.pluginID] ?? []
+    outcome = records.isEmpty ? .notInstalled : .installed
+  }
+
+  /// Minimal shape of `~/.claude/plugins/installed_plugins.json`. Only the
+  /// `plugins` map is needed; install-record fields (`scope`, `installPath`,
+  /// `version`, ...) are decoded away by `JSONDecoder`'s default leniency
+  /// about unknown keys, so `InstallRecord` declares none of them.
+  private struct InstalledPluginsFile: Decodable {
+    let plugins: [String: [InstallRecord]]
+  }
+
+  private struct InstallRecord: Decodable {}
+
+  #if DEBUG
+    /// Test-only seam: forces `outcome` directly, bypassing `install()`/
+    /// `uninstall()`, so tests can verify `refreshOutcome()` leaves a
+    /// `.failed`/`.claudeNotFound` outcome alone without shelling out to the
+    /// real `claude` CLI (which would mutate the user's live configuration).
+    func setOutcomeForTesting(_ newOutcome: Outcome) {
+      outcome = newOutcome
+    }
+  #endif
 
   /// Locates the `claude` CLI executable, checking well-known install paths
   /// before falling back to a login shell's `command -v claude`. Returns

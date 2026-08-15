@@ -51,7 +51,8 @@ Each one cost a wrong diagnosis to find.
 | Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer, single-instance guard |
 | Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
-| Art generator | `art/generate.py` | working, 8 states — 7 drawn, `starting` imported from `art/sources/appear.gif` |
+| Art generator | `art/generate.py` | working, 8 states — 6 drawn, `starting` and `working` imported from hand-drawn art in `art/sources/` |
+| App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol |
 | Python daemon | `legacy/` | **retired and non-functional** |
@@ -72,5 +73,3 @@ plugin on first launch, and the repo is no longer a marketplace.
   cannot make the panel flicker; also fixes event ordering as a side effect.
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.
-- `PluginInstaller.outcome` resets each launch, so Options reports "Plugin not
-  installed" until the user interacts with it. Cosmetic but misleading.

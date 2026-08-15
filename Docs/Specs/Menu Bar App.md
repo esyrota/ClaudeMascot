@@ -48,10 +48,11 @@ The user must restart Claude Code after installation so the hooks load.
 - **Launch at login** — toggle, via `SMAppService.mainApp.register()`
 - **Auto-load / auto-connect** — toggle; when off, the app stays resident but does not connect until explicitly enabled
 - **Brightness** — slider, 5–100 (default 35)
-- **Device** — show the remembered device, allow rescan and pick
+- **Device** — shows connection status ("Connected" / "Scanning…" / "Connecting…" / "Not connected") and offers Rescan. Never the panel identifier: it is a per-host CoreBluetooth UUID, so it is neither stable across machines nor meaningful to the user
 - **Idle timings** — sleep after (default 5m), panel off after (default 10m)
-- **Animation folder** — where the GIFs live, with a reveal-in-Finder button
-- **Plugin** — install state, and a re-register prompt when the app has moved since install
+- **Plugin** — install status is probed from `~/.claude/plugins/installed_plugins.json` at `PluginInstaller.init` and each time the Settings window appears, with Install or Uninstall buttons matching the probed state, plus a re-register prompt when the app has moved since install
+
+The pane is a grouped `Form` with four sections: General, Panel, Device, and Plugin.
 
 Defaults live in `Settings.swift` (`@AppStorage`); the idle timings are read once at launch because `PanelController` treats its timings as immutable.
 

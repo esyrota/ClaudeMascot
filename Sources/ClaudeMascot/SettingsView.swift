@@ -1,14 +1,20 @@
-import AppKit
 import SwiftUI
 
 /// The `Settings { }` scene's content: one pane covering every knob in
-/// `Settings`, plus a device row for the remembered panel and a "Rescan"
-/// action.
+/// `Settings`, plus a device row showing connection status and a "Rescan"
+/// action, and a plugin row showing probed install status.
 struct SettingsView: View {
   @ObservedObject var appModel: AppModel
   @ObservedObject var settings: AppSettings
 
   @State private var isBusy: Bool = false
+
+  /// Minute options for "Dim the panel", in menu order. `1` is the only
+  /// value that reads singular ("For 1 minute").
+  private static let dimOptions: [Int] = [1, 2, 3, 5, 10, 20, 30, 45, 60]
+
+  /// Minute options for "Turn the panel off", in menu order.
+  private static let offOptions: [Int] = [5, 10, 20, 30, 45, 60, 90, 120]
 
   init(appModel: AppModel) {
     self.appModel = appModel
@@ -19,114 +25,127 @@ struct SettingsView: View {
     Form {
       Section {
         Toggle(
-          "Launch at login",
+          "Launch Claude Mascot at login",
           isOn: Binding(
             get: { settings.launchAtLogin },
             set: { settings.launchAtLogin = $0 }
           ))
-        Toggle("Auto-connect", isOn: $settings.autoConnect)
+        Toggle("Connect to the panel automatically", isOn: $settings.autoConnect)
+      } header: {
+        sectionHeader("General")
       }
 
-      Section("Panel") {
-        HStack {
-          Text("Brightness")
-          Slider(
-            value: Binding(
-              get: { Double(settings.brightness) },
-              set: { settings.brightness = Int($0.rounded()) }
-            ), in: 5...100, step: 1)
-          Text("\(settings.brightness)%")
-            .monospacedDigit()
-            .frame(width: 44, alignment: .trailing)
-        }
-
-        HStack {
-          Text("Sleep after")
-          Stepper(
-            "\(settings.sleepAfterMinutes) min", value: $settings.sleepAfterMinutes, in: 1...60)
-        }
-
-        HStack {
-          Text("Panel off after")
-          Stepper(
-            "\(settings.offAfterMinutes) min", value: $settings.offAfterMinutes, in: 1...120)
-        }
-      }
-
-      Section("Animation folder") {
-        HStack {
-          Text(
-            settings.animationFolderPath.isEmpty
-              ? "Bundled animations" : settings.animationFolderPath
-          )
-          .foregroundStyle(settings.animationFolderPath.isEmpty ? .secondary : .primary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-
-          Spacer()
-
-          Button("Choose…") {
-            chooseAnimationFolder()
+      Section {
+        LabeledContent("Panel brightness") {
+          HStack {
+            Slider(
+              value: Binding(
+                get: { Double(settings.brightness) },
+                set: { settings.brightness = Int($0.rounded()) }
+              ), in: 5...100, step: 1)
+            Text("\(settings.brightness)%")
+              .monospacedDigit()
+              .frame(width: 44, alignment: .trailing)
           }
-
-          Button("Reveal in Finder") {
-            revealAnimationFolder()
-          }
-          .disabled(settings.animationFolderURL == nil)
         }
+
+        LabeledContent("Dim the panel when inactive") {
+          Picker("", selection: $settings.sleepAfterMinutes) {
+            ForEach(Self.dimOptions, id: \.self) { minutes in
+              Text(pickerLabel(minutes)).tag(minutes)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+        }
+
+        LabeledContent("Turn the panel off when inactive") {
+          Picker("", selection: $settings.offAfterMinutes) {
+            ForEach(Self.offOptions, id: \.self) { minutes in
+              Text(pickerLabel(minutes)).tag(minutes)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+        }
+      } header: {
+        sectionHeader("Panel")
       }
 
-      Section("Device") {
-        HStack {
-          Text(settings.panelIdentifier.isEmpty ? "None remembered" : settings.panelIdentifier)
-            .foregroundStyle(settings.panelIdentifier.isEmpty ? .secondary : .primary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-
-          Spacer()
-
+      Section {
+        LabeledContent(connectionStatusText) {
           Button("Rescan") {
             rescan()
           }
         }
+      } header: {
+        sectionHeader("Device")
       }
 
-      Section("Plugin") {
-        HStack {
-          Text(pluginStatusText)
-            .foregroundStyle(pluginStatusColor)
-
-          Spacer()
-
-          if isBusy {
-            ProgressView()
-              .controlSize(.small)
-          }
-
-          Button("Uninstall Plugin") {
-            uninstallPlugin()
-          }
-          .disabled(isBusy)
-        }
-
-        if appModel.pluginInstaller.needsReregistration() {
+      Section {
+        LabeledContent {
           HStack {
-            Text("Claude Mascot has moved since the plugin was installed.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
+            if isBusy {
+              ProgressView()
+                .controlSize(.small)
+            }
 
-            Spacer()
-
-            Button("Re-register") {
-              reregisterPlugin()
+            Button(pluginActionTitle) {
+              pluginAction()
             }
             .disabled(isBusy)
           }
+        } label: {
+          Text(pluginStatusText)
+            .foregroundStyle(pluginStatusColor)
         }
+
+        if appModel.pluginInstaller.needsReregistration() {
+          LabeledContent {
+            Button("Re-register") {
+              installPlugin()
+            }
+            .disabled(isBusy)
+          } label: {
+            Text("Claude Mascot has moved since the plugin was installed.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      } header: {
+        sectionHeader("Plugin")
       }
     }
-    .padding(20)
-    .frame(width: 420)
+    .formStyle(.grouped)
+    .frame(width: 500, height: 600)
+    .task {
+      settings.sleepAfterMinutes = nearestOption(settings.sleepAfterMinutes, in: Self.dimOptions)
+      settings.offAfterMinutes = nearestOption(settings.offAfterMinutes, in: Self.offOptions)
+      appModel.pluginInstaller.refreshOutcome()
+    }
+  }
+
+  private func sectionHeader(_ title: String) -> some View {
+    Text(title)
+      .font(.title3.weight(.semibold))
+      .foregroundStyle(.primary)
+  }
+
+  private func pickerLabel(_ minutes: Int) -> String {
+    minutes == 1 ? "For 1 minute" : "For \(minutes) minutes"
+  }
+
+  private func nearestOption(_ value: Int, in options: [Int]) -> Int {
+    options.min(by: { abs($0 - value) < abs($1 - value) }) ?? value
+  }
+
+  private var connectionStatusText: String {
+    switch appModel.bleClient.state {
+    case .connected: return "Connected"
+    case .scanning: return "Scanning…"
+    case .connecting: return "Connecting…"
+    case .off, .disconnected: return "Not connected"
+    }
   }
 
   private var pluginStatusText: String {
@@ -146,21 +165,16 @@ struct SettingsView: View {
     }
   }
 
-  private func chooseAnimationFolder() {
-    let panel = NSOpenPanel()
-    panel.canChooseDirectories = true
-    panel.canChooseFiles = false
-    panel.allowsMultipleSelection = false
-    panel.prompt = "Choose"
-
-    guard panel.runModal() == .OK, let url = panel.url else { return }
-    settings.animationFolderPath = url.path
-    appModel.animationLibrary.overrideFolder = url
+  private var pluginActionTitle: String {
+    appModel.pluginInstaller.outcome == .installed ? "Uninstall" : "Install"
   }
 
-  private func revealAnimationFolder() {
-    guard let url = settings.animationFolderURL else { return }
-    NSWorkspace.shared.activateFileViewerSelecting([url])
+  private func pluginAction() {
+    if appModel.pluginInstaller.outcome == .installed {
+      uninstallPlugin()
+    } else {
+      installPlugin()
+    }
   }
 
   private func rescan() {
@@ -178,7 +192,7 @@ struct SettingsView: View {
     }
   }
 
-  private func reregisterPlugin() {
+  private func installPlugin() {
     isBusy = true
     Task {
       await appModel.pluginInstaller.install()

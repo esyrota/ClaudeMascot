@@ -14,9 +14,9 @@ import os
 ///   it stays unit-testable with a fake clock)
 /// - implements the `enabled` master switch: off stops the BLE client and
 ///   ignores state changes; on starts it and re-applies the current state
-/// - applies live-tunable settings (brightness, animation folder) as they
-///   change; idle timings are baked into `PanelController`'s timings once,
-///   at launch, since `PanelController` treats them as immutable
+/// - applies live-tunable settings (brightness) as they change; idle
+///   timings are baked into `PanelController`'s timings once, at launch,
+///   since `PanelController` treats them as immutable
 /// - surfaces the panel's current state (set by `HookServer` in chunk 4)
 @MainActor
 final class AppModel: ObservableObject {
@@ -31,7 +31,6 @@ final class AppModel: ObservableObject {
 
   let settings: AppSettings
   let bleClient: BLEClient
-  let animationLibrary: AnimationLibrary
   let panelController: PanelController
   let hookServer: HookServer
   let pluginInstaller: PluginInstaller
@@ -44,7 +43,6 @@ final class AppModel: ObservableObject {
   private var tickTask: Task<Void, Never>?
   private let tickInterval: Duration
 
-  private var lastAppliedFolder: URL?
   private var lastAppliedBrightness: Int?
 
   init(
@@ -57,7 +55,6 @@ final class AppModel: ObservableObject {
   ) {
     self.settings = settings
     self.bleClient = bleClient
-    self.animationLibrary = animationLibrary
     self.hookServer = hookServer
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
@@ -68,10 +65,6 @@ final class AppModel: ObservableObject {
       at: FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".idotmatrix")
     )
-
-    let initialFolder = settings.animationFolderURL
-    animationLibrary.overrideFolder = initialFolder
-    self.lastAppliedFolder = initialFolder
 
     let adapter = PanelAdapter(library: animationLibrary, ble: bleClient)
     self.panelController = PanelController(
@@ -194,17 +187,11 @@ final class AppModel: ObservableObject {
     }
   }
 
-  /// Applies settings that can change while the app is running. The
-  /// animation folder override always applies; brightness only re-sends
-  /// while already connected (an idle/off panel reads the current value on
-  /// its next wake, via `PanelController`'s own `brightness` closure).
+  /// Applies settings that can change while the app is running. Brightness
+  /// only re-sends while already connected (an idle/off panel reads the
+  /// current value on its next wake, via `PanelController`'s own
+  /// `brightness` closure).
   private func applyLiveSettings() async {
-    let folder = settings.animationFolderURL
-    if folder != lastAppliedFolder {
-      animationLibrary.overrideFolder = folder
-      lastAppliedFolder = folder
-    }
-
     let brightness = settings.brightness
     if enabled, bleClient.state == .connected, brightness != lastAppliedBrightness {
       lastAppliedBrightness = brightness

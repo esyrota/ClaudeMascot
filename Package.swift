@@ -13,9 +13,9 @@ let package = Package(
         .executableTarget(
             name: "ClaudeMascot",
             dependencies: [],
-            // Info.plist is copied into the bundle by make-app.sh, not by SwiftPM.
-            // Excluding it silences the "unhandled file" build warning.
-            exclude: ["Resources/Info.plist"],
+            // Info.plist and AppIcon.icns are copied into the bundle by make-app.sh,
+            // not by SwiftPM. Excluding them silences the "unhandled file" warning.
+            exclude: ["Resources/Info.plist", "Resources/AppIcon.icns"],
             resources: [.copy("Resources/Animations")]
         ),
         .testTarget(
