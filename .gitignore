@@ -5,3 +5,4 @@ venv/
 *.xcuserstate
 art/preview.png
 art/**/*_preview.png
+.obsidian/
