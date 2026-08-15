@@ -252,39 +252,61 @@ def sleeping():
 # The hand-drawn states
 # --------------------------------------------------------------------------
 
-def imported(src: Path, recolour) -> list:
+def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 0)) -> list:
     """
-    Read a native 32x32 pixel-art GIF frame by frame, repainting it for the panel.
+    Read a hand-drawn GIF frame by frame and repaint it for the panel.
 
-    Both hand-drawn sources are already at panel resolution, so they are taken whole:
-    no resize, no crop, no frame subsampling (art/import_gif.py does all three,
-    because it exists for oversized anti-aliased source art -- these files need none
-    of it). The only change is the palette, via `recolour(rgb) -> rgb`.
+    `recolour(rgb) -> rgb` maps the source palette onto the panel's.
+
+    `native` is the art's own pixel-art resolution, which is not always the file's:
+    a 200x200 export of 19x19 art is resampled back to 19x19 by taking one pixel per
+    native cell. That doubles as the cleanest de-anti-aliasing available, because the
+    blend pixels only ever live on cell boundaries.
+
+    `scale` then blows each native pixel up to a whole number of panel pixels and
+    `at` places the result, so imported art can be landed exactly on the geometry the
+    drawn states use. Anything falling outside the panel is cropped.
+
+    There is no frame subsampling: the source durations are the animation.
+    (`art/import_gif.py` subsamples, crops to a power-of-two window and flattens to a
+    single colour -- it is for art imported blind, not for art drawn for this panel.)
     """
+    from PIL import GifImagePlugin
+    GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_FIRST
+
     im = Image.open(src)
-    if im.size != (SIZE, SIZE):
-        raise SystemExit(f"{src.name}: expected {SIZE}x{SIZE}, got {im.size[0]}x{im.size[1]}")
+    if im.size[0] != im.size[1]:
+        raise SystemExit(f"{src.name}: expected a square canvas, got {im.size[0]}x{im.size[1]}")
+    dx, dy = at
 
     out = []
     for index in range(im.n_frames):
         im.seek(index)
-        source = im.convert("RGB").load()
+        # PIL applies GIF disposal as it iterates, so the frame it yields is already
+        # complete. Compositing onto a running canvas as well makes every frame
+        # accumulate and smears the animation into a trail -- a bug that shipped once.
+        # Flattening the transparency onto black is all that is left to do.
+        flat = Image.alpha_composite(Image.new("RGBA", im.size, (0, 0, 0, 255)),
+                                     im.convert("RGBA")).convert("RGB")
+        source = flat.resize((native, native), Image.NEAREST).load()
         dst_im = frame()
         dst = dst_im.load()
-        for y in range(SIZE):
-            for x in range(SIZE):
-                dst[x, y] = recolour(source[x, y])
+        for y in range(native):
+            for x in range(native):
+                colour = recolour(source[x, y])
+                for sy in range(scale):
+                    for sx in range(scale):
+                        px, py = x * scale + sx + dx, y * scale + sy + dy
+                        if 0 <= px < SIZE and 0 <= py < SIZE:
+                            dst[px, py] = colour
         out.append((dst_im, im.info.get("duration") or 140))
     return out
 
 
-# appear.gif's colours arrive in three well-separated families -- pure black, a shade
-# family at max channel 111-123, and a body family at 246-255 -- with nothing in
-# between, so a threshold on the brightest channel maps them exactly.
-#
-# Its colours arrive in three well-separated families -- pure black, a shade family
-# at max channel 111-123, and a body family at 246-255 -- with nothing in between, so
-# a threshold on the brightest channel maps them exactly.
+# appear.gif is already native 32x32, so it needs no resampling. Its colours arrive in
+# three well-separated families -- pure black, a shade family at max channel 111-123,
+# and a body family at 246-255 -- with nothing in between, so a threshold on the
+# brightest channel maps them exactly.
 APPEAR_SRC = SOURCES / "appear.gif"
 SHADE_MIN, BODY_MIN = 64, 180
 # The panel holds the last frame of a GIF for its own duration before looping. Giving
@@ -308,30 +330,41 @@ def appear():
     return out
 
 
-# working.gif is drawn on white paper rather than on black, so a brightness threshold
-# would read its background as the brightest thing in the frame. It has an exact
-# five-entry palette instead (it was cleaned up to one on import from the artist's
-# screen capture), so it maps colour for colour -- and an unexpected colour is a
-# corrupted source, not something to guess at.
-WORKING_SRC = SOURCES / "working.gif"
+# The sweep comes from the mascot's own loading animation, exported at 200x200. Its
+# art is 19x19 -- one native pixel every 10.53 file pixels -- and at that resolution
+# it is EXACTLY the geometry above at half scale: an 8x6 torso, 2-tall arms, 1x1 eyes
+# and four 1x2 legs. Doubling it therefore lands on the same 16x12 torso, 4x4 arms and
+# 2x4 legs every drawn state uses, with the feet flush on the bottom row, which is
+# what WORKING_AT places. Importing it at 1:1 instead would put a half-size mascot on
+# the panel, and cutting to it from any other state would visibly shrink the figure.
+#
+# The one cost of 2x: at that size the sweep wants 38 columns and the panel has 32, so
+# WORKING_AT's -4 is a compromise struck on the horizontal. It puts the crouched,
+# sweeping frames -- five sixths of the animation -- fully on the panel with the whole
+# broom legible, and pays for it in the standing frames at either end, where the figure
+# sits flush left and 2px of its left arm run off the edge. Pulling that back to -2
+# makes every frame's silhouette pixel-identical to idle.gif but clips the top of the
+# broom, leaving a 4px smudge in the corner where the prop should be.
+WORKING_SRC = SOURCES / "claude-claude-code-1.gif"
+WORKING_NATIVE, WORKING_SCALE, WORKING_AT = 19, 2, (-4, 2)
 WORKING_PALETTE = {
-    (252, 252, 252): BG,            # paper
-    (211, 106, 76): MASCOT,
-    (184, 93, 66): MASCOT_DARK,     # the drawn shading down one side
-    (130, 130, 130): PROP,          # the broom
-    (8, 4, 4): EYE,
+    (0, 0, 0): BG,                  # background, and the eyes
+    (216, 112, 80): MASCOT,
+    (184, 104, 72): MASCOT_DARK,    # the drawn shading down one side
+    (136, 136, 136): PROP,          # the broom
 }
 
 
 def sweep():
-    """Working: the mascot picks up a broom and sweeps the floor while Claude works."""
+    """Working: the mascot sweeps the floor with a broom while Claude works."""
     def recolour(rgb):
-        try:
-            return WORKING_PALETTE[rgb]
-        except KeyError:
-            raise SystemExit(f"{WORKING_SRC.name}: unexpected colour {rgb}")
+        # A handful of anti-aliased pixels from the 200x200 export survive on cell
+        # boundaries; nearest-colour snaps each back to the side it came from.
+        return min(WORKING_PALETTE.items(),
+                   key=lambda kv: sum((a - b) ** 2 for a, b in zip(rgb, kv[0])))[1]
 
-    return imported(WORKING_SRC, recolour)
+    return imported(WORKING_SRC, recolour, native=WORKING_NATIVE,
+                    scale=WORKING_SCALE, at=WORKING_AT)
 
 
 def off():

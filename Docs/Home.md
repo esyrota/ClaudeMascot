@@ -52,6 +52,7 @@ Each one cost a wrong diagnosis to find.
 | Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
 | Art generator | `art/generate.py` | working, 8 states — 6 drawn, `starting` and `working` imported from hand-drawn art in `art/sources/` |
+| App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol |
 | Python daemon | `legacy/` | **retired and non-functional** |

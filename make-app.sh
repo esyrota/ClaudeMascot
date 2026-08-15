@@ -33,6 +33,17 @@ chmod +x "$APP_MACOS/$APP_NAME"
 echo "Copying Info.plist..."
 cp "Sources/ClaudeMascot/Resources/Info.plist" "$APP_CONTENTS/Info.plist"
 
+# Copy the icon. Info.plist names it via CFBundleIconFile, so the bundle shows a
+# generic icon in Finder without this step -- LSUIElement keeps it out of the Dock,
+# but Finder, Spotlight and the plugin-install alert all still show it.
+# Rebuild it with `python art/make_icon.py` after changing art/sources/logo.gif.
+echo "Copying icon..."
+if [ ! -f "Sources/ClaudeMascot/Resources/AppIcon.icns" ]; then
+  echo "ERROR: AppIcon.icns missing -- run: venv/bin/python art/make_icon.py" >&2
+  exit 1
+fi
+cp "Sources/ClaudeMascot/Resources/AppIcon.icns" "$APP_RESOURCES/AppIcon.icns"
+
 # Copy the animations INTO the bundle. AnimationLibrary looks these up via
 # Bundle.main ("Contents/Resources/Animations"), so without this step the app
 # builds and signs fine but cannot find a single animation at runtime.

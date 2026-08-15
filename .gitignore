@@ -6,4 +6,4 @@ venv/
 art/preview.png
 art/**/*_preview.png
 .obsidian/
-art/sources/*.mov
+__pycache__/
