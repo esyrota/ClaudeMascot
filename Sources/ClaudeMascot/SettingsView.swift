@@ -1,9 +1,8 @@
-import AppKit
 import SwiftUI
 
 /// The `Settings { }` scene's content: one pane covering every knob in
-/// `Settings`, plus a device row for the remembered panel and a "Rescan"
-/// action.
+/// `Settings`, plus a device row showing connection status and a "Rescan"
+/// action, and a plugin row showing probed install status.
 struct SettingsView: View {
   @ObservedObject var appModel: AppModel
   @ObservedObject var settings: AppSettings
@@ -17,7 +16,7 @@ struct SettingsView: View {
 
   var body: some View {
     Form {
-      Section {
+      Section("General") {
         Toggle(
           "Launch at login",
           isOn: Binding(
@@ -28,40 +27,32 @@ struct SettingsView: View {
       }
 
       Section("Panel") {
-        HStack {
-          Text("Brightness")
-          Slider(
-            value: Binding(
-              get: { Double(settings.brightness) },
-              set: { settings.brightness = Int($0.rounded()) }
-            ), in: 5...100, step: 1)
-          Text("\(settings.brightness)%")
-            .monospacedDigit()
-            .frame(width: 44, alignment: .trailing)
+        LabeledContent("Brightness") {
+          HStack {
+            Slider(
+              value: Binding(
+                get: { Double(settings.brightness) },
+                set: { settings.brightness = Int($0.rounded()) }
+              ), in: 5...100, step: 1)
+            Text("\(settings.brightness)%")
+              .monospacedDigit()
+              .frame(width: 44, alignment: .trailing)
+          }
         }
 
-        HStack {
-          Text("Sleep after")
+        LabeledContent("Sleep after") {
           Stepper(
             "\(settings.sleepAfterMinutes) min", value: $settings.sleepAfterMinutes, in: 1...60)
         }
 
-        HStack {
-          Text("Panel off after")
+        LabeledContent("Panel off after") {
           Stepper(
             "\(settings.offAfterMinutes) min", value: $settings.offAfterMinutes, in: 1...120)
         }
       }
 
       Section("Device") {
-        HStack {
-          Text(settings.panelIdentifier.isEmpty ? "None remembered" : settings.panelIdentifier)
-            .foregroundStyle(settings.panelIdentifier.isEmpty ? .secondary : .primary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-
-          Spacer()
-
+        LabeledContent(connectionStatusText) {
           Button("Rescan") {
             rescan()
           }
@@ -69,41 +60,51 @@ struct SettingsView: View {
       }
 
       Section("Plugin") {
-        HStack {
+        LabeledContent {
+          HStack {
+            if isBusy {
+              ProgressView()
+                .controlSize(.small)
+            }
+
+            Button(pluginActionTitle) {
+              pluginAction()
+            }
+            .disabled(isBusy)
+          }
+        } label: {
           Text(pluginStatusText)
             .foregroundStyle(pluginStatusColor)
-
-          Spacer()
-
-          if isBusy {
-            ProgressView()
-              .controlSize(.small)
-          }
-
-          Button("Uninstall Plugin") {
-            uninstallPlugin()
-          }
-          .disabled(isBusy)
         }
 
         if appModel.pluginInstaller.needsReregistration() {
-          HStack {
+          LabeledContent {
+            Button("Re-register") {
+              installPlugin()
+            }
+            .disabled(isBusy)
+          } label: {
             Text("Claude Mascot has moved since the plugin was installed.")
               .font(.caption)
               .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Button("Re-register") {
-              reregisterPlugin()
-            }
-            .disabled(isBusy)
           }
         }
       }
     }
-    .padding(20)
-    .frame(width: 420)
+    .formStyle(.grouped)
+    .frame(width: 500)
+    .task {
+      appModel.pluginInstaller.refreshOutcome()
+    }
+  }
+
+  private var connectionStatusText: String {
+    switch appModel.bleClient.state {
+    case .connected: return "Connected"
+    case .scanning: return "Scanning…"
+    case .connecting: return "Connecting…"
+    case .off, .disconnected: return "Not connected"
+    }
   }
 
   private var pluginStatusText: String {
@@ -123,6 +124,18 @@ struct SettingsView: View {
     }
   }
 
+  private var pluginActionTitle: String {
+    appModel.pluginInstaller.outcome == .installed ? "Uninstall" : "Install"
+  }
+
+  private func pluginAction() {
+    if appModel.pluginInstaller.outcome == .installed {
+      uninstallPlugin()
+    } else {
+      installPlugin()
+    }
+  }
+
   private func rescan() {
     settings.panelIdentifier = ""
     guard appModel.enabled else { return }
@@ -138,7 +151,7 @@ struct SettingsView: View {
     }
   }
 
-  private func reregisterPlugin() {
+  private func installPlugin() {
     isBusy = true
     Task {
       await appModel.pluginInstaller.install()
