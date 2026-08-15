@@ -3,7 +3,16 @@ import SwiftUI
 
 @main
 struct ClaudeMascotApp: App {
-  @StateObject private var appModel = AppModel()
+  @StateObject private var appModel: AppModel
+
+  // `StateObject`'s wrappedValue is an autoclosure, so `AppModel()` — which
+  // binds the hook socket and starts the BLE client — is not evaluated until
+  // SwiftUI first renders the body, strictly after this initializer clears
+  // out any older copy of the app.
+  init() {
+    SingleInstance.terminateOtherInstances()
+    _appModel = StateObject(wrappedValue: AppModel())
+  }
 
   var body: some Scene {
     MenuBarExtra {
