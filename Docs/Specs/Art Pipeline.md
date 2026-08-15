@@ -52,10 +52,15 @@ Two consequences worth knowing before editing a state:
 ## Style rules
 
 - One flat colour for every mascot pixel — `MASCOT = (255, 68, 4)`
-- `MASCOT_DARK = (255, 24, 0)` shades a turn, and appears only in `appear.gif`. Its
-  source art uses `(120, 50, 16)`, a mid-tone the panel renders blue-violet, so it is
-  deepened the only way the hardware allows: green and blue down, red pinned at 255.
-  It therefore reads as a deeper red-orange, not a true shadow
+- Two shades, because the two hand-drawn sources shade by different amounts. Both
+  deepen the hue rather than dimming it — green and blue down, red pinned at 255 —
+  which is the only way the hardware allows, so both read as a deeper red-orange
+  rather than a true shadow:
+  - `MASCOT_DARK = (255, 24, 0)` for `appear.gif`, whose own shade genuinely is dark
+    (its source drops from 246–255 to `(120, 50, 16)`)
+  - `MASCOT_SHADE = (255, 50, 2)` for the sweep, whose shading is only a 15% step
+    (`(216,112,80)` → `(184,104,72)`). Sending that to `MASCOT_DARK` turned a gentle
+    roll of the body into a hard two-tone band
 - Pure black eyes, no floor, no highlight or shade bands
 - Max channel must stay at 255 — see [[Panel Quirks]] before changing the colour
 - ≥ `MIN_COLORS` (9) distinct colours per frame, padded invisibly via blue-channel
@@ -103,13 +108,36 @@ lands the figure on the same silhouette every drawn state uses. Importing at 1:1
 instead would put a half-size mascot on the panel and cutting to it from any other
 state would visibly shrink the figure.
 
-The cost is horizontal: doubled, the sweep wants 38 columns and the panel has 32.
-`WORKING_AT`'s −4 puts the crouched sweeping frames — five sixths of the animation —
-fully on the panel with the whole broom legible, and pays for it in the standing
-frames at either end, where the figure sits flush left and 2px of its left arm run off
-the edge. Pulling it back to −2 makes every silhouette pixel-identical to `idle.gif`
-but clips the top of the broom, leaving a 4px smudge where the prop should be. There
-is no offset that gives both.
+### The crop tracks the figure
+
+Doubled, the sweep spans 38 columns against the panel's 32, and no *fixed* offset
+fits both the figure and its prop: centring the mascot clips the broom to a smudge,
+and pushing the broom on clips the mascot's own left arm while it stands. So
+`working_at()` pins the figure's left edge to the panel's, frame by frame. Its left
+edge only ever takes two values — it steps right as it crouches — so this is one 4px
+pan twice a loop, both times inside a pose change big enough to hide it. Every
+silhouette then survives whole and the broom is fully on-panel through the sweep; the
+only thing still cropped is the tip of the handle in the three frames where it is in
+mid-air.
+
+### Two repairs to the source
+
+The source's standing frames are redrawn rather than held, and two of those wobbles
+stop reading as life and start reading as damage once doubled onto 32px. `frame 0` is
+the same pose drawn correctly, so `WORKING_REPAIRS` fixes both against it:
+
+| Frames | Wobble |
+|---|---|
+| 1–4 | the **left eye** is two cells wide while the right stays at one |
+| 1–4, 32–33 | the **legs** are a cell short, filling the row where the four gaps belong |
+
+Each repair names the cells, the colour they must currently hold, and the colour to
+paint. The check on the current colour is the point: if the source art is ever
+replaced, the build fails loudly instead of silently painting over something else.
+
+Still unrepaired, and visible in the same frames: the mascot's **arms sit at different
+heights** there (left at eye level, right two cells lower). Fixing it means moving a
+limb rather than patching four cells, so it is left alone.
 
 ## The app icon
 
