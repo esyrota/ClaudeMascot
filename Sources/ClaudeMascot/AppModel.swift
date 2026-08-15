@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import os
 
 /// Owns the pieces (`Settings`, `BLEClient`, `AnimationLibrary`, `HookServer`)
 /// plus the `PanelController`/`PanelAdapter` that tie them together, and is
@@ -34,6 +35,10 @@ final class AppModel: ObservableObject {
   let panelController: PanelController
   let hookServer: HookServer
   let pluginInstaller: PluginInstaller
+
+  /// Hook events as they arrive, so "the panel never changed" can be told
+  /// apart from "no hook ever reached the app" without guesswork.
+  private static let log = Logger(subsystem: "com.eugene.claudemascot", category: "events")
 
   private var cancellables: Set<AnyCancellable> = []
   private var tickTask: Task<Void, Never>?
@@ -74,9 +79,9 @@ final class AppModel: ObservableObject {
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),
-        // Matches starting.gif's total frame duration (art/generate.py) so
-        // the boot animation plays exactly once before handing off.
-        startingHold: 1.48
+        // Matches starting.gif's motion length, which art/generate.py prints
+        // on every run, so the entrance plays exactly once before handing off.
+        startingHold: 6.02
       ),
       brightness: { settings.brightness }
     )
@@ -115,12 +120,18 @@ final class AppModel: ObservableObject {
       .sink { [weak self] event in
         guard let self else { return }
         guard let event else { return }
-        guard self.enabled else { return }
+        guard self.enabled else {
+          Self.log.debug("\(event.event, privacy: .public) ignored (disabled)")
+          return
+        }
 
         guard let state = EventPolicy.state(for: event) else {
           // Event is not ours to act on; ignore entirely.
+          Self.log.debug("\(event.event, privacy: .public) carries no panel state")
           return
         }
+        Self.log.notice(
+          "\(event.event, privacy: .public) -> \(state.rawValue, privacy: .public)")
 
         self.currentState = state
         self.panelController.handle(state)

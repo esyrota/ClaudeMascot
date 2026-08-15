@@ -231,6 +231,65 @@ func startingHoldShowsBootAnimationThenHandsOffToDesiredState() async {
 }
 
 @Test @MainActor
+func sessionStartReplaysEntranceThenSettlesIntoIdle() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600, startingHold: 5),
+    clock: clock
+  )
+
+  // Get past the launch entrance so this test is only about the second one.
+  clock.advance(5)
+  await controller.tick()
+  #expect(controller.displayed == .idle)
+
+  controller.handle(.starting)
+  await controller.tick()
+  #expect(controller.displayed == .starting)
+
+  clock.advance(4)
+  await controller.tick()
+  #expect(controller.displayed == .starting)
+
+  clock.advance(1)  // entrance over: `.starting` is never sat in
+  await controller.tick()
+  #expect(controller.displayed == .idle)
+}
+
+@Test @MainActor
+func wakingADarkPanelReplaysEntranceBeforeTheDesiredState() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600, startingHold: 5),
+    clock: clock
+  )
+
+  clock.advance(5)
+  await controller.tick()
+  clock.advance(600)  // idle -> sleeping -> off
+  await controller.tick()
+  #expect(controller.isPanelOff == true)
+
+  // A prompt arriving at a dark panel: the mascot has to appear before it can
+  // be seen thinking.
+  let callsBeforeWake = panel.calls.count
+  controller.handle(.thinking)
+  await controller.tick()
+  #expect(controller.displayed == .starting)
+  #expect(
+    Array(panel.calls[callsBeforeWake...])
+      == [.setPower(true), .setBrightness(40), .upload(.starting)])
+
+  clock.advance(5)
+  await controller.tick()
+  #expect(controller.displayed == .thinking)
+}
+
+@Test @MainActor
 func offPowersDownImmediatelyWithoutWaitingForIdleEscalation() async {
   let clock = FakeClock()
   let panel = MockPanel()
