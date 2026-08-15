@@ -65,6 +65,16 @@ final class BLEClient: NSObject, ObservableObject {
   private static let identifierDefaultsKey = "panelIdentifier"
   private static let scanTimeoutSeconds: Double = 6
   private static let maxReconnectDelaySeconds = 30
+  /// How long to wait for a direct connect to a remembered peripheral before
+  /// giving up on it.
+  ///
+  /// `CBCentralManager.connect` has no timeout of its own and never fails: if
+  /// the peripheral is not advertising, the request simply stays pending, and
+  /// none of the delegate callbacks that would schedule a reconnect ever
+  /// fire. Without this the client wedges in `.connecting` for the rest of
+  /// the app's life and every upload fails `.notConnected` — a panel that
+  /// goes dark and never comes back.
+  private static let connectTimeoutSeconds: Double = 10
 
   private var centralManager: CBCentralManager?
   private var peripheral: CBPeripheral?
@@ -74,7 +84,14 @@ final class BLEClient: NSObject, ObservableObject {
   private var reconnectDelaySeconds = 1
   private var reconnectTask: Task<Void, Never>?
   private var scanTimeoutTask: Task<Void, Never>?
+  private var connectTimeoutTask: Task<Void, Never>?
   private var pendingServiceCount = 0
+
+  /// Set when connecting to the remembered peripheral has just failed, so the
+  /// next attempt scans instead. Retrying a stale identifier forever is the
+  /// one way this can back off to its 30s ceiling and still never find a
+  /// panel that is sitting right there advertising under a new identity.
+  private var skipRememberedPeripheral = false
 
   /// The single in-flight write, if any. Guards against a duplicate resume:
   /// once a delegate callback resumes it, it is set to `nil` immediately, so
@@ -109,6 +126,8 @@ final class BLEClient: NSObject, ObservableObject {
     reconnectTask = nil
     scanTimeoutTask?.cancel()
     scanTimeoutTask = nil
+    connectTimeoutTask?.cancel()
+    connectTimeoutTask = nil
 
     if state == .scanning {
       centralManager?.stopScan()
@@ -165,7 +184,8 @@ final class BLEClient: NSObject, ObservableObject {
     guard isStarted, let centralManager, centralManager.state == .poweredOn else { return }
     lastError = nil
 
-    if let identifierString = UserDefaults.standard.string(forKey: Self.identifierDefaultsKey),
+    if !skipRememberedPeripheral,
+      let identifierString = UserDefaults.standard.string(forKey: Self.identifierDefaultsKey),
       let identifier = UUID(uuidString: identifierString)
     {
       let known = centralManager.retrievePeripherals(withIdentifiers: [identifier])
@@ -174,6 +194,7 @@ final class BLEClient: NSObject, ObservableObject {
         return
       }
     }
+    skipRememberedPeripheral = false
     startScanning()
   }
 
@@ -182,6 +203,29 @@ final class BLEClient: NSObject, ObservableObject {
     candidate.delegate = self
     updateState(.connecting)
     centralManager?.connect(candidate, options: nil)
+
+    connectTimeoutTask?.cancel()
+    connectTimeoutTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(Self.connectTimeoutSeconds))
+      guard let self, !Task.isCancelled else { return }
+      self.handleConnectTimeout()
+    }
+  }
+
+  /// Abandons a connect that never resolved, and makes the next attempt scan.
+  private func handleConnectTimeout() {
+    guard state == .connecting, let pending = peripheral else { return }
+    Self.log.error("connect timed out; falling back to a scan")
+    centralManager?.cancelPeripheralConnection(pending)
+    peripheral = nil
+    skipRememberedPeripheral = true
+    lastError = .deviceNotFound
+    guard isStarted else {
+      updateState(.off)
+      return
+    }
+    updateState(.disconnected)
+    scheduleReconnect()
   }
 
   private func startScanning() {
@@ -226,6 +270,9 @@ final class BLEClient: NSObject, ObservableObject {
 
   private func updateState(_ newState: ConnectionState) {
     guard state != newState else { return }
+    let previous = String(describing: state)
+    Self.log.notice(
+      "\(previous, privacy: .public) -> \(String(describing: newState), privacy: .public)")
     state = newState
     onStateChange?(newState)
   }
@@ -284,7 +331,10 @@ final class BLEClient: NSObject, ObservableObject {
 
   private func handleConnect(_ connected: CBPeripheral) {
     guard connected === peripheral else { return }
+    connectTimeoutTask?.cancel()
+    connectTimeoutTask = nil
     reconnectDelaySeconds = 1
+    skipRememberedPeripheral = false
     UserDefaults.standard.set(connected.identifier.uuidString, forKey: Self.identifierDefaultsKey)
     writeCharacteristic = nil
     pendingServiceCount = 0
@@ -294,10 +344,14 @@ final class BLEClient: NSObject, ObservableObject {
 
   private func handleFailToConnect(_ failed: CBPeripheral, error: Error?) {
     guard failed === peripheral else { return }
+    connectTimeoutTask?.cancel()
+    connectTimeoutTask = nil
     if let error {
       Self.log.error("connect failed: \(error.localizedDescription, privacy: .public)")
     }
     peripheral = nil
+    // The remembered peripheral just refused; scan for it next time round.
+    skipRememberedPeripheral = true
     lastError = .deviceNotFound
     guard isStarted else {
       updateState(.off)
@@ -309,6 +363,8 @@ final class BLEClient: NSObject, ObservableObject {
 
   private func handleDisconnect(_ disconnected: CBPeripheral, error: Error?) {
     guard disconnected === peripheral else { return }
+    connectTimeoutTask?.cancel()
+    connectTimeoutTask = nil
     if let error { Self.log.error("disconnected: \(error.localizedDescription, privacy: .public)") }
     peripheral = nil
     writeCharacteristic = nil
