@@ -53,29 +53,6 @@ struct SettingsView: View {
         }
       }
 
-      Section("Animation folder") {
-        HStack {
-          Text(
-            settings.animationFolderPath.isEmpty
-              ? "Bundled animations" : settings.animationFolderPath
-          )
-          .foregroundStyle(settings.animationFolderPath.isEmpty ? .secondary : .primary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-
-          Spacer()
-
-          Button("Choose…") {
-            chooseAnimationFolder()
-          }
-
-          Button("Reveal in Finder") {
-            revealAnimationFolder()
-          }
-          .disabled(settings.animationFolderURL == nil)
-        }
-      }
-
       Section("Device") {
         HStack {
           Text(settings.panelIdentifier.isEmpty ? "None remembered" : settings.panelIdentifier)
@@ -144,23 +121,6 @@ struct SettingsView: View {
     case .installed: return .green
     case .claudeNotFound, .failed: return .red
     }
-  }
-
-  private func chooseAnimationFolder() {
-    let panel = NSOpenPanel()
-    panel.canChooseDirectories = true
-    panel.canChooseFiles = false
-    panel.allowsMultipleSelection = false
-    panel.prompt = "Choose"
-
-    guard panel.runModal() == .OK, let url = panel.url else { return }
-    settings.animationFolderPath = url.path
-    appModel.animationLibrary.overrideFolder = url
-  }
-
-  private func revealAnimationFolder() {
-    guard let url = settings.animationFolderURL else { return }
-    NSWorkspace.shared.activateFileViewerSelecting([url])
   }
 
   private func rescan() {

@@ -14,7 +14,6 @@ import SwiftUI
 final class AppSettings: ObservableObject {
   @AppStorage("autoConnect") var autoConnect: Bool = true
   @AppStorage("brightness") var brightness: Int = 35
-  @AppStorage("animationFolder") var animationFolderPath: String = ""
   @AppStorage("sleepAfterMinutes") var sleepAfterMinutes: Int = 5
   @AppStorage("offAfterMinutes") var offAfterMinutes: Int = 10
   @AppStorage("panelIdentifier") var panelIdentifier: String = ""
@@ -29,12 +28,6 @@ final class AppSettings: ObservableObject {
   /// be queried. The authoritative value is always `launchAtLogin`'s
   /// getter, which reflects the live `.status`.
   @AppStorage("launchAtLogin") private var launchAtLoginStored: Bool = false
-
-  /// `animationFolderPath` resolved to a `URL`, or `nil` when unset (the
-  /// default — falls back to bundled art via `AnimationLibrary`).
-  var animationFolderURL: URL? {
-    animationFolderPath.isEmpty ? nil : URL(fileURLWithPath: animationFolderPath)
-  }
 
   /// Reflects the real login-item status rather than just the stored
   /// preference, since the user (or macOS) can change it outside the app —
