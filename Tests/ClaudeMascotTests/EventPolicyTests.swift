@@ -6,7 +6,7 @@ import Testing
 @Test(
   "all nine Claude Code events map to the documented PanelState",
   arguments: [
-    ("SessionStart", PanelState.idle),
+    ("SessionStart", PanelState.starting),
     ("UserPromptSubmit", .thinking),
     ("PreToolUse", .working),
     ("PostToolUse", .thinking),

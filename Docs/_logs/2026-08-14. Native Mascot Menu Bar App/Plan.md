@@ -1,6 +1,6 @@
 # Native Mascot Menu Bar App — Implementation Plan
 
-**Source:** [[Task]]
+**Source:** [[_logs/2026-08-14. Native Mascot Menu Bar App/Task]]
 **Touches:** [[Menu Bar App]], [[BLE Protocol]], [[Claude Code Plugin]], [[Art Pipeline]], [[macOS Bluetooth TCC]], [[Panel Quirks]], [[Library Quirks]]
 
 ## Scope

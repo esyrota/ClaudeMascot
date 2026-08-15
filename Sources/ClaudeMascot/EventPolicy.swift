@@ -23,7 +23,9 @@ enum EventPolicy {
   /// wait.
   static func state(for event: HookEvent) -> PanelState? {
     switch event.event {
-    case "SessionStart": return .idle
+    // The entrance, not `.idle`: a new session is the mascot arriving, and
+    // `PanelController` settles it into `.idle` once the animation finishes.
+    case "SessionStart": return .starting
     case "UserPromptSubmit": return .thinking
     case "PreToolUse": return .working
     case "PostToolUse": return .thinking

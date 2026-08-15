@@ -8,9 +8,12 @@ import Foundation
 /// `idle` for a while (see `PanelTimings.sleepAfter`). Both are represented
 /// by the same case.
 ///
-/// `starting` is never written by a hook; `PanelController` shows it on its
-/// own for `PanelTimings.startingHold` right after launch (see its `bootAt`
-/// bookkeeping), then falls through to whatever state is actually desired.
+/// `starting` is the entrance animation — the mascot rising out of nothing —
+/// and is the one state the machine never sits in. `PanelController` plays it
+/// for `PanelTimings.startingHold` and then falls through to whatever state
+/// is actually desired (see its `appearingUntil` bookkeeping). It runs at the
+/// three moments the mascot arrives from nothing: app launch, `SessionStart`,
+/// and a wake from a dark panel.
 ///
 /// `off` is written by the `SessionEnd` hook to blank the panel immediately,
 /// rather than waiting out the idle -> sleeping -> off escalation. Like the

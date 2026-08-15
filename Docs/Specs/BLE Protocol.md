@@ -1,7 +1,12 @@
 # BLE Protocol
 
-What [[Menu Bar App]] must reimplement in Swift. Ported from `idotmatrix/modules/gif.py`
-and `idotmatrix/connection_manager.py`.
+The wire contract with the panel, reverse-engineered from
+`idotmatrix/modules/gif.py` and `idotmatrix/connection_manager.py` before that library
+was dropped. **This page is the contract; it is not a description of the code.**
+
+Implemented by `Sources/ClaudeMascot/GifPacketizer.swift` (framing) and
+`BLEClient.swift` (discovery, connection, writes), and pinned byte-for-byte by
+`Tests/Fixtures/` — if Swift and the fixtures disagree, the Swift side is wrong.
 
 **Key simplification:** the app never *encodes* GIFs. [[Art Pipeline]] emits final
 32×32 GIF files; the app reads those bytes and frames them for BLE. That removes all
@@ -19,6 +24,10 @@ image processing from the Swift side.
 Scan filters on advertised local name beginning `IDM-`. Prefer reconnecting to a
 remembered identifier (CoreBluetooth `retrievePeripherals(withIdentifiers:)`) — that
 skips the ~5s scan and connects in ~1–3s.
+
+**But bound that preference with a timeout.** A remembered identifier that is no longer
+advertising makes `connect` pend forever, and one failed attempt must fall back to
+scanning rather than retrying the same identifier — see [[macOS Bluetooth TCC]].
 
 Do **not** read back after writing; the panel refuses it (see [[Library Quirks]]).
 
@@ -47,21 +56,19 @@ A typical 32×32 animation is ~1.5–3KB, so one 4096 chunk and a handful of wri
 
 ## Other commands
 
-Ported from `modules/common.py`:
+Short fixed byte arrays, ported from `modules/common.py`; the literals are in
+`BLEClient.swift`.
 
-- **Brightness** (5–100) — `set_brightness`
-- **Power on / off** — used by the idle escalation to blank the panel
-
-Read the exact byte sequences from the Python source when implementing; they are
-short fixed arrays.
+- **Brightness** (5–100) — rejected outside that range
+- **Power on / off** — used by the idle escalation to blank the panel, and by
+  `SessionEnd`. A real power-off, never a black image
 
 ## Verification
 
-Port correctness can be checked without hardware: run the Python packetiser and the
-Swift one over the same GIF and compare bytes. The Python side:
+No hardware needed. `art/export_golden.py` reframes every bundled GIF using a
+self-contained port of the original Python framing and writes `Tests/Fixtures/`
+(the GIF, its packets, and a manifest of lengths and CRCs); `GifPacketizerTests`
+then asserts the Swift output matches byte for byte.
 
-```python
-gif.create_gif_data_packets(gif_data=data, gif_type=12, time_sign=1)
-```
-
-For a known file this yields a stable byte sequence — a good golden-file test.
+**Regenerate the fixtures whenever the art changes** — the animations are inputs to
+these tests, so `art/generate.py` and `art/export_golden.py` are run as a pair.

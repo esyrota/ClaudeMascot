@@ -49,6 +49,35 @@ An app bundle that declares the key itself:
 Then the app *is* the responsible process, macOS prompts once for the app, and no
 Terminal is involved. This is the core justification for [[Menu Bar App]].
 
+## CoreBluetooth's connect never times out
+
+Unrelated to TCC, but the same class of silent stall, and it is what a dark panel
+usually turns out to be:
+
+`CBCentralManager.connect` has **no timeout and never fails**. Point it at a remembered
+peripheral that is not advertising and the request simply stays pending forever — no
+`didFailToConnect`, no `didDisconnect`, so none of the callbacks that would schedule a
+reconnect ever run. `BLEClient` wedges in `.connecting`, every upload fails
+`.notConnected`, and the panel stays black for the life of the process.
+
+`BLEClient.connectTimeoutSeconds` (10s) bounds it: on expiry it cancels the pending
+connect and sets `skipRememberedPeripheral`, so the next attempt **scans** instead of
+reaching for the same stale identifier and stalling again.
+
+## Symptom to check first
+
+A silent CoreBluetooth is diagnosable now: `BLEClient` logs every connection-state
+transition, and `PanelController` logs every upload, wake and power-off.
+
+```
+log stream --predicate 'subsystem == "com.eugene.claudemascot"' --info
+```
+
+**No `ble` category output at all** — not even `off -> scanning` — means
+`centralManagerDidUpdateState` never fired, which normally takes milliseconds. That is
+the signature of the permission grant not applying (a re-signed bundle gets a new
+identity, and ad-hoc signing re-signs on every build), *not* of a missing panel.
+
 ## Testing note
 
 Anything Bluetooth must be exercised by launching through Terminal (today) or the
