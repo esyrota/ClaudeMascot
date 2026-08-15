@@ -32,7 +32,7 @@ events are not tool-scoped and take no matcher.
 
 | Event | Async | Event → App state |
 |-------|-------|-------------------|
-| `SessionStart` | yes | `idle` |
+| `SessionStart` | yes | `starting` (the entrance, which settles into `idle`) |
 | `UserPromptSubmit` | yes | `thinking` |
 | `PreToolUse` | yes | `working` |
 | `PostToolUse` | yes | `thinking` |

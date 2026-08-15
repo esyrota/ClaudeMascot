@@ -6,6 +6,14 @@ conversation is doing: thinking, running tools, waiting on you, finished.
 **Device:** `IDM-E618C5` — CoreBluetooth UUID `95FFE74B-E5D9-125E-E136-8D25E959FA39`
 (per-host identifier, not a MAC; a different machine sees a different one).
 
+## Working in this repo
+
+**Specs first.** Write or update the spec, then change the code — and when a question
+comes up, read the spec before reading source. Specs carry the contracts, the reasons
+and the hard-won facts; they name the files that implement them rather than restating
+what those files do, so they stay short enough to be read in full and cannot drift into
+a second, staler copy of the code.
+
 ## How it fits together
 
 A native menu bar app owns the hardware and all the decisions; a Claude Code plugin
@@ -40,11 +48,11 @@ Each one cost a wrong diagnosis to find.
 
 | Piece | Location | Status |
 |---|---|---|
-| Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer |
+| Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer, single-instance guard |
 | Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
-| Art generator | `art/generate.py` | working, 8 states |
-| GIF importer | `art/import_gif.py` | working |
+| Art generator | `art/generate.py` | working, 8 states — 7 drawn, `starting` imported from `art/sources/appear.gif` |
+| GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol |
 | Python daemon | `legacy/` | **retired and non-functional** |
 | Colour test card | `art/testcard.py` | diagnostic, keep |
