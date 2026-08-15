@@ -31,7 +31,6 @@ final class AppModel: ObservableObject {
 
   let settings: AppSettings
   let bleClient: BLEClient
-  let animationLibrary: AnimationLibrary
   let panelController: PanelController
   let hookServer: HookServer
   let pluginInstaller: PluginInstaller
@@ -56,7 +55,6 @@ final class AppModel: ObservableObject {
   ) {
     self.settings = settings
     self.bleClient = bleClient
-    self.animationLibrary = animationLibrary
     self.hookServer = hookServer
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval

@@ -73,5 +73,3 @@ plugin on first launch, and the repo is no longer a marketplace.
   cannot make the panel flicker; also fixes event ordering as a side effect.
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.
-- `PluginInstaller.outcome` resets each launch, so Options reports "Plugin not
-  installed" until the user interacts with it. Cosmetic but misleading.
