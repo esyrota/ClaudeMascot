@@ -24,6 +24,7 @@ orange like (200,80,0) would render blue.
     python art/generate.py     # writes the app's bundled GIFs + art/preview.png
 """
 
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -460,6 +461,63 @@ STATES = {
 }
 
 
+# Metadata for each clip: pose, variant group, loops flag, and transition endpoints.
+# This drives both the clips.json manifest and the Swift animation layer.
+CLIP_METADATA = {
+    "starting": {
+        "loops": False,
+        "fromPose": "offBottom",
+        "toPose": "standing",
+    },
+    "idle": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 1.0,
+    },
+    "thinking": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "thinking",
+        "weight": 1.0,
+    },
+    "waiting": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "waiting",
+        "weight": 1.0,
+    },
+    "done": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "done",
+        "weight": 1.0,
+    },
+    "working": {
+        "loops": True,
+        "pose": "sitting",
+        "variantGroup": "working",
+        "weight": 1.0,
+    },
+    "sleeping": {
+        # Declared as lying even though current art draws it standing.
+        # Chunk 8 will redraw sleeping() to actually lie down.
+        "loops": True,
+        "pose": "lying",
+        "variantGroup": "sleeping",
+        "weight": 1.0,
+    },
+    "off": {
+        # Fallback asset never uploaded to hardware (see off()'s docstring).
+        # Included in the manifest to keep the state mapping total.
+        "loops": True,
+        "pose": "offBottom",
+        "variantGroup": "off",
+        "weight": 1.0,
+    },
+}
+
+
 def pad_palette(im: Image.Image) -> Image.Image:
     """
     Top the frame up to MIN_COLORS without putting anything visible on the panel.
@@ -515,22 +573,71 @@ def preview(all_frames) -> Path:
 
 if __name__ == "__main__":
     produced = {}
+    clips_data = {}
+
     for name, fn in STATES.items():
         frames = fn()
         produced[name] = frames
         path = save(name, frames)
+
+        # PIL merges consecutive identical frames during GIF encoding and sums their
+        # durations. Swift schedules against the saved file, not the in-memory frame
+        # list, so we must read frameCount, durationMs, and motionMs back from the
+        # encoded GIF file to match what will actually play.
+        from PIL import GifImagePlugin
+        GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_FIRST
+        gif = Image.open(path)
+        frame_count = gif.n_frames
+        durations = []
+        for frame_idx in range(frame_count):
+            gif.seek(frame_idx)
+            durations.append(gif.info.get("duration") or 140)
+        duration_ms = sum(durations)
+
+        # motionMs is the sum of all frame durations except the last for
+        # non-looping clips (the last frame is a deliberate dwell).
+        # For looping clips, motionMs equals durationMs.
+        if CLIP_METADATA[name]["loops"]:
+            motion_ms = duration_ms
+        else:
+            motion_ms = sum(durations[:-1])
+
+        # Build the clip entry: sort looping vs. non-looping fields as per the schema.
+        clip_entry = {
+            "file": path.name,
+            "frameCount": frame_count,
+            "durationMs": duration_ms,
+            "motionMs": motion_ms,
+            "loops": CLIP_METADATA[name]["loops"],
+        }
+
+        if CLIP_METADATA[name]["loops"]:
+            clip_entry["pose"] = CLIP_METADATA[name]["pose"]
+            clip_entry["variantGroup"] = CLIP_METADATA[name]["variantGroup"]
+            clip_entry["weight"] = CLIP_METADATA[name]["weight"]
+        else:
+            clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
+            clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
+
+        clips_data[name] = clip_entry
+
+        # Print status for all clips except off (which is never uploaded).
         if name == "off":
             # Never uploaded to real hardware -- see off()'s docstring.
-            print(f"{path.name:14s} {len(frames)} frames  (fallback asset, palette check skipped)")
+            print(f"{path.name:14s} {frame_count} frames  (fallback asset, palette check skipped)")
             continue
+
         n = min(len(pad_palette(im).getcolors(maxcolors=1 << 20)) for im, _ in frames)
         assert n >= MIN_COLORS, f"{name}: only {n} colors, need >= {MIN_COLORS}"
-        print(f"{path.name:14s} {len(frames)} frames  {n:2d} colors  {path.stat().st_size:5d} bytes")
-        if name == "starting":
-            # PanelTimings.startingHold must equal the motion length -- everything
-            # except the deliberate dwell on the last frame. Print it so the two
-            # cannot drift silently apart.
-            motion_ms = sum(ms for _, ms in frames[:-1])
-            print(f"{'':14s} motion {motion_ms} ms  -> PanelTimings.startingHold = "
-                  f"{motion_ms / 1000:.2f}s (+ {frames[-1][1]} ms tail)")
+        print(f"{path.name:14s} {frame_count} frames  {n:2d} colors  {path.stat().st_size:5d} bytes")
+
+    # Write clips.json with sorted keys for stable diffs.
+    manifest = {
+        "version": 1,
+        "clips": dict(sorted(clips_data.items())),
+    }
+    manifest_path = OUT / "clips.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"clips.json -> {manifest_path} ({len(clips_data)} clips)")
+
     print(f"preview.png -> {preview(produced)}")
