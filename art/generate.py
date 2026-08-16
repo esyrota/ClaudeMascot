@@ -99,19 +99,10 @@ HOME_Y = 16
 # lifts an arm clamps to it; expression comes from the props instead of a bigger reach.
 MAX_ARM_LIFT = -ARM_TOP
 
-# `lying` geometry. The standing figure is a 24w x16h footprint (TORSO_X-ARM_W to
-# TORSO_X+TORSO_W+ARM_W, HOME_Y to HOME_Y+LEG_TOP+LEG_H); lying keeps the same
-# creature at a lower profile. The legs merge into the body instead of hanging
-# separately below it -- that merge, not just the horizontal posture, is what stops
-# it reading as "hovering asleep" -- and a shallow raised hump at one end reads as
-# the head.
-LYING_BODY_W, LYING_BODY_H = 20, 6
-LYING_BODY_X = (SIZE - LYING_BODY_W) // 2
-LYING_HEAD_W, LYING_HEAD_H = 8, 3
-LYING_HEAD_X = LYING_BODY_X + 2
-LYING_HEAD_Y = SIZE - LYING_BODY_H - LYING_HEAD_H
-LYING_EYE_XS = (LYING_HEAD_X + 1, LYING_HEAD_X + 4)
-LYING_EYE_Y = LYING_HEAD_Y + 1
+# There is no `lying` geometry any more. The mascot used to sleep as a 20x6 blob on
+# the floor with a hump for a head, which was legible as a blob and not as this
+# creature -- see `Docs/Specs/Animation Catalogue.md`. It now sleeps standing, from
+# art/sources/sleep.gif, on exactly the silhouette above.
 
 
 def frame() -> Image.Image:
@@ -165,26 +156,6 @@ def mascot(
             rect(d, ex + dx, ey + EYE_H // 2, EYE_W, 1, EYE)
         else:
             rect(d, ex + dx, ey, EYE_W, EYE_H, EYE)
-
-
-def lying_pose(d, *, pulse: int = 0) -> None:
-    """
-    Draw the mascot resting flat on the floor -- the `lying` anchor.
-
-    Legs merge into the body instead of hanging separately below it the way they do
-    standing; that merge is what stops it reading as "hovering asleep". Called with
-    pulse=0 (the default) this is the exact pose sleeping()'s first/last frame and
-    the stand<->lie transition clips below must all land on -- the anchor-pose
-    contract in Task.md. `pulse` grows the body a pixel at a time from the floor up
-    and out to either side, so breathing reads as a chest swelling rather than the
-    standing idle's vertical bob -- a lying creature does not hop.
-    """
-    body_h = LYING_BODY_H + pulse
-    body_w = LYING_BODY_W + pulse * 2
-    rect(d, LYING_BODY_X - pulse, SIZE - body_h, body_w, body_h, MASCOT)
-    rect(d, LYING_HEAD_X, LYING_HEAD_Y, LYING_HEAD_W, LYING_HEAD_H, MASCOT)
-    for ex in LYING_EYE_XS:
-        rect(d, ex, LYING_EYE_Y, EYE_W, 1, EYE)
 
 
 def mascot_at(ox: int = 0, oy: int = 0, **kwargs) -> Image.Image:
@@ -306,33 +277,58 @@ def done():
     return out
 
 
+# The mascot dozes off standing, from art/sources/sleep.gif: the same silhouette as
+# every other standing clip, arms slumped four rows down onto the legs and the eyes
+# drawn as closed lids, with a one-eye peek twice a cycle. Its palette is a single
+# orange family against black -- no shade tone, and the lids are simply background --
+# so the threshold below is one comparison rather than appear.gif's three-way split.
+SLEEP_SRC = SOURCES / "sleep.gif"
+# The source is authored at a flat 1000ms a frame, which is the drawing tool's default
+# rather than an intention: it would put 18 seconds between one Z and the next. The Zs
+# are the only thing moving, so their cadence IS the clip's cadence, and this is what
+# sets it.
+SLEEP_FRAME_MS = 500
+
+
+def sleep_frames():
+    """Every frame of sleep.gif, recoloured, at SLEEP_FRAME_MS. NOT coalesced.
+
+    Coalescing here would collapse 18 frames to 4 -- the source holds the sleeping
+    pose for seconds at a time -- and the Zs drawn over them need every frame to
+    drift on. Timing is overridden wholesale, so the source's own durations, which
+    are what coalesce() would have summed, are not information being thrown away.
+    """
+    recolour = lambda rgb: BG if max(rgb) < SHADE_MIN else MASCOT
+    return [(im, SLEEP_FRAME_MS) for im, _ in imported(SLEEP_SRC, recolour)]
+
+
 def sleeping():
-    """Dozed off on the floor: eyes shut, slow deep breathing, Zs drifting up."""
-    out = []
-    # (pulse, z phase) -- deliberately slow so it reads as asleep, not idle.
-    poses = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 2), (1, 2), (1, 3), (0, 3)]
-    last = len(poses) - 1
-    for i, (pulse, phase) in enumerate(poses):
-        im = frame()
+    """Dozed off standing: eyes shut, arms slumped, Zs drifting up.
+
+    The `standing` anchor bookends this the way idle_think() and dancing() are
+    bookended, and the cut into the slumped pose is a real pop -- arms falling four
+    rows and the eyes closing, all on one frame. Unlike the imported sheets' size
+    pop, this one is at least *diegetic*: it is the mascot falling asleep and waking
+    up, and it happens at the two moments the panel is swapping clips anyway.
+    """
+    out = [(_standing_anchor(), 70)]
+    for i, (im, ms) in enumerate(sleep_frames()):
         d = ImageDraw.Draw(im)
-        lying_pose(d, pulse=pulse)
-        # Frame 0 and the last frame are the bare lying_pose() anchor (no Zs), so
-        # this loop starts and ends on the pixel-identical `lying` anchor the
-        # transition clips below also draw -- the same contract idle()'s own frame
-        # 0/last already satisfy for `standing`.
-        if i not in (0, last):
-            # Two Zs rising and fading out of the top-right.
-            for j in (0, 1):
-                step = (phase + j * 2) % 4
-                zx = 22 + step
-                zy = 18 - step * 7
-                if zy < 0:
-                    continue
-                size = 3 if j == 0 else 2
-                rect(d, zx, zy, size, 1, PROP)                  # top bar
-                rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
-                rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
-        out.append((im, 600))
+        # Two Zs rising out of the top-right. This is the pre-lying-pose geometry,
+        # restored: it was drawn for exactly this standing figure, and the slumped
+        # arms clear even more of that corner than the anchor's do.
+        for j in (0, 1):
+            step = (i + j * 2) % 4
+            zx = 22 + step
+            zy = 13 - step * 4
+            if zy < 0:
+                continue
+            size = 3 if j == 0 else 2
+            rect(d, zx, zy, size, 1, PROP)                  # top bar
+            rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
+            rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
+        out.append((im, ms))
+    out.append((_standing_anchor(), 70))
     return out
 
 
@@ -393,21 +389,6 @@ def fidget_look():
     return out
 
 
-def fidget_doze():
-    """Fidget: a deeper breath and a shuffle while asleep."""
-    out = []
-    # A bigger pulse than sleeping()'s own (which tops out at 1) so this reads as
-    # a deliberately deeper breath rather than another lap of the same loop.
-    for pulse in (0, 1, 2, 2, 1, 0):
-        im = frame()
-        d = ImageDraw.Draw(im)
-        lying_pose(d, pulse=pulse)
-        out.append((im, 260))
-    last_im, _ = out[-1]
-    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the lying anchor
-    return out
-
-
 def done_enter():
     """Entrance: the same jump as done(), with a checkmark flashed on the landing.
 
@@ -441,54 +422,6 @@ def done_enter():
 # change. The choreographer's graceful degradation (direct swap when no edge
 # exists) covers stand<->sit until then.
 # --------------------------------------------------------------------------
-
-def stand_to_lie():
-    """Transition: settles from standing down onto the floor to sleep."""
-    out = []
-    # mascot() and lying_pose() don't share a parameter space to morph between, so
-    # the settle eases the standing figure down through a crouch and cuts to the
-    # lying blob for the last couple of frames -- the same keyframe-then-cut
-    # approach done()'s stomp uses.
-    crouch = [(0, (0, 0, 0, 0), False), (1, (1, 1, 1, 1), True),
-              (3, (2, 2, 2, 2), True), (4, (3, 3, 3, 3), True)]
-    for squash, legs, blink in crouch:
-        im = frame()
-        d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y, legs=legs, squash=squash, blink=blink)
-        out.append((im, 140))
-    im = frame()
-    d = ImageDraw.Draw(im)
-    lying_pose(d, pulse=1)
-    out.append((im, 140))
-    im = frame()
-    d = ImageDraw.Draw(im)
-    lying_pose(d)
-    out.append((im, APPEAR_TAIL_MS))  # long dwell -- the lying anchor
-    return out
-
-
-def lie_to_stand():
-    """Transition: pushes back up from lying to standing."""
-    out = []
-    im = frame()
-    d = ImageDraw.Draw(im)
-    lying_pose(d)
-    out.append((im, 140))
-    im = frame()
-    d = ImageDraw.Draw(im)
-    lying_pose(d, pulse=1)
-    out.append((im, 140))
-    rise = [(3, (3, 3, 3, 3), True), (4, (2, 2, 2, 2), True),
-            (2, (1, 1, 1, 1), True), (0, (0, 0, 0, 0), False)]
-    for squash, legs, blink in rise:
-        im = frame()
-        d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y, legs=legs, squash=squash, blink=blink)
-        out.append((im, 140))
-    last_im, _ = out[-1]
-    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
-    return out
-
 
 def walk_off_left():
     """Transition: walks out of frame to the left."""
@@ -1055,9 +988,6 @@ STATES = {
     "done-enter": done_enter,
     "fidget-stretch": fidget_stretch,
     "fidget-look": fidget_look,
-    "fidget-doze": fidget_doze,
-    "stand-to-lie": stand_to_lie,
-    "lie-to-stand": lie_to_stand,
     "walk-off-left": walk_off_left,
     "walk-in-left": walk_in_left,
     "walk-off-right": walk_off_right,
@@ -1152,11 +1082,6 @@ CLIP_METADATA = {
         "fromPose": "standing",
         "toPose": "standing",
     },
-    "fidget-doze": {
-        "loops": False,
-        "fromPose": "lying",
-        "toPose": "lying",
-    },
     "working": {
         "loops": True,
         "pose": "sitting",
@@ -1173,20 +1098,13 @@ CLIP_METADATA = {
         "weight": 0.5,
     },
     "sleeping": {
+        # A `standing` loop now, not a pose of its own: the mascot sleeps on its
+        # feet. `lying` and its two edges are gone -- see sleeping()'s docstring
+        # and the catalogue.
         "loops": True,
-        "pose": "lying",
+        "pose": "standing",
         "variantGroup": "sleeping",
         "weight": 1.0,
-    },
-    "stand-to-lie": {
-        "loops": False,
-        "fromPose": "standing",
-        "toPose": "lying",
-    },
-    "lie-to-stand": {
-        "loops": False,
-        "fromPose": "lying",
-        "toPose": "standing",
     },
     "walk-off-left": {
         "loops": False,
@@ -1286,6 +1204,15 @@ def preview(all_frames) -> Path:
 if __name__ == "__main__":
     produced = {}
     clips_data = {}
+
+    # A clip dropped from STATES must not leave its GIF in the bundle. Nothing would
+    # play it -- clips.json is what the app reads -- but it would still be shipped,
+    # and it would still look like current art to anyone reading the folder.
+    keep = {f"{name}.gif" for name in STATES} | {"clips.json"}
+    for stale in OUT.iterdir():
+        if stale.name not in keep:
+            stale.unlink()
+            print(f"removed stale {stale.name}")
 
     for name, fn in STATES.items():
         frames = fn()

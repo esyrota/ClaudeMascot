@@ -81,46 +81,51 @@ func poseOfNilDisplayedIsOffBottom() {
 @Test @MainActor
 func oneEdgeAtATimeTowardATwoHopTarget() {
   let clock = FakeClock()
+  // A synthetic graph, not the shipped one: standing reaches sitting only by way
+  // of offLeft, so `.working` is deliberately two hops away. (This used to route
+  // to `.sleeping` at `.lying`; the mascot now sleeps standing and `lying` is
+  // gone, so the two-hop target had to become a pose that still exists.)
   let idle = loopClip("idle", pose: .standing, group: "idle")
-  let sleeping = loopClip("sleeping", pose: .lying, group: "sleeping")
-  let standSit = edgeClip("stand-sit", from: .standing, to: .sitting)
-  let sitLie = edgeClip("sit-lie", from: .sitting, to: .lying)
+  let working = loopClip("working", pose: .sitting, group: "working")
+  let standLeft = edgeClip("stand-left", from: .standing, to: .offLeft)
+  let leftSit = edgeClip("left-sit", from: .offLeft, to: .sitting)
   let choreographer = Choreographer(
-    manifest: manifest([idle, sleeping, standSit, sitLie]), clock: { clock() })
+    manifest: manifest([idle, working, standLeft, leftSit]), clock: { clock() })
 
-  // Standing, wants to be lying: only the first edge comes back.
-  let first = choreographer.clip(for: .sleeping, displayed: idle)
-  #expect(first?.id == "stand-sit")
+  // Standing, wants to be sitting: only the first edge comes back.
+  let first = choreographer.clip(for: .working, displayed: idle)
+  #expect(first?.id == "stand-left")
 
   // Same call again, nothing displayed yet: identical answer (idempotent).
-  let firstAgain = choreographer.clip(for: .sleeping, displayed: idle)
-  #expect(firstAgain?.id == "stand-sit")
+  let firstAgain = choreographer.clip(for: .working, displayed: idle)
+  #expect(firstAgain?.id == "stand-left")
 
   // Only once the first edge is actually displayed does the second appear.
-  let second = choreographer.clip(for: .sleeping, displayed: standSit)
-  #expect(second?.id == "sit-lie")
+  let second = choreographer.clip(for: .working, displayed: standLeft)
+  #expect(second?.id == "left-sit")
 }
 
 @Test @MainActor
 func targetFlippingMidJourneyIsSelfCorrecting() {
   let clock = FakeClock()
+  // Same synthetic two-hop graph as above, plus the edge back.
   let idle = loopClip("idle", pose: .standing, group: "idle")
-  let sleeping = loopClip("sleeping", pose: .lying, group: "sleeping")
-  let standSit = edgeClip("stand-sit", from: .standing, to: .sitting)
-  let sitStand = edgeClip("sit-stand", from: .sitting, to: .standing)
-  let sitLie = edgeClip("sit-lie", from: .sitting, to: .lying)
+  let working = loopClip("working", pose: .sitting, group: "working")
+  let standLeft = edgeClip("stand-left", from: .standing, to: .offLeft)
+  let leftStand = edgeClip("left-stand", from: .offLeft, to: .standing)
+  let leftSit = edgeClip("left-sit", from: .offLeft, to: .sitting)
   let choreographer = Choreographer(
-    manifest: manifest([idle, sleeping, standSit, sitStand, sitLie]), clock: { clock() })
+    manifest: manifest([idle, working, standLeft, leftStand, leftSit]), clock: { clock() })
 
-  // Walking toward .sleeping: first edge lands us at sitting.
-  let firstEdge = choreographer.clip(for: .sleeping, displayed: idle)
-  #expect(firstEdge?.id == "stand-sit")
+  // Walking toward .working: first edge lands us at offLeft.
+  let firstEdge = choreographer.clip(for: .working, displayed: idle)
+  #expect(firstEdge?.id == "stand-left")
 
   // The world changes its mind before the second edge plays: target flips
-  // back to .idle (standing). From sitting, that's a single edge back —
-  // not a continuation of the walk toward lying.
-  let corrected = choreographer.clip(for: .idle, displayed: standSit)
-  #expect(corrected?.id == "sit-stand")
+  // back to .idle (standing). From offLeft, that's a single edge back —
+  // not a continuation of the walk toward sitting.
+  let corrected = choreographer.clip(for: .idle, displayed: standLeft)
+  #expect(corrected?.id == "left-stand")
 }
 
 // MARK: - Graceful degradation

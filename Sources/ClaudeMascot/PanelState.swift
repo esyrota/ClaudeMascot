@@ -33,12 +33,14 @@ extension PanelState {
     switch self {
     case .starting:
       return nil
-    case .idle, .thinking, .waiting, .done:
+    case .idle, .thinking, .waiting, .done, .sleeping:
+      // `.sleeping` was `.lying` until the mascot started sleeping on its feet.
+      // The choreographer resolves a target pose here and then looks for a loop
+      // clip at it, so this has to agree with the pose `sleeping` declares in
+      // clips.json or the state has no clip at all.
       return .standing
     case .working:
       return .sitting
-    case .sleeping:
-      return .lying
     case .off:
       return .offBottom
     }

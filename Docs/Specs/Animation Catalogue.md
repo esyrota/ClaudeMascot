@@ -29,7 +29,7 @@ is why `motion` (the real movement) is much shorter than `duration`.
 
 **The anchor contract binds all of them:** every loop begins and ends on its pose's
 pixel-identical anchor frame, and every transition starts and ends on the anchor of the
-pose at each end. `idle` frame 0 defines `standing`; `sleeping` frame 0 defines `lying`;
+pose at each end. `idle` frame 0 defines `standing`;
 an offscreen anchor is an empty frame. Break this once and every swap visibly jumps.
 
 ---
@@ -48,13 +48,25 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 | ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif) |
 | **thinking** · 5f · 1.12s · w 1.0 | **thinking-alt** · 15f · 2.1s · w 0.5 | **waiting** · 8f · 1.12s · w 1.0 | **done** · 17f · 3.71s · w 1.0 |
 
+| |
+|---|
+| ![sleeping](_animations/sleeping.gif) |
+| **sleeping** · 20f · 9.14s · w 1.0 |
+
 - `idle` group has four variants — the richest set, because idle is on screen most.
 - **The floor line is absolute at `standing`.** Every idle variant keeps all four feet on
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle`/`idle-alt` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing` and `thinking-alt`/`idle-think` are imported; `idle`, `idle-alt`, `thinking`,
-  `waiting` and `done` are drawn or assembled in `art/generate.py`.
+- `dancing`, `sleeping` and `thinking-alt`/`idle-think` are imported; `idle`, `idle-alt`,
+  `thinking`, `waiting` and `done` are drawn or assembled in `art/generate.py`.
+- **`sleeping` is a `standing` clip.** The mascot dozes on its feet — arms slumped four
+  rows onto the legs, eyes drawn as closed lids, two Zs drifting out of the top-right, and
+  a one-eye peek twice a cycle. It used to be a 20×6 blob on the floor at a `lying` pose of
+  its own, which read as a blob and not as this creature; that pose and its two edges are
+  gone. Its source, `art/sources/sleep.gif`, is authored at a flat 1000ms a frame, so the
+  timing is overridden wholesale in `art/generate.py` — the Zs are the only thing moving,
+  so their cadence is the clip's cadence.
 - `waiting` is the flag wave: it means Claude is asking *you* for something, so it should
   stay the most legible clip on the panel from across a room.
 - `done` is the *same jump* as the `done-enter` celebration, held as a loop with confetti
@@ -72,16 +84,6 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 connects to `sitting`** — see the gaps below — so both are only ever reached by a direct
 swap.
 
-### lying
-
-| |
-|---|
-| ![sleeping](_animations/sleeping.gif) |
-| **sleeping** · 8f · 4.8s · w 1.0 |
-
-Frame 0 defines the `lying` anchor. It used to be drawn standing with its eyes shut, which
-read as the mascot hovering; it now rests on the panel floor and breathes as a width pulse.
-
 ### offBottom
 
 |                             |
@@ -98,14 +100,14 @@ Never uploaded. `PanelController` cuts power for `.off` instead. It exists only 
 
 ### Pose edges
 
-|                                                           |                                                       |                                                          |                                                          |
-| --------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| ![starting](_animations/starting.gif)                      | ![sink](_animations/sink.gif)                         | ![stand-to-lie](_animations/stand-to-lie.gif)            | ![lie-to-stand](_animations/lie-to-stand.gif)            |
-| **starting**<br>offBottom → standing<br>19f · motion 3.36s | **sink**<br>standing → offBottom<br>5f · motion 0.56s | **stand-to-lie**<br>standing → lying<br>6f · motion 0.7s | **lie-to-stand**<br>lying → standing<br>6f · motion 0.7s |
+|                                                            |                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------- |
+| ![starting](_animations/starting.gif)                      | ![sink](_animations/sink.gif)                         |
+| **starting**<br>offBottom → standing<br>19f · motion 3.36s | **sink**<br>standing → offBottom<br>5f · motion 0.56s |
 
-| | | | |
-|---|---|---|---|
-| ![walk-off-left](_animations/walk-off-left.gif) | ![walk-in-left](_animations/walk-in-left.gif) | ![walk-off-right](_animations/walk-off-right.gif) | ![walk-in-right](_animations/walk-in-right.gif) |
+|                                                              |                                                            |                                                                |                                                              |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
+| ![walk-off-left](_animations/walk-off-left.gif)              | ![walk-in-left](_animations/walk-in-left.gif)              | ![walk-off-right](_animations/walk-off-right.gif)              | ![walk-in-right](_animations/walk-in-right.gif)              |
 | **walk-off-left**<br>standing → offLeft<br>5f · motion 0.56s | **walk-in-left**<br>offLeft → standing<br>5f · motion 0.7s | **walk-off-right**<br>standing → offRight<br>5f · motion 0.56s | **walk-in-right**<br>offRight → standing<br>5f · motion 0.7s |
 
 `starting` is the original hand-drawn entrance and is far longer than the others (3.4s of
@@ -127,10 +129,10 @@ same numbers.
 
 ### Self-edges — fidgets and one-shots
 
-| | | | |
-|---|---|---|---|
-| ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![fidget-doze](_animations/fidget-doze.gif) | ![done-enter](_animations/done-enter.gif) |
-| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **fidget-doze**<br>lying, 5f · 1.3s | **done-enter**<br>standing, 17f · motion 3.01s |
+| | | |
+|---|---|---|
+| ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif) |
+| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **done-enter**<br>standing, 17f · motion 3.01s |
 
 Fidgets are motion with no cause — the thing that separates "animated" from "alive". They
 fire on a seeded roll during long holds and return the mascot exactly where it stood.
@@ -149,29 +151,30 @@ self-edge that is *not* an entrance. Declare one wrong and it silently never fir
 
 ```
         offLeft ──walk-in-left──►  standing  ◄──walk-in-right── offRight
-              ◄──walk-off-left──   ▲ │ ▲               ──walk-off-right──►
-                                   │ │ │
-              starting ────────────┘ │ └──────────── lie-to-stand
-            (from offBottom)         │                  (from lying)
-                                     │
-                            sink ────┘────► offBottom
-                    stand-to-lie ────────► lying
+              ◄──walk-off-left──     ▲ │             ──walk-off-right──►
+                                     │ │
+                starting ────────────┘ └────────────► sink
+              (from offBottom)                       (to offBottom)
 
                               sitting   ← no edges at all
 ```
 
-| From ↓ To → | standing | sitting | lying | offLeft | offRight | offBottom |
-|---|---|---|---|---|---|---|
-| **standing** | — | ❌ | `stand-to-lie` | `walk-off-left` | `walk-off-right` | `sink` |
-| **sitting** | ❌ | — | ❌ | ❌ | ❌ | ❌ |
-| **lying** | `lie-to-stand` | ❌ | — | ❌ | ❌ | ❌ |
-| **offLeft** | `walk-in-left` | ❌ | ❌ | — | ❌ | ❌ |
-| **offRight** | `walk-in-right` | ❌ | ❌ | ❌ | — | ❌ |
-| **offBottom** | `starting` | ❌ | ❌ | ❌ | ❌ | — |
+| From ↓ To → | standing | sitting | offLeft | offRight | offBottom |
+|---|---|---|---|---|---|
+| **standing** | — | ❌ | `walk-off-left` | `walk-off-right` | `sink` |
+| **sitting** | ❌ | — | ❌ | ❌ | ❌ |
+| **offLeft** | `walk-in-left` | ❌ | — | ❌ | ❌ |
+| **offRight** | `walk-in-right` | ❌ | ❌ | — | ❌ |
+| **offBottom** | `starting` | ❌ | ❌ | ❌ | — |
+
+`lying` is gone entirely — the pose, its two edges and `fidget-doze` with them — because
+`sleeping` was the only state that ever wanted it and the mascot now sleeps standing.
+`Pose.lying` came out of the Swift enum in the same change: a pose no clip declares is a
+node the pathfinder can only ever fail to reach.
 
 `standing` is the hub: every route runs through it, and the choreographer's breadth-first
-search finds multi-hop paths for free (`lying → offLeft` walks `lie-to-stand` then
-`walk-off-left`, one edge per boundary).
+search finds multi-hop paths for free (`offLeft → offRight` walks `walk-in-left` then
+`walk-off-right`, one edge per boundary).
 
 A ❌ is not a bug. Where no path exists the choreographer swaps directly at the next
 boundary — the panel's swaps are seamless, so a missing edge costs a pose pop, never a
@@ -196,9 +199,19 @@ stall.
 4. **`waiting` has no variants**, despite being the state that most wants to catch your
    eye.
 5. **No fidgets at `sitting`** — the mascot is perfectly still at the laptop between loops.
+   There are none for `sleeping` either now: `fidget-doze` was drawn against the retired
+   `lying` blob and went with it, so a standing doze fidget is a clean slot to fill.
 6. **`thinking` and `waiting` do not satisfy the anchor contract.** Both open and close
    holding a prop — the barbell resting on the head, the flag mid-arc — so neither end is
    the bare `standing` anchor, and swapping into or out of either pops the prop into
    existence. Every other `standing` clip now checks out. The fix is the same bookending
    `idle-think` and `dancing` use: an anchor frame at each end, with the prop entering on
    the frame after it.
+7. **`sleeping` cuts hard into the slumped pose.** The anchor bookend is the eyes-open,
+   arms-up standing frame and the very next frame is fully asleep — arms four rows down,
+   eyes shut, all at once. It is at least *diegetic* (that pop is the mascot dropping off,
+   and waking), but two in-between frames easing the arms down would sell it properly.
+8. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
+   diagonal stroke has zero height, so the smaller one degenerates into a square. It has
+   always been that way — it reads as distance rather than as a letter, which is
+   survivable, but a 2-wide Z drawn deliberately would be better than one that collapses.
