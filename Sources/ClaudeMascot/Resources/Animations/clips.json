@@ -3,9 +3,9 @@
   "clips": {
     "dancing": {
       "file": "dancing.gif",
-      "frameCount": 15,
-      "durationMs": 2870,
-      "motionMs": 2870,
+      "frameCount": 18,
+      "durationMs": 3710,
+      "motionMs": 3710,
       "loops": true,
       "pose": "standing",
       "variantGroup": "idle",
@@ -117,18 +117,18 @@
     },
     "starting": {
       "file": "starting.gif",
-      "frameCount": 19,
-      "durationMs": 5860,
-      "motionMs": 3360,
+      "frameCount": 16,
+      "durationMs": 5020,
+      "motionMs": 2520,
       "loops": false,
       "fromPose": "offBottom",
       "toPose": "standing"
     },
     "thinking": {
       "file": "thinking.gif",
-      "frameCount": 5,
-      "durationMs": 1120,
-      "motionMs": 1120,
+      "frameCount": 3,
+      "durationMs": 3600,
+      "motionMs": 3600,
       "loops": true,
       "pose": "standing",
       "variantGroup": "thinking",
@@ -139,6 +139,16 @@
       "frameCount": 14,
       "durationMs": 6060,
       "motionMs": 6060,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "thinking",
+      "weight": 0.5
+    },
+    "thinking-pace": {
+      "file": "thinking-pace.gif",
+      "frameCount": 17,
+      "durationMs": 4720,
+      "motionMs": 4720,
       "loops": true,
       "pose": "standing",
       "variantGroup": "thinking",
@@ -214,9 +224,9 @@
     },
     "wander-off-left-rise": {
       "file": "wander-off-left-rise.gif",
-      "frameCount": 24,
-      "durationMs": 9060,
-      "motionMs": 6560,
+      "frameCount": 21,
+      "durationMs": 8220,
+      "motionMs": 5720,
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
@@ -247,9 +257,9 @@
     },
     "wander-off-right-rise": {
       "file": "wander-off-right-rise.gif",
-      "frameCount": 24,
-      "durationMs": 9060,
-      "motionMs": 6560,
+      "frameCount": 21,
+      "durationMs": 8220,
+      "motionMs": 5720,
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
@@ -280,9 +290,9 @@
     },
     "wander-sink-rise": {
       "file": "wander-sink-rise.gif",
-      "frameCount": 24,
-      "durationMs": 9060,
-      "motionMs": 6560,
+      "frameCount": 21,
+      "durationMs": 8220,
+      "motionMs": 5720,
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
@@ -308,6 +318,16 @@
       "pose": "sitting",
       "variantGroup": "working",
       "weight": 0.5
+    },
+    "workout": {
+      "file": "workout.gif",
+      "frameCount": 7,
+      "durationMs": 1720,
+      "motionMs": 1720,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.4
     }
   }
 }

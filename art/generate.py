@@ -200,8 +200,14 @@ def idle():
     return out
 
 
-def thinking():
-    """Gym Claude: pressing a barbell while it works on your prompt."""
+def workout():
+    """Gym Claude: pressing a barbell overhead.
+
+    An `idle` variant, not a `thinking` one. It was `thinking` for as long as this
+    project had four animations and four states to spread them over, but lifting
+    weights says nothing about working on a prompt -- it is just the mascot doing
+    something while nothing is happening, which is what idle means.
+    """
     out = []
     # A shoulder press, not a curl. The arms cannot travel past MAX_ARM_LIFT without
     # detaching from the 12px torso, so the whole lift is the top 2px of that range:
@@ -220,6 +226,56 @@ def thinking():
         rect(d, 0, bar_y - 1, 2, 4, PROP)
         rect(d, SIZE - 2, bar_y - 1, 2, 4, PROP)
         out.append((im, 140))
+    # Anchor bookends. Every frame of the press has the arms up at the rack, so
+    # without these the clip neither starts nor ends on the standing anchor -- and
+    # this is an `idle` variant now, rotating against three clips that all do, in
+    # the group that is on screen most. The barbell itself still appears in one
+    # frame; the silhouette no longer does.
+    return [(_standing_anchor(), 200)] + out + [(_standing_anchor(), 400)]
+
+
+def thinking():
+    """Thinking: standing still and breathing, focused on nothing visible.
+
+    The plainest clip in the manifest, on purpose. Thinking is mostly *not* visible
+    from outside, and a mascot that always performs its thinking has nothing left to
+    say when the thought is a hard one. Slower than idle()'s breath -- 600ms a frame
+    against 320 -- so held stillness reads as concentration rather than as idle with
+    the label changed.
+    """
+    out = []
+    for breath in (0, 0, 1, 1, 0, 0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, squash=breath)
+        out.append((im, 600))
+    return out
+
+
+# Pacing: one lap is off the right edge and back in from the left, which on a panel
+# with no middle distance is what walking in circles looks like. Two laps ship in the
+# clip rather than one because the clip loops: a single lap would repeat on a perfect
+# metronome, and the two home pauses below differ so it does not.
+PACE_LAPS = 2
+# The exits and entrances are written for pose changes and dwell 2.5s offscreen,
+# which would read as leaving rather than pacing. Offscreen is a beat here, not a
+# destination.
+PACE_OFFSCREEN_MS = 200
+PACE_HOME_MS = (700, 1100)
+
+
+def thinking_pace():
+    """Thinking variant: paces off one side and back in the other, twice."""
+    out = []
+    for lap in range(PACE_LAPS):
+        away = walk_off_right()
+        # Trim the offscreen dwell to a beat.
+        away[-1] = (away[-1][0], PACE_OFFSCREEN_MS)
+        # Drop walk_in_left()'s own leading empty frame: the exit above just supplied
+        # one, and two in a row would only lengthen the pause it already sets.
+        back = walk_in_left()[1:]
+        back[-1] = (back[-1][0], PACE_HOME_MS[lap])  # a pause at home, then off again
+        out += away + back
     return out
 
 
@@ -685,14 +741,19 @@ APPEAR_TAIL_MS = 2500
 # appear.gif is not one animation but two beats back to back, and each is worth more
 # than the other half it was bolted to:
 #
-#   [0..17]  the mascot bursts up out of the floor, hangs at the top, lands and
+#   [0..14]  the mascot bursts up out of the floor, hangs at the top, lands and
 #            settles -- an ENTRANCE, and only ever wanted once per session.
-#   [18..31] a shaded side-to-side sway that never leaves the floor -- an IDLE, and
+#   [15..31] a shaded side-to-side sway that never leaves the floor -- an IDLE, and
 #            wasted at the tail of a clip that plays once.
 #
 # So APPEAR_RISE splits them, and the two clips built from it are `appear()` and
 # `dancing()`. Both indices are into the coalesced list -- see coalesce().
-APPEAR_RISE = 18
+#
+# The cut is at 15 and not 18 because 15-17 are where the mascot TURNS: they are the
+# first three frames carrying the sway's shading (46 shaded pixels each against 0 in
+# every frame before them), and on the end of an entrance they read as three extra
+# beats after the landing has already finished. They belong to the sway.
+APPEAR_RISE = 15
 # The jump inside the entrance, on its own: frame 3 is the crouch that anticipates it,
 # 4-11 are airborne, 12-14 the landing squash and 15-17 the settle. Frames 0-2 are the
 # mascot still emerging through the floor, which only makes sense as an entrance, so
@@ -1112,6 +1173,8 @@ STATES = {
     "sleeping": sleeping,
     "thinking": thinking,
     "thinking-alt": thinking_alt,
+    "thinking-pace": thinking_pace,
+    "workout": workout,
     "working": sweep,
     "working-alt": working_alt,
     "waiting": waiting,
@@ -1171,10 +1234,26 @@ CLIP_METADATA = {
         "weight": 0.5,
     },
     "thinking": {
+        # The quiet one: standing and breathing. See thinking()'s docstring for why
+        # the group's base clip performs nothing at all.
         "loops": True,
         "pose": "standing",
         "variantGroup": "thinking",
         "weight": 1.0,
+    },
+    "thinking-pace": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "thinking",
+        "weight": 0.5,
+    },
+    "workout": {
+        # Was the "thinking" clip until "thinking" stopped meaning "do something
+        # strenuous". An idle variant now -- see workout()'s docstring.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.4,
     },
     "thinking-alt": {
         # Same variantGroup as "thinking" -- imported from the sprite sheet's

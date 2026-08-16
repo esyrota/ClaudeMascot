@@ -38,25 +38,44 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 
 ### standing
 
-|                               |                                       |                                           |                                     |
-| ----------------------------- | ------------------------------------- | ----------------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **dancing** · 15f · 2.87s · w 0.5 |
+**idle** — four variants, the richest set, because idle is on screen most.
 
-|                                       |                                               |                                     |                                |
-| ------------------------------------- | --------------------------------------------- | ----------------------------------- | ------------------------------ |
-| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif)  |
-| **thinking** · 5f · 1.12s · w 1.0     | **thinking-alt** · 14f · 6.06s · w 0.5         | **waiting** · 8f · 1.12s · w 1.0    | **done** · 17f · 3.71s · w 1.0 |
+| | | | |
+|---|---|---|---|
+| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **dancing** · 18f · 3.71s · w 0.5 | **workout** · 7f · 1.72s · w 0.4 |
 
-- `idle` group has three variants — the richest set, because idle is on screen most.
-  A fourth, `idle-think`, was cut: sliced out of the thinking sheet, it carried that
-  sheet's ~87% silhouette (gap 2 below) and read as a smaller, different creature.
+**thinking** — three variants, and none of them mimes thinking.
+
+| | | |
+|---|---|---|
+| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![thinking-pace](_animations/thinking-pace.gif) |
+| **thinking** · 3f · 3.6s · w 1.0 | **thinking-alt** · 14f · 6.06s · w 0.5 | **thinking-pace** · 17f · 4.72s · w 0.5 |
+
+**waiting** and **done** — one each.
+
+| | |
+|---|---|
+| ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif) |
+| **waiting** · 8f · 1.12s · w 1.0 | **done** · 17f · 3.71s · w 1.0 |
+
+- `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
+  clip for as long as this project had four animations and four states to spread them
+  over, but lifting weights says nothing about working on a prompt — it is the mascot
+  doing something while nothing is happening, which is what idle means.
+- **The `thinking` group performs nothing.** `thinking` itself just stands and breathes,
+  slower than idle does; `thinking-pace` walks off one side and back in the other, twice,
+  which on a panel with no middle distance is what walking in circles looks like; only
+  `thinking-alt` shows a thought at all. Thinking is mostly not visible from outside, and
+  a mascot that always mimes it has nothing left to say when the thought is a hard one.
+- A fourth idle variant, `idle-think`, was cut: sliced out of the thinking sheet, it
+  carried that sheet's ~87% silhouette (gap 2 below) and read as a smaller creature.
 - **The floor line is absolute at `standing`.** Every idle variant keeps all four feet on
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle`/`idle-alt` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing` and `sleeping` are imported; everything else in these two rows is drawn or
-  assembled in `art/generate.py`.
+- `dancing` and `sleeping` are imported; everything else above is drawn or assembled in
+  `art/generate.py`.
 - `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
   and fills in a "..." one dot at a time, holds, then retreats the way it came. It was
   sliced out of the 36-frame thinking sheet until that cost it three things at once — the
@@ -126,14 +145,14 @@ Never uploaded. `PanelController` cuts power for `.off` instead. It exists only 
 |                                                            |                                                       |
 | ---------------------------------------------------------- | ----------------------------------------------------- |
 | ![starting](_animations/starting.gif)                      | ![sink](_animations/sink.gif)                         |
-| **starting**<br>offBottom → standing<br>19f · motion 3.36s | **sink**<br>standing → offBottom<br>5f · motion 0.56s |
+| **starting**<br>offBottom → standing<br>16f · motion 2.52s | **sink**<br>standing → offBottom<br>5f · motion 0.56s |
 
 |                                                              |                                                            |                                                                |                                                              |
 | ------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
 | ![walk-off-left](_animations/walk-off-left.gif)              | ![walk-in-left](_animations/walk-in-left.gif)              | ![walk-off-right](_animations/walk-off-right.gif)              | ![walk-in-right](_animations/walk-in-right.gif)              |
 | **walk-off-left**<br>standing → offLeft<br>5f · motion 0.56s | **walk-in-left**<br>offLeft → standing<br>5f · motion 0.7s | **walk-off-right**<br>standing → offRight<br>5f · motion 0.56s | **walk-in-right**<br>offRight → standing<br>5f · motion 0.7s |
 
-`starting` is the original hand-drawn entrance and is far longer than the others (3.4s of
+`starting` is the original hand-drawn entrance and is far longer than the others (2.5s of
 motion against ~0.6s); it is the one transition the user is meant to notice.
 
 **`art/sources/appear.gif` is not one animation but three**, and `art/generate.py` now
@@ -141,9 +160,15 @@ cuts it into three clips rather than playing the whole 32-frame strip once a ses
 
 | Coalesced frames | Becomes | Why |
 |---|---|---|
-| 0–17 | `starting` | Bursting up through the floor only makes sense as an entrance. |
-| 3–17 | `done` / `done-enter` | Frames 3–17 alone are a clean crouch → leap → land → settle. It reads as a jump anywhere, not just on arrival. |
-| 18–31 | `dancing` | A shaded sway that never leaves the floor — an idle that was stranded at the tail of a clip that plays once. |
+| 0–14 | `starting` | Bursting up through the floor only makes sense as an entrance. |
+| 3–17 | `done` / `done-enter` | A clean crouch → leap → land → settle. It reads as a jump anywhere, not just on arrival. |
+| 15–31 | `dancing` | A shaded sway that never leaves the floor — an idle that was stranded at the tail of a clip that plays once. |
+
+The split between the entrance and the sway falls at **15**, where the shading starts:
+frames 15–17 carry 46 shaded pixels each against 0 in every frame before them, and they
+are the mascot *turning*. On the end of an entrance they read as three extra beats after
+the landing has already finished, so they go with the sway they belong to. The jump keeps
+them, where the same three frames are a recovery wobble after touching down.
 
 The frame numbers are indices into the **coalesced** strip — PIL merges runs of identical
 frames when it encodes the GIF, so the raw import is numbered differently. `coalesce()` in

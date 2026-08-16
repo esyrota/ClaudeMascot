@@ -1,16 +1,18 @@
 {
   "dancing": {
-    "gif_bytes": 3021,
-    "crc32": 4084560163,
+    "gif_bytes": 3615,
+    "crc32": 3092661910,
     "outer_chunks": 1,
-    "ble_packets": 6,
+    "ble_packets": 8,
     "packet_lengths": [
       509,
       509,
       509,
       509,
       509,
-      492
+      509,
+      509,
+      68
     ]
   },
   "done": {
@@ -143,10 +145,10 @@
     ]
   },
   "starting": {
-    "gif_bytes": 3671,
-    "crc32": 681102034,
+    "gif_bytes": 3077,
+    "crc32": 3790821677,
     "outer_chunks": 1,
-    "ble_packets": 8,
+    "ble_packets": 7,
     "packet_lengths": [
       509,
       509,
@@ -154,19 +156,17 @@
       509,
       509,
       509,
-      509,
-      124
+      39
     ]
   },
   "thinking": {
-    "gif_bytes": 1042,
-    "crc32": 3793784575,
+    "gif_bytes": 590,
+    "crc32": 2156183542,
     "outer_chunks": 1,
-    "ble_packets": 3,
+    "ble_packets": 2,
     "packet_lengths": [
       509,
-      509,
-      40
+      97
     ]
   },
   "thinking-alt": {
@@ -181,6 +181,20 @@
       509,
       509,
       334
+    ]
+  },
+  "thinking-pace": {
+    "gif_bytes": 2795,
+    "crc32": 3609519872,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      266
     ]
   },
   "waiting": {
@@ -258,10 +272,10 @@
     ]
   },
   "wander-off-left-rise": {
-    "gif_bytes": 4451,
-    "crc32": 2277769452,
-    "outer_chunks": 2,
-    "ble_packets": 10,
+    "gif_bytes": 3857,
+    "crc32": 1444996359,
+    "outer_chunks": 1,
+    "ble_packets": 8,
     "packet_lengths": [
       509,
       509,
@@ -270,9 +284,7 @@
       509,
       509,
       509,
-      509,
-      40,
-      371
+      310
     ]
   },
   "wander-off-right-in-left": {
@@ -298,10 +310,10 @@
     ]
   },
   "wander-off-right-rise": {
-    "gif_bytes": 4451,
-    "crc32": 4054046008,
-    "outer_chunks": 2,
-    "ble_packets": 10,
+    "gif_bytes": 3857,
+    "crc32": 713901045,
+    "outer_chunks": 1,
+    "ble_packets": 8,
     "packet_lengths": [
       509,
       509,
@@ -310,9 +322,7 @@
       509,
       509,
       509,
-      509,
-      40,
-      371
+      310
     ]
   },
   "wander-sink-in-left": {
@@ -338,10 +348,10 @@
     ]
   },
   "wander-sink-rise": {
-    "gif_bytes": 4415,
-    "crc32": 2841005198,
-    "outer_chunks": 2,
-    "ble_packets": 10,
+    "gif_bytes": 3821,
+    "crc32": 2652362798,
+    "outer_chunks": 1,
+    "ble_packets": 8,
     "packet_lengths": [
       509,
       509,
@@ -350,9 +360,7 @@
       509,
       509,
       509,
-      509,
-      40,
-      335
+      274
     ]
   },
   "working": {
@@ -401,6 +409,17 @@
       509,
       509,
       54
+    ]
+  },
+  "workout": {
+    "gif_bytes": 1414,
+    "crc32": 3567402877,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      412
     ]
   }
 }

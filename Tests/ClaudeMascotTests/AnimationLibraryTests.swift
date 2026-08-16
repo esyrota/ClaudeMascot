@@ -116,9 +116,10 @@ final class AnimationLibraryTests: XCTestCase {
     let manifest = try XCTUnwrap(library.manifest)
     XCTAssertEqual(manifest.version, 1)
 
-    // 3.36s since appear.gif was split: `starting` is now the rise out of the floor
-    // alone, and the sway that used to follow it ships as the `dancing` idle variant.
+    // 2.52s since appear.gif was split: `starting` is the rise out of the floor and
+    // the landing, and the sway that used to follow it ships as `dancing`. Read from
+    // the real bundled manifest, so this is the number the panel is actually held on.
     let starting = try XCTUnwrap(library.clip(id: "starting"))
-    XCTAssertEqual(starting.motion, 3.36, accuracy: 0.0001)
+    XCTAssertEqual(starting.motion, 2.52, accuracy: 0.0001)
   }
 }
