@@ -3,9 +3,14 @@
 The Python tooling that authors the animations. Build-time only: [[Menu Bar App]]
 consumes the finished GIFs and never generates or resizes art itself.
 
-Eight states, one per `PanelState`. Six are drawn programmatically; `starting` and
-`working` are imported from hand-drawn art. **`starting`'s silhouette is the reference
-the drawn six are built to match** — see the one deliberate exception under
+Clips are no longer one-per-`PanelState`: a state can have several weighted variants, and
+poses are joined by transition clips. **[[Animation Catalogue]] is the inventory** — every
+clip, its numbers and the pose graph, with a playable image of each. This page covers how
+they are *made*.
+
+Most are drawn programmatically; `starting`, `working` and the sprite-sheet variants are
+imported from hand-drawn art. **`starting`'s silhouette is the reference the drawn clips
+are built to match** — see the one deliberate exception under
 [[#The sweep (`working.gif`)]].
 
 ## Tools
@@ -14,7 +19,9 @@ the drawn six are built to match** — see the one deliberate exception under
 |---|---|
 | `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + clips.json + a 6× contact sheet `preview.png`. Draws six states; imports two (see below) |
 | `art/import_gif.py` | Converts an *oversized* arbitrary GIF into a panel-ready animation in `Animations/custom/` — coalesce, crop, downscale, subsample |
+| `art/sheet_import.py` | Slices a *screenshot* contact sheet (grey page, gaps, label strips, irregular tiles) into 32×32 frames — detects each tile's own bbox, never a fixed pitch |
 | `art/export_golden.py` | Re-frames the bundled GIFs into `Tests/Fixtures/`; run after any art change — see [[BLE Protocol]] |
+| `art/export_docs.py` | Regenerates the 6× images in [[Animation Catalogue]] from the bundled GIFs, so the page cannot drift from what ships |
 | `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |
 | `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
 

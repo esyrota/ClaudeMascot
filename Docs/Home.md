@@ -27,6 +27,7 @@ claude ──hooks──> relay.sh ──socket──> ClaudeMascot.app ──BL
 - [[Claude Code Plugin]] — the relay: nine events, four fields, zero policy
 - [[BLE Protocol]] — the packet framing, pinned byte-for-byte by golden fixtures
 - [[Art Pipeline]] — the Python tooling that authors the animations (build-time only)
+- [[Animation Catalogue]] — **every clip and transition, with a playable image of each**
 
 The split is forced by a permission rule, not taste: only an app bundle can hold
 Bluetooth permission — see [[macOS Bluetooth TCC]].
@@ -51,10 +52,14 @@ Each one cost a wrong diagnosis to find.
 | Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer, single-instance guard |
 | Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
-| Art generator | `art/generate.py` | working, 8 states — 6 drawn, `starting` and `working` imported from hand-drawn art in `art/sources/` |
+| Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling |
+| Event log | `EventLog.swift` | **shipped** — always-on input + decision JSONL under Application Support |
+| Art generator | `art/generate.py` | working, **23 clips** — 11 loops, 12 transitions. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
+| Sprite-sheet importer | `art/sheet_import.py` | working — slices screenshot contact sheets into 32×32 frames |
 | Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol |
+| Catalogue images | `art/export_docs.py` | working — 6× previews for [[Animation Catalogue]] |
 | Python daemon | `legacy/` | **retired and non-functional** |
 | Colour test card | `art/testcard.py` | diagnostic, keep |
 
@@ -66,10 +71,17 @@ plugin on first launch, and the repo is no longer a marketplace.
 - `_logs/2026-08-14. Native Mascot Menu Bar App/` — the Python → Swift port
 - `_logs/2026-08-15. App Plugin Interaction/` — state file → socket relay, first-run
   installer, plugin bundled into the app. See its [[Analysis]] for what the run cost.
+- `_logs/2026-08-16. Settings Window Cleanup/` — the Settings pane rebuild.
+- `_logs/2026-08-16. Stateful Mascot Choreography/` — the world model, pose graph and
+  boundary scheduling. Its [[Analysis]] records the boundary bug that only hardware found.
 
 ## Deferred
 
-- `_tasks/Debounce short tool calls.md` — suppress sub-1s tool calls so `PostToolUse`
-  cannot make the panel flicker; also fixes event ordering as a side effect.
+- **`stand-to-sit` / `sit-to-stand`** — `sitting` has no edges at all, so the mascot
+  teleports into and out of `working`. The largest remaining win; see
+  [[Animation Catalogue]] → Known gaps.
+- Rescaling the imported sheets to the drawn silhouette (~87% today), and giving the
+  laptop black outlines so it stops reading as a white slab.
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.
+- Retuning the choreography constants against the accumulated `decision.jsonl`.
