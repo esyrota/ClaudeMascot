@@ -211,13 +211,20 @@ def mascot_at(ox: int = 0, oy: int = 0, **kwargs) -> Image.Image:
 # --------------------------------------------------------------------------
 
 def idle():
-    """Session open: standing, breathing, occasional blink."""
+    """Session open: standing, breathing, occasional blink.
+
+    The breath is a `squash` -- the torso compresses from the top while the legs stay
+    put -- not the `HOME_Y - bob` lift this used to be. A lift moves the whole figure,
+    feet included, so every breath took the mascot a pixel off the panel's bottom row
+    and idle read as a slow hop. Only a clip that is *meant* to leave the ground (the
+    jump in done()/done_enter(), the walks) should ever break the floor line.
+    """
     out = []
-    for bob, blink in [(0, False), (1, False), (1, False), (0, False),
-                       (0, True), (0, False), (1, False), (0, False)]:
+    for breath, blink in [(0, False), (1, False), (1, False), (0, False),
+                          (0, True), (0, False), (1, False), (0, False)]:
         im = frame()
         d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y - bob, blink=blink)
+        mascot(d, HOME_Y, squash=breath, blink=blink)
         out.append((im, 320))
     return out
 
@@ -263,26 +270,39 @@ def waiting():
     return out
 
 
+# Where the celebration's props go, as offsets into the jump slice (APPEAR_JUMP):
+# local 0 is the crouch, 1-8 airborne, 9-11 the landing squash, 12-14 the settle.
+#
+# Both props have to wait for the landing, and that is a constraint, not a choice: at
+# the apex the mascot spans rows 1-22 and there is simply no clear panel left to draw
+# on. From touchdown onward the top half is empty again. Landing on the beat reads as
+# "stuck it" rather than the old stomp's "threw it in the air", which is the same
+# celebration told the other way round.
+DONE_BURSTS = (9, 11)       # confetti fires twice, on impact and on the rebound
+DONE_CHECK_AT = (10, 11, 12)  # the checkmark flashes across the settle
+CHECK_STROKE = (((11, 6), (14, 9)), ((14, 9), (21, 2)))
+
+
+def _jump_frames():
+    """The bare jump lifted out of appear.gif -- see APPEAR_JUMP."""
+    return appear_frames()[APPEAR_JUMP]
+
+
 def done():
-    """Confetti Claude: a stomp, then two bursts fired on the way up."""
-    out = []
-    stomp = [(0, 0, 0), (3, 0, 2), (0, 0, -2), (0, 3, -4),
-             (0, 1, -3), (0, 0, -1), (0, 0, 0), (0, 0, 0)]
-    for i, (squash, lift, arm) in enumerate(stomp):
-        im = frame()
+    """Confetti Claude: the entrance's jump again, with two bursts on the landing."""
+    out = [(_standing_anchor(), 70)]  # loop contract: start on the standing anchor...
+    for i, (im, ms) in enumerate(_jump_frames()):
         d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y - lift, arms=(arm, arm), squash=squash)
-        # The article notes confetti waits for the hand to reach the top of the stomp.
-        # It starts just above the head (row 16) and rises out of the panel.
-        for burst_at in (2, 4):
-            if i < burst_at:
-                continue
+        # Each burst starts just above the head and rises out of the panel, the same
+        # spread the drawn stomp used -- only the frames it fires on have moved.
+        for burst_at in DONE_BURSTS:
             age = i - burst_at
-            if age > 3:
+            if not 0 <= age <= 3:
                 continue
             for j, color in enumerate(CONFETTI):
                 rect(d, 15 + (j - 2) * (2 + age), 10 - age * 4 + (j % 2), 2, 2, color)
-        out.append((im, 150))
+        out.append((im, ms))
+    out.append((_standing_anchor(), 700))  # ...and end on it.
     return out
 
 
@@ -331,16 +351,17 @@ def sleeping():
 def idle_alt():
     """Idle variant: a slower, lazier breathing cycle with a gentle weight shift."""
     out = []
-    # (bob, dx, blink) -- a longer cycle than idle()'s, and a slight side-to-side
+    # (breath, dx, blink) -- a longer cycle than idle()'s, and a slight side-to-side
     # lean instead of a pure vertical bob, so it reads as a different mood rather
-    # than a repeat of the same breath.
+    # than a repeat of the same breath. `breath` is a torso squash, not a lift, for
+    # the same reason as idle(): the feet stay welded to the panel's bottom row.
     frames = [(0, 0, False), (0, 1, False), (1, 1, False), (1, 1, False),
               (1, 0, False), (0, 0, False), (0, -1, False), (1, -1, False),
               (1, -1, False), (1, 0, True), (0, 0, False), (0, 0, False)]
-    for bob, dx, blink in frames:
+    for breath, dx, blink in frames:
         im = frame()
         d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y - bob, dx=dx, blink=blink)
+        mascot(d, HOME_Y, dx=dx, squash=breath, blink=blink)
         out.append((im, 380))
     return out
 
@@ -388,26 +409,21 @@ def fidget_doze():
 
 
 def done_enter():
-    """Entrance: a hop with a flashed checkmark, celebrating before the satisfied loop takes over."""
-    out = []
-    # (squash, up, arms, blink) -- crouch, leap with arms thrown up, hang at the
-    # apex with a checkmark, land, settle. `up` lifts the whole figure the same
-    # way stand_to_lie/lie_to_stand ease through a crouch: keyframed, not eased.
-    steps = [(0, 0, (0, 0), False), (2, 0, (0, 0), True),
-             (0, 4, (-4, -4), False), (0, 5, (-4, -4), False),
-             (0, 4, (-4, -4), False), (2, 0, (0, 0), True),
-             (0, 0, (0, 0), False)]
-    checkmark_at = (2, 3, 4)
-    for i, (squash, up, arms, blink) in enumerate(steps):
-        im = frame()
-        d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y - up, arms=arms, squash=squash, blink=blink)
-        if i in checkmark_at:
-            d.line([(11, 6), (14, 9)], fill=PROP)
-            d.line([(14, 9), (21, 2)], fill=PROP)
-        out.append((im, 130))
-    last_im, _ = out[-1]
-    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    """Entrance: the same jump as done(), with a checkmark flashed on the landing.
+
+    done() and this share their motion deliberately -- one celebration, told once as
+    a one-shot and then held as a loop -- and differ only in the prop: a checkmark
+    here, confetti there. That is what keeps the hand-off from the entrance into the
+    loop invisible while still making the entrance the beat you notice.
+    """
+    out = [(_standing_anchor(), 70)]  # the jump opens on a crouch, not the anchor
+    for i, (im, ms) in enumerate(_jump_frames()):
+        if i in DONE_CHECK_AT:
+            d = ImageDraw.Draw(im)
+            for a, b in CHECK_STROKE:
+                d.line([a, b], fill=PROP)
+        out.append((im, ms))
+    out.append((_standing_anchor(), APPEAR_TAIL_MS))  # long dwell -- standing anchor
     return out
 
 
@@ -594,6 +610,28 @@ def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 
     return out
 
 
+def coalesce(frames):
+    """
+    Merge runs of pixel-identical consecutive frames, summing their durations.
+
+    PIL does exactly this when it encodes the GIF (see the manifest note in
+    __main__), so an in-memory list and the file that ships from it are numbered
+    differently wherever the source holds a pose across several frames. Every clip
+    sliced out of appear.gif below indexes the COALESCED list, so the frame numbers
+    in the code, in `Docs/Specs/Animation Catalogue.md` and in the shipped GIF are
+    all the same numbers. Slicing the raw import instead would silently cut in a
+    different place.
+    """
+    out = []
+    for im, ms in frames:
+        if out and out[-1][0].tobytes() == im.tobytes():
+            prev, prev_ms = out[-1]
+            out[-1] = (prev, prev_ms + ms)
+        else:
+            out.append((im, ms))
+    return out
+
+
 # appear.gif is already native 32x32, so it needs no resampling. Its colours arrive in
 # three well-separated families -- pure black, a shade family at max channel 111-123,
 # and a body family at 246-255 -- with nothing in between, so a threshold on the
@@ -606,18 +644,55 @@ SHADE_MIN, BODY_MIN = 64, 180
 # `PanelTimings.startingHold`, which is set to the motion length alone.
 APPEAR_TAIL_MS = 2500
 
+# appear.gif is not one animation but two beats back to back, and each is worth more
+# than the other half it was bolted to:
+#
+#   [0..17]  the mascot bursts up out of the floor, hangs at the top, lands and
+#            settles -- an ENTRANCE, and only ever wanted once per session.
+#   [18..31] a shaded side-to-side sway that never leaves the floor -- an IDLE, and
+#            wasted at the tail of a clip that plays once.
+#
+# So APPEAR_RISE splits them, and the two clips built from it are `appear()` and
+# `dancing()`. Both indices are into the coalesced list -- see coalesce().
+APPEAR_RISE = 18
+# The jump inside the entrance, on its own: frame 3 is the crouch that anticipates it,
+# 4-11 are airborne, 12-14 the landing squash and 15-17 the settle. Frames 0-2 are the
+# mascot still emerging through the floor, which only makes sense as an entrance, so
+# the reusable jump starts after them. `done()` and `done_enter()` both play this.
+APPEAR_JUMP = slice(3, 18)
+
+
+def _appear_recolour(rgb):
+    value = max(rgb)
+    if value < SHADE_MIN:
+        return BG                       # background, and the eyes
+    return MASCOT_DARK if value < BODY_MIN else MASCOT
+
+
+def appear_frames():
+    """Every frame of appear.gif, recoloured and coalesced, at its authored timing."""
+    return coalesce(imported(APPEAR_SRC, _appear_recolour))
+
 
 def appear():
-    """Entrance: the mascot rises out of nothing, settles, and looks around."""
-    def recolour(rgb):
-        value = max(rgb)
-        if value < SHADE_MIN:
-            return BG                       # background, and the eyes
-        return MASCOT_DARK if value < BODY_MIN else MASCOT
+    """Entrance: the mascot bursts up out of the floor, lands and settles."""
+    out = appear_frames()[:APPEAR_RISE]
+    # Frame 17 is mid-settle and carries the sway's shading, so it is NOT the
+    # `standing` anchor the transition contract requires this clip to end on. (The
+    # old, unsplit clip ended on appear.gif's own last frame, which happens to be
+    # pixel-identical to mascot_at() -- that is what satisfied the contract before.)
+    # Cutting to the drawn anchor restores it, and doubles as the long dwell.
+    out.append((_standing_anchor(), APPEAR_TAIL_MS))
+    return out
 
-    out = imported(APPEAR_SRC, recolour)
-    last, _ = out[-1]
-    out[-1] = (last, APPEAR_TAIL_MS)
+
+def dancing():
+    """Idle variant: the shaded sway from appear.gif's second half, on the spot."""
+    # appear.gif's last frame IS the standing anchor pixel-for-pixel, so the tail of
+    # this slice satisfies the loop contract on its own; only the head needs the
+    # drawn anchor bookending it, the same way idle_think() does.
+    out = [(_standing_anchor(), 70)]
+    out += appear_frames()[APPEAR_RISE:]
     return out
 
 
@@ -969,6 +1044,7 @@ STATES = {
     "idle": idle,
     "idle-alt": idle_alt,
     "idle-think": idle_think,
+    "dancing": dancing,
     "sleeping": sleeping,
     "thinking": thinking,
     "thinking-alt": thinking_alt,
@@ -1020,6 +1096,16 @@ CLIP_METADATA = {
         "pose": "standing",
         "variantGroup": "idle",
         "weight": 0.3,
+    },
+    "dancing": {
+        # A fourth "idle" variant: appear.gif's own second half, which used to be
+        # stranded at the tail of the entrance where it played once a session. It is
+        # the most characterful idle art there is, so it carries the highest weight
+        # of the variants -- see dancing()'s docstring.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.5,
     },
     "thinking": {
         "loops": True,

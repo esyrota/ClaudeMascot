@@ -38,23 +38,28 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 
 ### standing
 
+|                               |                                       |                                           |                                     |
+| ----------------------------- | ------------------------------------- | ----------------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![idle-think](_animations/idle-think.gif) | ![dancing](_animations/dancing.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4     | **idle-think** · 7f · 1.48s · w 0.3       | **dancing** · 15f · 2.87s · w 0.5   |
+
 | | | | |
 |---|---|---|---|
-| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![idle-think](_animations/idle-think.gif) | ![thinking](_animations/thinking.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **idle-think** · 7f · 1.48s · w 0.3 | **thinking** · 5f · 1.12s · w 1.0 |
+| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif) |
+| **thinking** · 5f · 1.12s · w 1.0 | **thinking-alt** · 15f · 2.1s · w 0.5 | **waiting** · 8f · 1.12s · w 1.0 | **done** · 17f · 3.71s · w 1.0 |
 
-| | | |
-|---|---|---|
-| ![thinking-alt](_animations/thinking-alt.gif) | ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif) |
-| **thinking-alt** · 15f · 2.1s · w 0.5 | **waiting** · 8f · 1.12s · w 1.0 | **done** · 8f · 1.2s · w 1.0 |
-
-- `idle` group has three variants — the richest set, because idle is on screen most.
-- `thinking-alt` is imported from a hand-drawn sheet; the rest of this row is drawn in
-  `art/generate.py`.
+- `idle` group has four variants — the richest set, because idle is on screen most.
+- **The floor line is absolute at `standing`.** Every idle variant keeps all four feet on
+  the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
+  `idle`/`idle-alt` used to bob a pixel upward and read as a slow hop. Only a clip that
+  *means* to leave the ground — the jump, the walks — may break it.
+- `dancing` and `thinking-alt`/`idle-think` are imported; `idle`, `idle-alt`, `thinking`,
+  `waiting` and `done` are drawn or assembled in `art/generate.py`.
 - `waiting` is the flag wave: it means Claude is asking *you* for something, so it should
   stay the most legible clip on the panel from across a room.
-- `done` is the *satisfied* loop that follows the `done-enter` celebration, not the
-  celebration itself.
+- `done` is the *same jump* as the `done-enter` celebration, held as a loop with confetti
+  fired on each landing instead of a checkmark. One celebration, told once and then
+  sustained — so the hand-off from entrance to loop has nothing to give away.
 
 ### sitting
 
@@ -95,29 +100,46 @@ Never uploaded. `PanelController` cuts power for `.off` instead. It exists only 
 
 |                                                           |                                                       |                                                          |                                                          |
 | --------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
-| ![starting](_animations/starting.gif)                     | ![sink](_animations/sink.gif)                         | ![stand-to-lie](_animations/stand-to-lie.gif)            | ![lie-to-stand](_animations/lie-to-stand.gif)            |
-| **starting**<br>offBottom → standing<br>32f · motion 5.6s | **sink**<br>standing → offBottom<br>5f · motion 0.56s | **stand-to-lie**<br>standing → lying<br>6f · motion 0.7s | **lie-to-stand**<br>lying → standing<br>6f · motion 0.7s |
+| ![starting](_animations/starting.gif)                      | ![sink](_animations/sink.gif)                         | ![stand-to-lie](_animations/stand-to-lie.gif)            | ![lie-to-stand](_animations/lie-to-stand.gif)            |
+| **starting**<br>offBottom → standing<br>19f · motion 3.36s | **sink**<br>standing → offBottom<br>5f · motion 0.56s | **stand-to-lie**<br>standing → lying<br>6f · motion 0.7s | **lie-to-stand**<br>lying → standing<br>6f · motion 0.7s |
 
 | | | | |
 |---|---|---|---|
 | ![walk-off-left](_animations/walk-off-left.gif) | ![walk-in-left](_animations/walk-in-left.gif) | ![walk-off-right](_animations/walk-off-right.gif) | ![walk-in-right](_animations/walk-in-right.gif) |
 | **walk-off-left**<br>standing → offLeft<br>5f · motion 0.56s | **walk-in-left**<br>offLeft → standing<br>5f · motion 0.7s | **walk-off-right**<br>standing → offRight<br>5f · motion 0.56s | **walk-in-right**<br>offRight → standing<br>5f · motion 0.7s |
 
-`starting` is the original hand-drawn entrance and is far longer than the others (5.6s of
+`starting` is the original hand-drawn entrance and is far longer than the others (3.4s of
 motion against ~0.6s); it is the one transition the user is meant to notice.
+
+**`art/sources/appear.gif` is not one animation but three**, and `art/generate.py` now
+cuts it into three clips rather than playing the whole 32-frame strip once a session:
+
+| Coalesced frames | Becomes | Why |
+|---|---|---|
+| 0–17 | `starting` | Bursting up through the floor only makes sense as an entrance. |
+| 3–17 | `done` / `done-enter` | Frames 3–17 alone are a clean crouch → leap → land → settle. It reads as a jump anywhere, not just on arrival. |
+| 18–31 | `dancing` | A shaded sway that never leaves the floor — an idle that was stranded at the tail of a clip that plays once. |
+
+The frame numbers are indices into the **coalesced** strip — PIL merges runs of identical
+frames when it encodes the GIF, so the raw import is numbered differently. `coalesce()` in
+`art/generate.py` is what makes the numbers here, in the code and in the shipped GIF the
+same numbers.
 
 ### Self-edges — fidgets and one-shots
 
 | | | | |
 |---|---|---|---|
 | ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![fidget-doze](_animations/fidget-doze.gif) | ![done-enter](_animations/done-enter.gif) |
-| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **fidget-doze**<br>lying, 5f · 1.3s | **done-enter**<br>standing, 7f · 0.78s |
+| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **fidget-doze**<br>lying, 5f · 1.3s | **done-enter**<br>standing, 17f · motion 3.01s |
 
 Fidgets are motion with no cause — the thing that separates "animated" from "alive". They
 fire on a seeded roll during long holds and return the mascot exactly where it stood.
 
 `done-enter` is the `<group>-enter` one-shot: it plays once on arriving at `done`, then
-the `done` loop takes over. **The naming is load-bearing** — a clip is treated as an
+the `done` loop takes over. Both are the jump cut out of `appear.gif` (frames 3–17 above);
+the checkmark is what makes this one the beat you notice, and the confetti is what carries
+the loop after it. Both props wait for the landing — at the apex the mascot spans rows
+1–22 and there is no clear panel left to draw on. **The naming is load-bearing** — a clip is treated as an
 entrance only if its id is `<group>-enter`, and as a fidget only if it is a non-looping
 self-edge that is *not* an entrance. Declare one wrong and it silently never fires.
 
@@ -174,3 +196,9 @@ stall.
 4. **`waiting` has no variants**, despite being the state that most wants to catch your
    eye.
 5. **No fidgets at `sitting`** — the mascot is perfectly still at the laptop between loops.
+6. **`thinking` and `waiting` do not satisfy the anchor contract.** Both open and close
+   holding a prop — the barbell resting on the head, the flag mid-arc — so neither end is
+   the bare `standing` anchor, and swapping into or out of either pops the prop into
+   existence. Every other `standing` clip now checks out. The fix is the same bookending
+   `idle-think` and `dancing` use: an anchor frame at each end, with the prop entering on
+   the frame after it.

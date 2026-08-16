@@ -23,11 +23,18 @@ ROOT = Path(__file__).resolve().parent.parent
 ANIMATIONS = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 FIXTURES = ROOT / "Tests" / "Fixtures"
 
-STATES = ["idle", "idle-alt", "idle-think", "sleeping", "thinking", "thinking-alt",
-          "working", "working-alt", "waiting", "done",
-          "done-enter", "fidget-stretch", "fidget-look", "fidget-doze",
-          "stand-to-lie", "lie-to-stand", "walk-off-left", "walk-in-left",
-          "walk-off-right", "walk-in-right", "sink"]
+# Every clip the manifest ships, minus "off" -- that one is never uploaded, so there
+# are no packets to golden (see off()'s docstring in generate.py). Read from
+# clips.json rather than listed here: a hand-kept list silently drops whatever was
+# added since it was last edited, and this one had already lost "starting" that way.
+# GifPacketizerTests iterates the fixture manifest, so a clip added to the art is
+# covered by the suite the moment it appears.
+SKIP = {"off"}
+
+
+def clip_names():
+    manifest = json.loads((ANIMATIONS / "clips.json").read_text())["clips"]
+    return [name for name in sorted(manifest) if name not in SKIP]
 
 CHUNK_SIZE = 4096
 HEADER_SIZE = 16
@@ -81,10 +88,19 @@ def create_gif_data_packets(gif_data: bytes, gif_type: int = GIF_TYPE) -> list[l
 
 def main() -> None:
     FIXTURES.mkdir(parents=True, exist_ok=True)
+    states = clip_names()
     manifest = {}
 
+    # A renamed or deleted clip must not leave its old fixture behind: the Swift
+    # suite iterates manifest.json, so an orphan would sit unverified in the tree.
+    keep = {f"{name}.{ext}" for name in states for ext in ("gif", "packets")}
+    for stale in list(FIXTURES.glob("*.gif")) + list(FIXTURES.glob("*.packets")):
+        if stale.name not in keep:
+            stale.unlink()
+            print(f"removed stale {stale.name}")
+
     print(f"{'state':10s} {'bytes':>6s} {'crc32':>10s} {'chunks':>7s} {'packets':>8s}  lengths")
-    for state in STATES:
+    for state in states:
         src = ANIMATIONS / f"{state}.gif"
         if not src.exists():
             raise SystemExit(f"missing animation: {src}")
@@ -112,7 +128,7 @@ def main() -> None:
         print(f"{state:10s} {len(raw):6d} 0x{crc:08x} {len(packets):7d} {len(flat):8d}  {lengths}")
 
     (FIXTURES / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"\nwrote {len(STATES)} fixtures + manifest.json to {FIXTURES}")
+    print(f"\nwrote {len(states)} fixtures + manifest.json to {FIXTURES}")
 
 
 if __name__ == "__main__":

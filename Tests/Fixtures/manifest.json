@@ -1,25 +1,100 @@
 {
-  "idle": {
-    "gif_bytes": 1335,
-    "crc32": 3274966629,
+  "dancing": {
+    "gif_bytes": 3021,
+    "crc32": 4084560163,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      492
+    ]
+  },
+  "done": {
+    "gif_bytes": 3488,
+    "crc32": 913440323,
+    "outer_chunks": 1,
+    "ble_packets": 7,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      450
+    ]
+  },
+  "done-enter": {
+    "gif_bytes": 3415,
+    "crc32": 4100888825,
+    "outer_chunks": 1,
+    "ble_packets": 7,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      377
+    ]
+  },
+  "fidget-doze": {
+    "gif_bytes": 846,
+    "crc32": 3926969283,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      353
+    ]
+  },
+  "fidget-look": {
+    "gif_bytes": 963,
+    "crc32": 2582506224,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      470
+    ]
+  },
+  "fidget-stretch": {
+    "gif_bytes": 1349,
+    "crc32": 2243132752,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
       509,
       509,
-      333
+      347
+    ]
+  },
+  "idle": {
+    "gif_bytes": 1333,
+    "crc32": 1082299974,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      331
     ]
   },
   "idle-alt": {
-    "gif_bytes": 1707,
-    "crc32": 1005054186,
+    "gif_bytes": 1703,
+    "crc32": 3760434561,
     "outer_chunks": 1,
     "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      196
+      192
     ]
   },
   "idle-think": {
@@ -33,6 +108,27 @@
       299
     ]
   },
+  "lie-to-stand": {
+    "gif_bytes": 1063,
+    "crc32": 3588914083,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      61
+    ]
+  },
+  "sink": {
+    "gif_bytes": 777,
+    "crc32": 907374700,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      284
+    ]
+  },
   "sleeping": {
     "gif_bytes": 1374,
     "crc32": 2680603367,
@@ -42,6 +138,33 @@
       509,
       509,
       372
+    ]
+  },
+  "stand-to-lie": {
+    "gif_bytes": 1064,
+    "crc32": 3944405394,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      62
+    ]
+  },
+  "starting": {
+    "gif_bytes": 3671,
+    "crc32": 681102034,
+    "outer_chunks": 1,
+    "ble_packets": 8,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      124
     ]
   },
   "thinking": {
@@ -67,6 +190,58 @@
       509,
       509,
       402
+    ]
+  },
+  "waiting": {
+    "gif_bytes": 1739,
+    "crc32": 1298930632,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      228
+    ]
+  },
+  "walk-in-left": {
+    "gif_bytes": 813,
+    "crc32": 2195636767,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "walk-in-right": {
+    "gif_bytes": 813,
+    "crc32": 3134849561,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "walk-off-left": {
+    "gif_bytes": 813,
+    "crc32": 1576751028,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "walk-off-right": {
+    "gif_bytes": 813,
+    "crc32": 2543213075,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
     ]
   },
   "working": {
@@ -115,144 +290,6 @@
       509,
       509,
       54
-    ]
-  },
-  "waiting": {
-    "gif_bytes": 1739,
-    "crc32": 1298930632,
-    "outer_chunks": 1,
-    "ble_packets": 4,
-    "packet_lengths": [
-      509,
-      509,
-      509,
-      228
-    ]
-  },
-  "done": {
-    "gif_bytes": 1655,
-    "crc32": 364253142,
-    "outer_chunks": 1,
-    "ble_packets": 4,
-    "packet_lengths": [
-      509,
-      509,
-      509,
-      144
-    ]
-  },
-  "done-enter": {
-    "gif_bytes": 1393,
-    "crc32": 2728551227,
-    "outer_chunks": 1,
-    "ble_packets": 3,
-    "packet_lengths": [
-      509,
-      509,
-      391
-    ]
-  },
-  "fidget-stretch": {
-    "gif_bytes": 1349,
-    "crc32": 2243132752,
-    "outer_chunks": 1,
-    "ble_packets": 3,
-    "packet_lengths": [
-      509,
-      509,
-      347
-    ]
-  },
-  "fidget-look": {
-    "gif_bytes": 963,
-    "crc32": 2582506224,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      470
-    ]
-  },
-  "fidget-doze": {
-    "gif_bytes": 846,
-    "crc32": 3926969283,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      353
-    ]
-  },
-  "stand-to-lie": {
-    "gif_bytes": 1064,
-    "crc32": 3944405394,
-    "outer_chunks": 1,
-    "ble_packets": 3,
-    "packet_lengths": [
-      509,
-      509,
-      62
-    ]
-  },
-  "lie-to-stand": {
-    "gif_bytes": 1063,
-    "crc32": 3588914083,
-    "outer_chunks": 1,
-    "ble_packets": 3,
-    "packet_lengths": [
-      509,
-      509,
-      61
-    ]
-  },
-  "walk-off-left": {
-    "gif_bytes": 813,
-    "crc32": 1576751028,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      320
-    ]
-  },
-  "walk-in-left": {
-    "gif_bytes": 813,
-    "crc32": 2195636767,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      320
-    ]
-  },
-  "walk-off-right": {
-    "gif_bytes": 813,
-    "crc32": 2543213075,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      320
-    ]
-  },
-  "walk-in-right": {
-    "gif_bytes": 813,
-    "crc32": 3134849561,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      320
-    ]
-  },
-  "sink": {
-    "gif_bytes": 777,
-    "crc32": 907374700,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      284
     ]
   }
 }
