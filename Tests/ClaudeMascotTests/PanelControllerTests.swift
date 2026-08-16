@@ -117,7 +117,7 @@ private func makeController(
   panel: MockPanel,
   timings: PanelTimings = PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600),
   clock: FakeClock,
-  resolve: @escaping (PanelState) -> Clip? = { defaultTestClips[$0] }
+  resolve: @escaping (PanelState, Clip?) -> Clip? = { state, _ in defaultTestClips[state] }
 ) -> PanelController {
   PanelController(
     panel: panel,
@@ -454,7 +454,7 @@ func nonLoopingClipHandsOffAtMotionNotDuration() async {
   let transition = testClip(.sleeping, loops: false, duration: 10, motion: 3)
   var clips = defaultTestClips
   clips[.sleeping] = transition
-  let controller = makeController(panel: panel, clock: clock, resolve: { clips[$0] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
 
   controller.handle(.sleeping)
   await controller.tick()  // nothing showing yet: uploads immediately

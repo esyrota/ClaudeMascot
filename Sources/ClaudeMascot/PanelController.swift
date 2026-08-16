@@ -84,11 +84,14 @@ final class PanelController: ObservableObject {
   @Published private(set) var isPanelOff: Bool = false
 
   private let panel: any PanelDriving
-  /// Turns a `PanelState` into the clip that should represent it. Injected
-  /// rather than hardcoded so this machine never has to change when the
-  /// resolution policy does — chunk 6 replaces a manifest-id lookup with a
-  /// full choreographer without touching a line here.
-  private let resolve: (PanelState) -> Clip?
+  /// Turns a `PanelState` into the clip that should represent it, given what
+  /// is currently on the panel. Injected rather than hardcoded so this
+  /// machine never has to change when the resolution policy does —
+  /// `Choreographer` walks a pose graph behind this closure without
+  /// touching a line here. Called speculatively on every `tick()`, so it
+  /// must be side-effect-free: the second argument is `displayed` at the
+  /// moment of the call, not a state the resolver should mutate or remember.
+  private let resolve: (PanelState, Clip?) -> Clip?
   private let timings: PanelTimings
   private let brightness: () -> Int
   private let clock: () -> TimeInterval
@@ -137,7 +140,7 @@ final class PanelController: ObservableObject {
 
   init(
     panel: any PanelDriving,
-    resolve: @escaping (PanelState) -> Clip?,
+    resolve: @escaping (PanelState, Clip?) -> Clip?,
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
     clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
@@ -243,7 +246,7 @@ final class PanelController: ObservableObject {
     }
 
     let targetState = currentTarget(now: now)
-    guard let targetClip = resolve(targetState) else {
+    guard let targetClip = resolve(targetState, displayed) else {
       // The resolver has nothing for this state. Treat it like a failed
       // upload: back off and retry, rather than getting stuck silently on a
       // stale `displayed`.
@@ -367,7 +370,10 @@ final class PanelController: ObservableObject {
       // failed wake retries from the beginning rather than burning the hold.
       beginAppearing(now: now)
       let targetState = currentTarget(now: now)
-      guard let targetClip = resolve(targetState) else {
+      // `displayed` is `nil` here (a dark panel shows nothing) — passed
+      // through anyway so the resolver sees the same "nothing on screen"
+      // signal it would from any other call.
+      guard let targetClip = resolve(targetState, displayed) else {
         throw ClipResolutionError.unresolved(targetState)
       }
       // Unconditional, like every upload out of "nothing showing": `displayed`

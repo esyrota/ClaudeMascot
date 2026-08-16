@@ -75,12 +75,19 @@ final class AppModel: ObservableObject {
     )
 
     let adapter = PanelAdapter(library: animationLibrary, ble: bleClient)
+    // Walks the pose graph instead of looking states up 1:1. Built from
+    // whatever manifest the library loaded (an empty one when none did, so
+    // resolution simply returns `nil` everywhere rather than crashing).
+    // Wiring `SessionTracker` into the target it resolves is chunk 7 — for
+    // now the resolver still sees the same `PanelState` `HookServer` always
+    // produced.
+    let choreographer = Choreographer(
+      manifest: animationLibrary.manifest ?? ClipManifest(version: 0, clips: [:]),
+      clock: { Date().timeIntervalSince1970 }
+    )
     self.panelController = PanelController(
       panel: adapter,
-      // A direct port of today's behaviour: the state's own name is the
-      // clip id. Chunk 6 supersedes this with a choreographer that walks a
-      // pose graph instead of looking states up 1:1.
-      resolve: { [animationLibrary] state in animationLibrary.clip(id: state.rawValue) },
+      resolve: { [choreographer] state, displayed in choreographer.clip(for: state, displayed: displayed) },
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),
