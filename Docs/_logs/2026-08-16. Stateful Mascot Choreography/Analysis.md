@@ -18,7 +18,8 @@ exist only as images pasted into the planning conversation, never saved to `art/
 | 8 | Lying pose + transitions | Sonnet | 131.4k | 16 | success |
 | 9 | Fidgets, variant, celebration | Sonnet | 117.5k | 14 | success |
 | 10 | Specs + final gates | Haiku | 67.4k | 30 | success *(5 spec errors caught)* |
-| | **Total** | | **~1.08M** | **248** | 10/10 |
+| 11 | Sprite sheet import | Sonnet | 250.3k | 87 | success *(2 art caveats)* |
+| | **Total** | | **~1.33M** | **335** | 11/11 |
 
 **Wall clock:** 16:13 → 17:31, ~78 minutes. **Estimated 460k tokens, actual ~1.08M — 2.3×
 over.** The estimate was built from file sizes and ignored that verification-heavy chunks
@@ -94,8 +95,41 @@ Worth recording because both corrected the brief, not the code:
 | For spec chunks, give Haiku the *source* line ranges that state each fact, not just the file list | would likely have prevented all 5 spec errors |
 | Budget verification-heavy chunks at 2× the file-size estimate | estimation accuracy, not spend |
 
+## On hardware
+
+The first install connected and ran the new choreography on the panel:
+
+```
+18:20:18  ble]   off -> connecting
+18:20:19  ble]   connecting -> connected
+18:20:21  panel] showing starting
+18:20:27  panel] showing thinking
+```
+
+`starting` → `thinking` is 6.4s against `starting.gif`'s 5.6s motion length, so **boundary
+scheduling was confirmed working on real hardware** — the entrance finished its motion and
+handed off inside the dwell rather than being cut mid-arrival.
+
+**The second install lost Bluetooth**, exactly as [[macOS Bluetooth TCC]] and the Menu Bar
+App spec's Risks section predict: `make-app.sh` re-signs ad hoc on every build, the grant
+is tied to the binary's identity, and the failure presents as `notConnected` with **total
+silence from the `ble` category** — never as a permission error. Two installs in one
+session was enough to trigger it. This is the strongest argument yet for a stable signing
+identity; it cost a diagnosis here and will cost one every time.
+
+## Art caveats from chunk 11 — user decisions, not defects
+
+- **The imported sheets are drawn ~87% the size of the procedural mascot** (21×14 vs 24×16
+  bounding box, 123/1024 pixels differing at rest). The anchor contract is satisfied
+  mechanically by prepending/appending the procedural anchor frame, but that means a
+  visible size pop at each end of an imported clip. Rescaling the sheet art to the
+  procedural silhouette would fix it properly.
+- **The laptop is now a featureless white slab.** The panel colour rule forbids mid-grey,
+  so grey mapped to pure white and the screen detail flattened out. Drawing it with black
+  (`BG`) outlines would give it shape back within the palette.
+
 ## Verdict
 
-The engine is complete and the mascot now has a body, a memory, and a sense of timing —
-but **none of it has touched hardware**, and the one thing the whole task exists to improve
-is how it *feels* on the panel, which no test can answer.
+The engine is complete, the mascot has a body, a memory and a sense of timing, and the
+choreography was seen working on the panel. What remains is a judgment no test can make —
+whether it *feels* alive — plus two art-scale decisions and a signing identity.
