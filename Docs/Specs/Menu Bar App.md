@@ -70,7 +70,7 @@ The mascot is a **pose graph**: nodes are poses (`standing`, `sitting`, `lying`,
 
 Clips are either looping (variant loops at their pose, eligible for fidgets) or non-looping (entrances and transitions). Swaps land only on clip boundaries:
 
-- **Looping clips** hand off at the next multiple of `duration` — the seam where the panel restarts the loop, so a swap there is invisible.
+- **Looping clips** hand off once a full loop has played, at the most recent seam (`floor(elapsed / duration)`). A swap therefore waits at most one loop. Computing the *next* seam instead is a trap: it is always `>= now`, so the "are we there yet" test can only pass at exact equality, and a 1s poll against a floating-point clock never lands there — the panel locks onto its first looping clip forever. That shipped once; see `PanelController.nextBoundary`.
 - **Non-looping clips** hand off at `motion`, *not* `duration`. A transition ends on a long dwell frame so the panel has something to hold; waiting out the whole dwell would park a motionless mascot on screen long after its motion finished.
 - **Power transitions** (wake, power-off) bypass boundary gating entirely, for immediate panel response.
 - **The target is held, never queued.** When a decision is made and the clip is already on screen, nothing uploads; the mascot simply sits and displays the current clip until the boundary arrives. This collapsing of bursts is implicit — the scheduler holds the latest desired state and recomputes the next clip on every tick.

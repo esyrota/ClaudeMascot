@@ -334,7 +334,24 @@ final class PanelController: ObservableObject {
       return now
     }
     let elapsed = now - startedAt
-    let cyclesElapsed = (elapsed / clip.duration).rounded(.up)
+    // The seam to swap on is the most recent one, not the next one.
+    //
+    // Rounding *up* returns a boundary that is always >= now, so `now >=
+    // boundary` could only ever hold at exact equality — elapsed being a
+    // whole multiple of the duration. A 1s poll against a floating-point
+    // clock essentially never lands there, so a looping clip could never be
+    // swapped for another looping clip: the panel locked onto whatever loop
+    // reached it first. Found on hardware, where the mascot stuck on
+    // `thinking-alt` and never reached `done`; missed by the tests because
+    // their fixture used a 1s duration with whole-second advances, making
+    // every elapsed value an exact multiple.
+    //
+    // Rounding down asks the question that was actually meant: has a full
+    // loop finished yet? If so, the last seam is behind us and the swap may
+    // land now — at most one loop after it was requested, which is the
+    // "never interrupt mid-animation" rule this whole machine exists for.
+    let cyclesElapsed = (elapsed / clip.duration).rounded(.down)
+    guard cyclesElapsed >= 1 else { return startedAt + clip.duration }
     return startedAt + clip.duration * cyclesElapsed
   }
 

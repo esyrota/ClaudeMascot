@@ -117,6 +117,33 @@ silence from the `ble` category** — never as a permission error. Two installs 
 session was enough to trigger it. This is the strongest argument yet for a stable signing
 identity; it cost a diagnosis here and will cost one every time.
 
+## Feedback round — the boundary bug the tests could not see
+
+Eugene watched the panel and reported it stuck on `thinking`, never reaching `done` or
+`idle`. The decision log diagnosed it in one read: `deferred to boundary at …` repeating
+with the boundary receding by exactly the clip's duration each tick.
+
+`nextBoundary` rounded **up**, returning a seam always `>= now`. The gate `now >= boundary`
+could then only pass when `elapsed` was an *exact multiple* of the duration — which a 1s
+poll against a floating-point clock essentially never hits. **Once a looping clip reached
+the panel, it could never be swapped for another looping clip.** It had only appeared to
+work because BLE was failing (so `displayed` stayed `nil` and took the immediate path) and
+because `starting` is non-looping and hands off at a fixed `motion`.
+
+Every test passed throughout, because the fixture used `duration: 1` advanced in whole
+seconds — every elapsed value *was* an exact multiple. The chunk-4 agent even reported
+this ("every existing advance is already an exact multiple of that duration"); it read as
+a note about test convenience, and it was actually the bug announcing itself.
+
+Fixed by rounding down and requiring one full loop. Two regression tests added, both using
+a deliberately non-multiple `2.1s` duration — the real `thinking-alt` duration that exposed
+it — one proving the swap eventually lands, one proving it does not land early. Four
+existing tests needed the clock advanced to a boundary; no assertion was weakened.
+
+**Lesson worth keeping: a fixture whose numbers are all exact multiples cannot test
+boundary arithmetic.** The verification that mattered came from the panel and the decision
+log, not the suite.
+
 ## Art caveats from chunk 11 — user decisions, not defects
 
 - **The imported sheets are drawn ~87% the size of the procedural mascot** (21×14 vs 24×16

@@ -136,10 +136,11 @@ func doneHoldsThenRevertsToIdle() async {
 
   await controller.tick()  // initial idle upload
   controller.handle(.done)
+  clock.advance(1)  // let `.idle`'s loop finish -- swaps land on a boundary
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.done.rawValue)
 
-  clock.advance(29)
+  clock.advance(28)  // 29s since `.done` was requested: still inside the hold
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.done.rawValue)
 
@@ -156,6 +157,7 @@ func newStateDuringDoneHoldPreemptsIt() async {
 
   await controller.tick()
   controller.handle(.done)
+  clock.advance(1)  // let `.idle`'s loop finish -- swaps land on a boundary
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.done.rawValue)
 
@@ -300,10 +302,11 @@ func sessionStartReplaysEntranceThenSettlesIntoIdle() async {
   #expect(controller.displayed?.id == PanelState.idle.rawValue)
 
   controller.handle(.starting)
+  clock.advance(1)  // let `.idle`'s loop finish -- swaps land on a boundary
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.starting.rawValue)
 
-  clock.advance(4)
+  clock.advance(3)  // 4s into the 5s entrance -- still arriving
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.starting.rawValue)
 
@@ -351,6 +354,7 @@ func offPowersDownImmediatelyWithoutWaitingForIdleEscalation() async {
 
   await controller.tick()  // initial idle upload
   controller.handle(.working)
+  clock.advance(1)  // let `.idle`'s loop finish -- swaps land on a boundary
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.working.rawValue)
 
@@ -489,4 +493,62 @@ func powerOffAndWakeAreNotBoundaryGated() async {
   await controller.tick()
   #expect(controller.isPanelOff == false)
   #expect(controller.displayed?.id == PanelState.thinking.rawValue)  // wake uploads immediately too
+}
+
+/// Regression: a looping clip whose duration is not a whole multiple of the
+/// tick interval must still be swappable.
+///
+/// The original boundary maths rounded *up*, yielding a boundary that was
+/// always >= now, so `now >= boundary` held only when elapsed was an exact
+/// multiple of the duration. Every other fixture in this file uses a 1s
+/// duration advanced in whole seconds, which hits that equality every time
+/// and hid the bug completely — on hardware the panel locked onto the first
+/// looping clip it showed and never changed again.
+@Test @MainActor
+func loopingClipWithNonMultipleDurationStillSwaps() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  // 2.1s is the real `thinking-alt` duration that exposed this on the panel.
+  var clips = defaultTestClips
+  clips[.thinking] = testClip(.thinking, duration: 2.1)
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+
+  controller.handle(.thinking)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.thinking.rawValue)
+
+  // Poll once a second, exactly as `AppModel`'s timer does. The swap must
+  // land within a loop or two; it must never be deferred indefinitely.
+  controller.handle(.done)
+  var swapped = false
+  for _ in 0..<10 {
+    clock.advance(1)
+    await controller.tick()
+    if controller.displayed?.id == PanelState.done.rawValue {
+      swapped = true
+      break
+    }
+  }
+  #expect(swapped, "a looping clip with a non-multiple duration never reached a boundary")
+}
+
+/// The swap waits for the loop to finish rather than cutting it short —
+/// the whole point of boundary scheduling. Pinned alongside the regression
+/// above so a fix for one cannot silently undo the other.
+@Test @MainActor
+func swapDoesNotLandBeforeTheLoopCompletes() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var clips = defaultTestClips
+  clips[.thinking] = testClip(.thinking, duration: 2.1)
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+
+  controller.handle(.thinking)
+  await controller.tick()
+
+  controller.handle(.done)
+  clock.advance(1)  // still inside the first loop
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.thinking.rawValue)
+  #expect(panel.uploadCount == 1)
 }
