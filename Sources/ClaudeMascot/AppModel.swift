@@ -80,9 +80,10 @@ final class AppModel: ObservableObject {
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),
-        // Matches starting.gif's motion length, which art/generate.py prints
-        // on every run, so the entrance plays exactly once before handing off.
-        startingHold: 6.02
+        // Read from the manifest rather than hand-synced, so the entrance
+        // plays exactly once before handing off. `0` (manifest absent) means
+        // the entrance is disabled, matching PanelTimings' documented default.
+        startingHold: animationLibrary.clip(id: "starting")?.motion ?? 0
       ),
       brightness: { settings.brightness },
       eventLog: eventLog

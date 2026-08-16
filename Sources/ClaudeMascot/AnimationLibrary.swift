@@ -29,7 +29,40 @@ import Foundation
     return try Data(contentsOf: url)
   }
 
+  /// The decoded clip manifest, loaded once (through the same bundle search
+  /// as GIFs) and cached. `nil` when `clips.json` is absent or unreadable —
+  /// treated as "no manifest" rather than fatal, so builds and tests that
+  /// predate it keep working.
+  lazy var manifest: ClipManifest? = loadManifest()
+
+  /// Looks up a clip by its manifest id.
+  func clip(id: String) -> Clip? {
+    manifest?[id]
+  }
+
+  /// Returns the data for a manifest clip, resolved through the same
+  /// bundle-search fallbacks as `data(for: PanelState)`.
+  func data(for clip: Clip) throws -> Data {
+    guard let url = bundledURL(for: clip.file) else {
+      throw AnimationLibraryError.clipNotFound(clip.id)
+    }
+    return try Data(contentsOf: url)
+  }
+
   // MARK: - Private
+
+  /// Locates and decodes `Animations/clips.json` through `bundledURL`, the
+  /// same search GIFs use. `ClipManifest.decode` still throws on a malformed
+  /// *present* file when called directly (e.g. from tests); here that's
+  /// folded into "no manifest" so a bad file degrades rather than crashes.
+  private func loadManifest() -> ClipManifest? {
+    guard let url = bundledURL(for: "clips.json"),
+      let data = try? Data(contentsOf: url)
+    else {
+      return nil
+    }
+    return try? ClipManifest.decode(data)
+  }
 
   private func fileExists(at url: URL) -> Bool {
     FileManager.default.fileExists(atPath: url.path)
@@ -84,11 +117,14 @@ import Foundation
 
 enum AnimationLibraryError: LocalizedError {
   case notFound(PanelState)
+  case clipNotFound(String)
 
   var errorDescription: String? {
     switch self {
     case .notFound(let state):
       return "Animation not found for state: \(state.rawValue)"
+    case .clipNotFound(let id):
+      return "Animation not found for clip: \(id)"
     }
   }
 }

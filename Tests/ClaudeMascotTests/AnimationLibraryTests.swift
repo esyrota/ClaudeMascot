@@ -93,4 +93,23 @@ final class AnimationLibraryTests: XCTestCase {
       }
     }
   }
+
+  @MainActor
+  func testRealBundledManifestLoadsAndReportsStartingMotion() throws {
+    // Point straight at the source resources directory the same way
+    // `fixturesDirectory` above points at the fixtures, since `swift test`
+    // does not put the package's own bundled resources on `Bundle.main`.
+    let resourcesDir = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Sources/ClaudeMascot/Resources")
+    library.bundleOverride = Bundle(path: resourcesDir.path)
+
+    let manifest = try XCTUnwrap(library.manifest)
+    XCTAssertEqual(manifest.version, 1)
+
+    let starting = try XCTUnwrap(library.clip(id: "starting"))
+    XCTAssertEqual(starting.motion, 5.6, accuracy: 0.0001)
+  }
 }

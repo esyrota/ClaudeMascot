@@ -28,11 +28,12 @@ struct PanelTimings: Sendable {
   var sleepAfter: TimeInterval = 5 * 60
   var offAfter: TimeInterval = 10 * 60
   /// How long the `.starting` entrance is shown before handing off to the
-  /// actually-desired state. Must match the motion length of `starting.gif`
-  /// (`art/generate.py` prints it) so the mascot finishes arriving exactly
-  /// once: the panel loops whatever GIF it holds, and that file dwells on its
-  /// final resting frame afterwards, so a hand-off anywhere inside the dwell
-  /// looks like a mascot standing still rather than a restarted entrance.
+  /// actually-desired state. Read from the manifest's `starting` clip
+  /// (`Clip.motion`) so it no longer needs hand-syncing to `art/generate.py`'s
+  /// printed motion length: the panel loops whatever GIF it holds, and that
+  /// file dwells on its final resting frame afterwards, so a hand-off
+  /// anywhere inside the dwell looks like a mascot standing still rather than
+  /// a restarted entrance.
   ///
   /// `0` (the default) disables the entrance outright, which is what every
   /// existing test relies on to see its expected state upload immediately.
