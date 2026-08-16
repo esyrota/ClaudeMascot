@@ -315,6 +315,101 @@ def sleeping():
 
 
 # --------------------------------------------------------------------------
+# Variants and fidgets -- the art that switches on variant rotation and fidget
+# injection (built in chunk 6 but dormant until now, since every group had only
+# one candidate and no clip was shaped like a fidget). See the chunk 9 brief and
+# Task.md's variant/fidget/done decisions for the shapes these must match:
+# a variant is a LOOPING clip sharing a variantGroup; a fidget is a NON-LOOPING
+# clip with fromPose == toPose whose id does not end in "-enter"; an entrance
+# one-shot is a NON-LOOPING clip with fromPose == toPose and id "<group>-enter".
+# Every clip below starts and ends pixel-identical to its pose's anchor, same
+# contract as the states and transitions above.
+# --------------------------------------------------------------------------
+
+def idle_alt():
+    """Idle variant: a slower, lazier breathing cycle with a gentle weight shift."""
+    out = []
+    # (bob, dx, blink) -- a longer cycle than idle()'s, and a slight side-to-side
+    # lean instead of a pure vertical bob, so it reads as a different mood rather
+    # than a repeat of the same breath.
+    frames = [(0, 0, False), (0, 1, False), (1, 1, False), (1, 1, False),
+              (1, 0, False), (0, 0, False), (0, -1, False), (1, -1, False),
+              (1, -1, False), (1, 0, True), (0, 0, False), (0, 0, False)]
+    for bob, dx, blink in frames:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y - bob, dx=dx, blink=blink)
+        out.append((im, 380))
+    return out
+
+
+def fidget_stretch():
+    """Fidget: a quick stretch, arms reaching up and back down."""
+    out = []
+    arm_lifts = [0, -1, -3, -4, -4, -3, -1, 0]
+    for lift in arm_lifts:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, arms=(lift, lift))
+        out.append((im, 110))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+def fidget_look():
+    """Fidget: glances one way, then the other, then settles."""
+    out = []
+    for dx in (0, -1, -1, 0, 1, 1, 0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, dx=dx)
+        out.append((im, 130))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+def fidget_doze():
+    """Fidget: a deeper breath and a shuffle while asleep."""
+    out = []
+    # A bigger pulse than sleeping()'s own (which tops out at 1) so this reads as
+    # a deliberately deeper breath rather than another lap of the same loop.
+    for pulse in (0, 1, 2, 2, 1, 0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        lying_pose(d, pulse=pulse)
+        out.append((im, 260))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the lying anchor
+    return out
+
+
+def done_enter():
+    """Entrance: a hop with a flashed checkmark, celebrating before the satisfied loop takes over."""
+    out = []
+    # (squash, up, arms, blink) -- crouch, leap with arms thrown up, hang at the
+    # apex with a checkmark, land, settle. `up` lifts the whole figure the same
+    # way stand_to_lie/lie_to_stand ease through a crouch: keyframed, not eased.
+    steps = [(0, 0, (0, 0), False), (2, 0, (0, 0), True),
+             (0, 4, (-4, -4), False), (0, 5, (-4, -4), False),
+             (0, 4, (-4, -4), False), (2, 0, (0, 0), True),
+             (0, 0, (0, 0), False)]
+    checkmark_at = (2, 3, 4)
+    for i, (squash, up, arms, blink) in enumerate(steps):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y - up, arms=arms, squash=squash, blink=blink)
+        if i in checkmark_at:
+            d.line([(11, 6), (14, 9)], fill=PROP)
+            d.line([(14, 9), (21, 2)], fill=PROP)
+        out.append((im, 130))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+# --------------------------------------------------------------------------
 # Transition clips -- the pose graph's edges. Drawn procedurally, like the states
 # above, because that is what lands them exactly on the anchor frame; see
 # "Edge art is procedural, loop art is imported" in Task.md. Each ends on a long
@@ -631,11 +726,16 @@ def off():
 STATES = {
     "starting": appear,
     "idle": idle,
+    "idle-alt": idle_alt,
     "sleeping": sleeping,
     "thinking": thinking,
     "working": sweep,
     "waiting": waiting,
     "done": done,
+    "done-enter": done_enter,
+    "fidget-stretch": fidget_stretch,
+    "fidget-look": fidget_look,
+    "fidget-doze": fidget_doze,
     "stand-to-lie": stand_to_lie,
     "lie-to-stand": lie_to_stand,
     "walk-off-left": walk_off_left,
@@ -661,6 +761,14 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 1.0,
     },
+    "idle-alt": {
+        # Same variantGroup as "idle" -- that is what makes this a variant rather
+        # than a new state -- at a lower weight so plain idle stays the common sight.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.4,
+    },
     "thinking": {
         "loops": True,
         "pose": "standing",
@@ -678,6 +786,30 @@ CLIP_METADATA = {
         "pose": "standing",
         "variantGroup": "done",
         "weight": 1.0,
+    },
+    "done-enter": {
+        # Non-looping one-shot played once on arriving at "done", before the
+        # "done" loop above takes over -- the celebration in front of the
+        # satisfied idle. Id must end in "-enter" for the choreographer to
+        # recognise it as an entrance rather than a fidget.
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+    },
+    "fidget-stretch": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+    },
+    "fidget-look": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+    },
+    "fidget-doze": {
+        "loops": False,
+        "fromPose": "lying",
+        "toPose": "lying",
     },
     "working": {
         "loops": True,

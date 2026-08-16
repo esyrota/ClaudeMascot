@@ -11,6 +11,42 @@
       "variantGroup": "done",
       "weight": 1.0
     },
+    "done-enter": {
+      "file": "done-enter.gif",
+      "frameCount": 7,
+      "durationMs": 3280,
+      "motionMs": 780,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing"
+    },
+    "fidget-doze": {
+      "file": "fidget-doze.gif",
+      "frameCount": 5,
+      "durationMs": 3800,
+      "motionMs": 1300,
+      "loops": false,
+      "fromPose": "lying",
+      "toPose": "lying"
+    },
+    "fidget-look": {
+      "file": "fidget-look.gif",
+      "frameCount": 5,
+      "durationMs": 3280,
+      "motionMs": 780,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing"
+    },
+    "fidget-stretch": {
+      "file": "fidget-stretch.gif",
+      "frameCount": 7,
+      "durationMs": 3270,
+      "motionMs": 770,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing"
+    },
     "idle": {
       "file": "idle.gif",
       "frameCount": 7,
@@ -20,6 +56,16 @@
       "pose": "standing",
       "variantGroup": "idle",
       "weight": 1.0
+    },
+    "idle-alt": {
+      "file": "idle-alt.gif",
+      "frameCount": 9,
+      "durationMs": 4560,
+      "motionMs": 4560,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.4
     },
     "lie-to-stand": {
       "file": "lie-to-stand.gif",
