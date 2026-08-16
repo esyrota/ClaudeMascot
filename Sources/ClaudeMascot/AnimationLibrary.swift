@@ -1,35 +1,47 @@
 import Foundation
 
-/// Resolves animation GIFs for panel states.
+/// Resolves animation GIFs for manifest clips.
 @MainActor final class AnimationLibrary {
   /// For testing: allows overriding the bundle to load animations from.
   var bundleOverride: Bundle?
 
-  /// Resolves the URL for an animation in this precedence order:
-  /// 1. bundled `Animations/custom/<state>.gif`
-  /// 2. bundled `Animations/<state>.gif`
-  /// Returns `nil` if nothing is found.
-  func url(for state: PanelState) -> URL? {
-    let filename = "\(state.rawValue).gif"
+  /// The decoded clip manifest, loaded once (through the same bundle search
+  /// as GIFs) and cached. `nil` when `clips.json` is absent or unreadable —
+  /// treated as "no manifest" rather than fatal, so builds and tests that
+  /// predate it keep working.
+  lazy var manifest: ClipManifest? = loadManifest()
 
-    // Check bundled animations
-    if let bundledURL = bundledURL(for: filename) {
-      return bundledURL
-    }
-
-    return nil
+  /// Looks up a clip by its manifest id.
+  func clip(id: String) -> Clip? {
+    manifest?[id]
   }
 
-  /// Returns the data for an animation, following the same resolution order as `url(for:)`.
-  /// Throws if the file cannot be read.
-  func data(for state: PanelState) throws -> Data {
-    guard let url = url(for: state) else {
-      throw AnimationLibraryError.notFound(state)
+  /// Returns the data for a manifest clip, resolved in this precedence
+  /// order:
+  /// 1. bundled `Animations/custom/<file>`
+  /// 2. bundled `Animations/<file>`
+  /// Throws if neither is found or the file cannot be read.
+  func data(for clip: Clip) throws -> Data {
+    guard let url = bundledURL(for: clip.file) else {
+      throw AnimationLibraryError.clipNotFound(clip.id)
     }
     return try Data(contentsOf: url)
   }
 
   // MARK: - Private
+
+  /// Locates and decodes `Animations/clips.json` through `bundledURL`, the
+  /// same search GIFs use. `ClipManifest.decode` still throws on a malformed
+  /// *present* file when called directly (e.g. from tests); here that's
+  /// folded into "no manifest" so a bad file degrades rather than crashes.
+  private func loadManifest() -> ClipManifest? {
+    guard let url = bundledURL(for: "clips.json"),
+      let data = try? Data(contentsOf: url)
+    else {
+      return nil
+    }
+    return try? ClipManifest.decode(data)
+  }
 
   private func fileExists(at url: URL) -> Bool {
     FileManager.default.fileExists(atPath: url.path)
@@ -83,12 +95,12 @@ import Foundation
 }
 
 enum AnimationLibraryError: LocalizedError {
-  case notFound(PanelState)
+  case clipNotFound(String)
 
   var errorDescription: String? {
     switch self {
-    case .notFound(let state):
-      return "Animation not found for state: \(state.rawValue)"
+    case .clipNotFound(let id):
+      return "Animation not found for clip: \(id)"
     }
   }
 }

@@ -4,11 +4,16 @@ import Foundation
 import os
 
 /// Owns the pieces (`Settings`, `BLEClient`, `AnimationLibrary`, `HookServer`)
-/// plus the `PanelController`/`PanelAdapter` that tie them together, and is
-/// the only place any of that wiring happens:
+/// plus the `SessionTracker`, `Choreographer`, `PanelController`/`PanelAdapter` that
+/// tie them together, and is the only place any of that wiring happens:
 ///
-/// - accepts hook events from the plugin relay via `HookServer`, maps them
-///   through `EventPolicy`, and drives `PanelController` accordingly
+/// Data flow: `HookServer` → `SessionTracker` → `Choreographer` → `PanelController`
+///
+/// - accepts hook events from the plugin relay via `HookServer`
+/// - feeds them to `SessionTracker`, which reduces multiple live sessions to one
+///   panel state by priority
+/// - applies `Choreographer` to turn desired state into displayable clips
+/// - drives `PanelController` accordingly
 /// - drives `PanelController.tick()` from a repeating timer **owned here**
 ///   (never inside `PanelController`, which is deliberately timer-free so
 ///   it stays unit-testable with a fake clock)
@@ -17,13 +22,13 @@ import os
 /// - applies live-tunable settings (brightness) as they change; idle
 ///   timings are baked into `PanelController`'s timings once, at launch,
 ///   since `PanelController` treats them as immutable
-/// - surfaces the panel's current state (set by `HookServer` in chunk 4)
+/// - surfaces the panel's current state (derived from `SessionTracker`)
 @MainActor
 final class AppModel: ObservableObject {
   /// Master switch mirrored by the menu bar's "Enabled" toggle.
   @Published var enabled: Bool = true
-  /// The panel's current state as driven by hooks (initially idle, updated by
-  /// `HookServer` once wired in chunk 4).
+  /// The panel's current state as derived from `SessionTracker` (initially idle,
+  /// updated by the session tracker as hooks arrive and sessions are reaped).
   @Published private(set) var currentState: PanelState = .idle
   /// Error from `hookServer.start()` if the socket failed to bind. Nil if
   /// startup succeeded or has not been attempted.
@@ -34,6 +39,7 @@ final class AppModel: ObservableObject {
   let panelController: PanelController
   let hookServer: HookServer
   let pluginInstaller: PluginInstaller
+  let sessionTracker: SessionTracker
 
   /// Hook events as they arrive, so "the panel never changed" can be told
   /// apart from "no hook ever reached the app" without guesswork.
@@ -44,6 +50,13 @@ final class AppModel: ObservableObject {
   private let tickInterval: Duration
 
   private var lastAppliedBrightness: Int?
+
+  /// Always-on record of every hook event received and every panel decision
+  /// made, so the choreography work can be tuned against real sessions
+  /// instead of guesses. Held here because it is the one place that sees
+  /// hook input directly; `panelController` gets its own reference for
+  /// decision logging.
+  private let eventLog: EventLog
 
   init(
     settings: AppSettings = AppSettings(),
@@ -58,6 +71,8 @@ final class AppModel: ObservableObject {
     self.hookServer = hookServer
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
+    self.eventLog = EventLog()
+    self.sessionTracker = SessionTracker()
 
     // Clean up old state directory (can be deleted once no installed build
     // predates the socket).
@@ -67,16 +82,28 @@ final class AppModel: ObservableObject {
     )
 
     let adapter = PanelAdapter(library: animationLibrary, ble: bleClient)
+    // Walks the pose graph instead of looking states up 1:1. Built from
+    // whatever manifest the library loaded (an empty one when none did, so
+    // resolution simply returns `nil` everywhere rather than crashing).
+    // Wired into `SessionTracker`'s derived state in the hook subscription
+    // and tick loop below.
+    let choreographer = Choreographer(
+      manifest: animationLibrary.manifest ?? ClipManifest(version: 0, clips: [:]),
+      clock: { Date().timeIntervalSince1970 }
+    )
     self.panelController = PanelController(
       panel: adapter,
+      resolve: { [choreographer] state, displayed in choreographer.clip(for: state, displayed: displayed) },
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),
-        // Matches starting.gif's motion length, which art/generate.py prints
-        // on every run, so the entrance plays exactly once before handing off.
-        startingHold: 6.02
+        // Read from the manifest rather than hand-synced, so the entrance
+        // plays exactly once before handing off. `0` (manifest absent) means
+        // the entrance is disabled, matching PanelTimings' documented default.
+        startingHold: animationLibrary.clip(id: "starting")?.motion ?? 0
       ),
-      brightness: { settings.brightness }
+      brightness: { settings.brightness },
+      eventLog: eventLog
     )
 
     self.enabled = settings.autoConnect
@@ -113,21 +140,39 @@ final class AppModel: ObservableObject {
       .sink { [weak self] event in
         guard let self else { return }
         guard let event else { return }
+
+        // Logged before the `enabled` guard below, on purpose: the whole point
+        // of this log is to see what Claude Code actually emits, including
+        // everything we currently drop.
+        let inputRecord = InputRecord(
+          at: Date(), event: event.event, tool: event.tool, session: event.session, mode: event.mode)
+        Task { await self.eventLog.record(inputRecord) }
+
         guard self.enabled else {
           Self.log.debug("\(event.event, privacy: .public) ignored (disabled)")
           return
         }
 
-        guard let state = EventPolicy.state(for: event) else {
-          // Event is not ours to act on; ignore entirely.
-          Self.log.debug("\(event.event, privacy: .public) carries no panel state")
-          return
-        }
-        Self.log.notice(
-          "\(event.event, privacy: .public) -> \(state.rawValue, privacy: .public)")
+        // Apply the event to the tracker, which owns the per-session state reduction.
+        self.sessionTracker.apply(event)
 
-        self.currentState = state
-        self.panelController.handle(state)
+        // If a new session just started, trigger the entrance animation.
+        if self.sessionTracker.takeEntranceRequest() {
+          self.panelController.handle(.starting)
+        }
+
+        // Derive the new panel state from all live sessions.
+        let derivedState = self.sessionTracker.derived
+        if derivedState != self.currentState {
+          self.currentState = derivedState
+          self.panelController.handle(derivedState)
+        } else {
+          // Event reached the app but changed nothing; distinguish from
+          // "no hook reached the app" (earlier "ignored (disabled)") vs
+          // "hook meant nothing" (earlier "carries no panel state").
+          Self.log.debug("\(event.event, privacy: .public) carries no panel state")
+        }
+
         Task { await self.panelController.tick() }
       }
       .store(in: &cancellables)
@@ -162,7 +207,11 @@ final class AppModel: ObservableObject {
   private func applyEnabledChange(_ isEnabled: Bool) {
     if isEnabled {
       bleClient.start()
-      panelController.handle(currentState)
+      // Re-derive from the tracker rather than replaying a stale single state,
+      // so re-enabling after a quiet period does not restore a stale state.
+      let derivedState = sessionTracker.derived
+      currentState = derivedState
+      panelController.handle(derivedState)
       Task { await panelController.tick() }
     } else {
       bleClient.stop()
@@ -182,6 +231,13 @@ final class AppModel: ObservableObject {
         try? await Task.sleep(for: self.tickInterval)
         if Task.isCancelled { break }
         await self.applyLiveSettings()
+        // Reap stale sessions and propagate any state change to the panel.
+        self.sessionTracker.reap()
+        let derivedState = self.sessionTracker.derived
+        if derivedState != self.currentState {
+          self.currentState = derivedState
+          self.panelController.handle(derivedState)
+        }
         await self.panelController.tick()
       }
     }

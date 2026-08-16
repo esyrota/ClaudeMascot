@@ -1,7 +1,7 @@
 import Foundation
 
 /// Bridges the state machine (`PanelController`) to the two pieces it
-/// needs but must not know about directly: resolves a `PanelState` to GIF
+/// needs but must not know about directly: resolves a `Clip` to GIF
 /// bytes via `AnimationLibrary`, then uploads them via `BLEClient`. This is
 /// the only place those two talk to each other.
 ///
@@ -25,8 +25,8 @@ final class PanelAdapter: PanelDriving {
     try await ble.setBrightness(percent)
   }
 
-  func upload(_ state: PanelState) async throws {
-    let data = try library.data(for: state)
+  func upload(_ clip: Clip) async throws {
+    let data = try library.data(for: clip)
     try await ble.send(gif: data)
   }
 }

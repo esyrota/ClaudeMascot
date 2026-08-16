@@ -26,7 +26,7 @@ Swift 6 + SwiftUI, CoreBluetooth, plus Python tooling that authors the animation
 ## Build, test, run
 
 ```bash
-swift test                  # 35 tests, no hardware needed
+swift test                  # full suite, no hardware needed
 ./make-app.sh               # builds + bundles + ad-hoc signs ClaudeMascot.app
 ```
 
@@ -37,13 +37,18 @@ reactivates the running one; quit it first.
 ## Changing the art
 
 ```bash
-venv/bin/python art/generate.py       # rewrites the bundled GIFs + preview.png
+venv/bin/python art/generate.py       # rewrites the bundled GIFs + preview.png + clips.json
 venv/bin/python art/export_golden.py  # MUST follow: the GIFs are test inputs
+venv/bin/python art/export_docs.py    # refreshes the images in Docs/Specs/Animation Catalogue.md
 ```
 
 Skipping the second step leaves `Tests/Fixtures/` stale and `GifPacketizerTests`
-failing. `generate.py` prints the entrance's motion length; keep
-`PanelTimings.startingHold` equal to it.
+failing. The entrance motion length is now read from `clips.json` at runtime, so no
+manual sync is needed.
+
+**`Docs/Specs/Animation Catalogue.md` is the single source of truth for the art** — every
+clip, its numbers, and the pose graph, with a playable image of each. A new clip needs a
+line adding there by hand; the third command above keeps the existing images honest.
 
 ## Two constraints that shape everything
 

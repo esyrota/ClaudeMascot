@@ -24,9 +24,12 @@ orange like (200,80,0) would render blue.
     python art/generate.py     # writes the app's bundled GIFs + art/preview.png
 """
 
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw
+
+import sheet_import
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
@@ -96,6 +99,20 @@ HOME_Y = 16
 # lifts an arm clamps to it; expression comes from the props instead of a bigger reach.
 MAX_ARM_LIFT = -ARM_TOP
 
+# `lying` geometry. The standing figure is a 24w x16h footprint (TORSO_X-ARM_W to
+# TORSO_X+TORSO_W+ARM_W, HOME_Y to HOME_Y+LEG_TOP+LEG_H); lying keeps the same
+# creature at a lower profile. The legs merge into the body instead of hanging
+# separately below it -- that merge, not just the horizontal posture, is what stops
+# it reading as "hovering asleep" -- and a shallow raised hump at one end reads as
+# the head.
+LYING_BODY_W, LYING_BODY_H = 20, 6
+LYING_BODY_X = (SIZE - LYING_BODY_W) // 2
+LYING_HEAD_W, LYING_HEAD_H = 8, 3
+LYING_HEAD_X = LYING_BODY_X + 2
+LYING_HEAD_Y = SIZE - LYING_BODY_H - LYING_HEAD_H
+LYING_EYE_XS = (LYING_HEAD_X + 1, LYING_HEAD_X + 4)
+LYING_EYE_Y = LYING_HEAD_Y + 1
+
 
 def frame() -> Image.Image:
     return Image.new("RGB", (SIZE, SIZE), BG)
@@ -148,6 +165,45 @@ def mascot(
             rect(d, ex + dx, ey + EYE_H // 2, EYE_W, 1, EYE)
         else:
             rect(d, ex + dx, ey, EYE_W, EYE_H, EYE)
+
+
+def lying_pose(d, *, pulse: int = 0) -> None:
+    """
+    Draw the mascot resting flat on the floor -- the `lying` anchor.
+
+    Legs merge into the body instead of hanging separately below it the way they do
+    standing; that merge is what stops it reading as "hovering asleep". Called with
+    pulse=0 (the default) this is the exact pose sleeping()'s first/last frame and
+    the stand<->lie transition clips below must all land on -- the anchor-pose
+    contract in Task.md. `pulse` grows the body a pixel at a time from the floor up
+    and out to either side, so breathing reads as a chest swelling rather than the
+    standing idle's vertical bob -- a lying creature does not hop.
+    """
+    body_h = LYING_BODY_H + pulse
+    body_w = LYING_BODY_W + pulse * 2
+    rect(d, LYING_BODY_X - pulse, SIZE - body_h, body_w, body_h, MASCOT)
+    rect(d, LYING_HEAD_X, LYING_HEAD_Y, LYING_HEAD_W, LYING_HEAD_H, MASCOT)
+    for ex in LYING_EYE_XS:
+        rect(d, ex, LYING_EYE_Y, EYE_W, 1, EYE)
+
+
+def mascot_at(ox: int = 0, oy: int = 0, **kwargs) -> Image.Image:
+    """
+    Draw the mascot at an arbitrary offset from its home origin.
+
+    mascot()'s own `dx` is documented safe only to +/-4 -- past that the figure
+    starts leaving the panel, which is exactly what walking fully off-panel needs,
+    but silently passing it a huge dx would be exceeding a documented contract
+    rather than working within one. So the walk/sink transitions below draw the
+    ordinary on-panel figure once, then paste it at whatever offset the step
+    needs; Image.paste clips to the destination canvas the same way rect() clips
+    to it, so this is safe at any offset, including fully off-panel in either axis.
+    """
+    scratch = frame()
+    mascot(ImageDraw.Draw(scratch), **kwargs)
+    canvas = frame()
+    canvas.paste(scratch, (ox, oy))
+    return canvas
 
 
 # --------------------------------------------------------------------------
@@ -231,27 +287,248 @@ def done():
 
 
 def sleeping():
-    """Dozed off: eyes shut, slow deep breathing, Zs drifting up."""
+    """Dozed off on the floor: eyes shut, slow deep breathing, Zs drifting up."""
     out = []
-    # (bob, z phase) -- deliberately slow so it reads as asleep, not idle.
+    # (pulse, z phase) -- deliberately slow so it reads as asleep, not idle.
     poses = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 2), (1, 2), (1, 3), (0, 3)]
-    for bob, phase in poses:
+    last = len(poses) - 1
+    for i, (pulse, phase) in enumerate(poses):
         im = frame()
         d = ImageDraw.Draw(im)
-        # Eyes shut: a single closed lid line instead of the open eye.
-        mascot(d, HOME_Y - bob, blink=True, legs=(1, 0, 0, 1))
-        # Two Zs rising and fading out of the top-right.
-        for i in (0, 1):
-            step = (phase + i * 2) % 4
-            zx = 22 + step
-            zy = 13 - step * 4
-            if zy < 0:
-                continue
-            size = 3 if i == 0 else 2
-            rect(d, zx, zy, size, 1, PROP)                  # top bar
-            rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
-            rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
+        lying_pose(d, pulse=pulse)
+        # Frame 0 and the last frame are the bare lying_pose() anchor (no Zs), so
+        # this loop starts and ends on the pixel-identical `lying` anchor the
+        # transition clips below also draw -- the same contract idle()'s own frame
+        # 0/last already satisfy for `standing`.
+        if i not in (0, last):
+            # Two Zs rising and fading out of the top-right.
+            for j in (0, 1):
+                step = (phase + j * 2) % 4
+                zx = 22 + step
+                zy = 18 - step * 7
+                if zy < 0:
+                    continue
+                size = 3 if j == 0 else 2
+                rect(d, zx, zy, size, 1, PROP)                  # top bar
+                rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
+                rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
         out.append((im, 600))
+    return out
+
+
+# --------------------------------------------------------------------------
+# Variants and fidgets -- the art that switches on variant rotation and fidget
+# injection (built in chunk 6 but dormant until now, since every group had only
+# one candidate and no clip was shaped like a fidget). See the chunk 9 brief and
+# Task.md's variant/fidget/done decisions for the shapes these must match:
+# a variant is a LOOPING clip sharing a variantGroup; a fidget is a NON-LOOPING
+# clip with fromPose == toPose whose id does not end in "-enter"; an entrance
+# one-shot is a NON-LOOPING clip with fromPose == toPose and id "<group>-enter".
+# Every clip below starts and ends pixel-identical to its pose's anchor, same
+# contract as the states and transitions above.
+# --------------------------------------------------------------------------
+
+def idle_alt():
+    """Idle variant: a slower, lazier breathing cycle with a gentle weight shift."""
+    out = []
+    # (bob, dx, blink) -- a longer cycle than idle()'s, and a slight side-to-side
+    # lean instead of a pure vertical bob, so it reads as a different mood rather
+    # than a repeat of the same breath.
+    frames = [(0, 0, False), (0, 1, False), (1, 1, False), (1, 1, False),
+              (1, 0, False), (0, 0, False), (0, -1, False), (1, -1, False),
+              (1, -1, False), (1, 0, True), (0, 0, False), (0, 0, False)]
+    for bob, dx, blink in frames:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y - bob, dx=dx, blink=blink)
+        out.append((im, 380))
+    return out
+
+
+def fidget_stretch():
+    """Fidget: a quick stretch, arms reaching up and back down."""
+    out = []
+    arm_lifts = [0, -1, -3, -4, -4, -3, -1, 0]
+    for lift in arm_lifts:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, arms=(lift, lift))
+        out.append((im, 110))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+def fidget_look():
+    """Fidget: glances one way, then the other, then settles."""
+    out = []
+    for dx in (0, -1, -1, 0, 1, 1, 0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, dx=dx)
+        out.append((im, 130))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+def fidget_doze():
+    """Fidget: a deeper breath and a shuffle while asleep."""
+    out = []
+    # A bigger pulse than sleeping()'s own (which tops out at 1) so this reads as
+    # a deliberately deeper breath rather than another lap of the same loop.
+    for pulse in (0, 1, 2, 2, 1, 0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        lying_pose(d, pulse=pulse)
+        out.append((im, 260))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the lying anchor
+    return out
+
+
+def done_enter():
+    """Entrance: a hop with a flashed checkmark, celebrating before the satisfied loop takes over."""
+    out = []
+    # (squash, up, arms, blink) -- crouch, leap with arms thrown up, hang at the
+    # apex with a checkmark, land, settle. `up` lifts the whole figure the same
+    # way stand_to_lie/lie_to_stand ease through a crouch: keyframed, not eased.
+    steps = [(0, 0, (0, 0), False), (2, 0, (0, 0), True),
+             (0, 4, (-4, -4), False), (0, 5, (-4, -4), False),
+             (0, 4, (-4, -4), False), (2, 0, (0, 0), True),
+             (0, 0, (0, 0), False)]
+    checkmark_at = (2, 3, 4)
+    for i, (squash, up, arms, blink) in enumerate(steps):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y - up, arms=arms, squash=squash, blink=blink)
+        if i in checkmark_at:
+            d.line([(11, 6), (14, 9)], fill=PROP)
+            d.line([(14, 9), (21, 2)], fill=PROP)
+        out.append((im, 130))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+# --------------------------------------------------------------------------
+# Transition clips -- the pose graph's edges. Drawn procedurally, like the states
+# above, because that is what lands them exactly on the anchor frame; see
+# "Edge art is procedural, loop art is imported" in Task.md. Each ends on a long
+# dwell frame, same as appear()'s APPEAR_TAIL_MS below: the panel loops whatever it
+# holds, so the dwell is what makes a hand-off during it look like a still mascot
+# rather than a restarted clip.
+#
+# stand<->sit is deliberately not here -- see the chunk brief's scope note. The
+# sitting anchor comes from imported, hand-drawn art (`sweep()`) that a later chunk
+# replaces; matching it procedurally now would be building against art about to
+# change. The choreographer's graceful degradation (direct swap when no edge
+# exists) covers stand<->sit until then.
+# --------------------------------------------------------------------------
+
+def stand_to_lie():
+    """Transition: settles from standing down onto the floor to sleep."""
+    out = []
+    # mascot() and lying_pose() don't share a parameter space to morph between, so
+    # the settle eases the standing figure down through a crouch and cuts to the
+    # lying blob for the last couple of frames -- the same keyframe-then-cut
+    # approach done()'s stomp uses.
+    crouch = [(0, (0, 0, 0, 0), False), (1, (1, 1, 1, 1), True),
+              (3, (2, 2, 2, 2), True), (4, (3, 3, 3, 3), True)]
+    for squash, legs, blink in crouch:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, legs=legs, squash=squash, blink=blink)
+        out.append((im, 140))
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d, pulse=1)
+    out.append((im, 140))
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d)
+    out.append((im, APPEAR_TAIL_MS))  # long dwell -- the lying anchor
+    return out
+
+
+def lie_to_stand():
+    """Transition: pushes back up from lying to standing."""
+    out = []
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d)
+    out.append((im, 140))
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d, pulse=1)
+    out.append((im, 140))
+    rise = [(3, (3, 3, 3, 3), True), (4, (2, 2, 2, 2), True),
+            (2, (1, 1, 1, 1), True), (0, (0, 0, 0, 0), False)]
+    for squash, legs, blink in rise:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, legs=legs, squash=squash, blink=blink)
+        out.append((im, 140))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+def walk_off_left():
+    """Transition: walks out of frame to the left."""
+    out = []
+    # ox carries the mascot's origin left of the panel via mascot_at() -- well
+    # past the +/-4 mascot()'s own dx documents as safe -- while legs alternate
+    # through mascot()'s per-leg shortening for the stride.
+    steps = [(0, (0, 0, 0, 0)), (-7, (2, 0, 0, 2)), (-14, (0, 0, 0, 0)),
+             (-21, (0, 2, 2, 0)), (-28, (0, 0, 0, 0))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((frame(), APPEAR_TAIL_MS))  # clear of the panel -- the offLeft anchor
+    return out
+
+
+def walk_in_left():
+    """Transition: walks in from the left to home."""
+    out = [(frame(), 140)]  # starts fully offscreen -- the offLeft anchor
+    steps = [(-28, (0, 0, 0, 0)), (-21, (0, 2, 2, 0)), (-14, (0, 0, 0, 0)),
+             (-7, (2, 0, 0, 2))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((mascot_at(0, 0, by=HOME_Y), APPEAR_TAIL_MS))  # long dwell -- standing anchor
+    return out
+
+
+def walk_off_right():
+    """Transition: walks out to the right."""
+    out = []
+    steps = [(0, (0, 0, 0, 0)), (7, (0, 2, 2, 0)), (14, (0, 0, 0, 0)),
+             (21, (2, 0, 0, 2)), (28, (0, 0, 0, 0))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((frame(), APPEAR_TAIL_MS))  # clear of the panel -- the offRight anchor
+    return out
+
+
+def walk_in_right():
+    """Transition: walks in from the right."""
+    out = [(frame(), 140)]  # starts fully offscreen -- the offRight anchor
+    steps = [(28, (0, 0, 0, 0)), (21, (2, 0, 0, 2)), (14, (0, 0, 0, 0)),
+             (7, (0, 2, 2, 0))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((mascot_at(0, 0, by=HOME_Y), APPEAR_TAIL_MS))  # long dwell -- standing anchor
+    return out
+
+
+def sink():
+    """Transition: standing drops straight down and out through the floor."""
+    out = []
+    # oy carries the mascot below its own drawn canvas, the same paste offset
+    # mascot_at() uses horizontally for the walks above.
+    for oy in (0, 4, 9, 14, 19):
+        out.append((mascot_at(0, oy, by=HOME_Y), 140))
+    out.append((frame(), APPEAR_TAIL_MS))  # below the panel -- the offBottom anchor
     return out
 
 
@@ -431,6 +708,245 @@ def sweep():
                     scale=WORKING_SCALE, at=working_at, repair=working_repair)
 
 
+# --------------------------------------------------------------------------
+# Imported sprite sheets -- hand-authored loop variants, sliced by sheet_import.py
+# rather than a GIF read frame by frame (see "Edge art is procedural, loop art is
+# imported" in Task.md). Two 36-frame contact-sheet screenshots: a standing
+# "thinking" set with speech/thought/question/exclamation beats, and a seated
+# "working" set at a grey laptop. Both are screenshots, not clean exports -- see
+# sheet_import.py's module docstring for the tile-detection and resampling this
+# rests on.
+# --------------------------------------------------------------------------
+
+THINKING_SHEET = SOURCES / "F85A47A0-4D7B-420B-9F9E-4C75DE1EE34E.png"
+WORKING_SHEET = SOURCES / "186F7A97-0B62-4283-9DC4-65E953629BDC.png"
+
+# Anti-aliasing/JPEG noise in a screenshot means source pixels never land exactly on
+# a named constant, so classification here is by shape, not by exact match:
+#   - dark (background, eyes)            -> BG
+#   - achromatic but not dark (R=G=B-ish) -> PROP
+#   - everything else (the orange body)   -> MASCOT
+# The achromatic bucket is what makes this safe rather than fragile: it catches the
+# working sheet's grey laptop (~(134,134,134), brightest channel 134) and its white
+# speech/exclamation marks (~(255,255,255)) with the same rule, and it is why
+# neither sheet ever hits MASCOT_DARK/MASCOT_SHADE -- neither draws a second body
+# tone, so the classifier never has to choose between them.
+#
+# Plain nearest-neighbour against the full named palette (the way working_class()
+# above snaps sweep()'s already-clean colours) was tried first and rejected: in
+# Euclidean RGB distance, grey (134,134,134) is closer to MASCOT (255,68,4) -- ~190
+# -- than to PROP (255,255,255) -- ~210 -- so it would have painted the laptop
+# orange, exactly the panel-colour-rule violation this palette exists to prevent
+# (see the module docstring above: a colour whose brightest channel is under 255
+# renders blue-violet, and there is deliberately no grey constant to reach for
+# instead).
+SHEET_DARK = 40
+SHEET_ACHROMATIC_SPREAD = 40
+
+
+def sheet_classify(rgb):
+    if max(rgb) < SHEET_DARK:
+        return BG
+    if max(rgb) - min(rgb) < SHEET_ACHROMATIC_SPREAD:
+        return PROP
+    return MASCOT
+
+
+def _bg_components(px, left, top, right, bottom):
+    """4-connected BG-coloured blobs within [left,right]x[top,bottom], inclusive."""
+    seen = set()
+    comps = []
+    for y in range(top, bottom + 1):
+        for x in range(left, right + 1):
+            if (x, y) in seen or px[x, y] != BG:
+                continue
+            stack, comp = [(x, y)], []
+            seen.add((x, y))
+            while stack:
+                cx, cy = stack.pop()
+                comp.append((cx, cy))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = cx + dx, cy + dy
+                    if (left <= nx <= right and top <= ny <= bottom
+                            and (nx, ny) not in seen and px[nx, ny] == BG):
+                        seen.add((nx, ny))
+                        stack.append((nx, ny))
+            comps.append(comp)
+    return comps
+
+
+def sheet_repair(index, im) -> None:
+    """
+    Erase whatever is drawn directly below the eyes, back to MASCOT.
+
+    Both sheets draw the eyes as a pair of small squares near the top of the head.
+    The working sheet's three-quarter view also draws a mouth immediately beneath
+    them -- confirmed by inspecting the source screenshot at native resolution, a
+    stepped ~3px dark mark, absent from the thinking sheet's flat front-on view. At
+    32x32 the mascot is ~16px tall, so that mark reads as noise rather than an
+    expression: the eyes already carry the face in every other clip (idle,
+    thinking, waiting, ...), so it comes off here rather than riding along as a
+    stray mark.
+
+    Unlike WORKING_REPAIRS above, there is no fixed coordinate table -- each
+    tile's own bounding box (and so the head's exact placement) differs slightly
+    frame to frame, by design; see sheet_import.py's module docstring on why tiles
+    are never assumed to share a pitch. Instead: find the two small BG blobs in
+    the top third of the body (the eyes), and clear any BG pixel in the two rows
+    directly beneath them, between their inner edges. Requiring exactly two small
+    blobs is what keeps this a safe no-op on frames where the pose (a raised arm,
+    a turned head) makes the eyes ambiguous, or on the thinking sheet, which has
+    no mouth to begin with, rather than mangling a frame it cannot read
+    confidently -- following `imported()`'s own `repair=` callback pattern, called
+    per-frame on the already-resampled image.
+    """
+    px = im.load()
+    body = [(x, y) for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT]
+    if not body:
+        return
+    left = min(x for x, _ in body)
+    right = max(x for x, _ in body)
+    top = min(y for _, y in body)
+    bottom = max(y for _, y in body)
+    band = top + max(1, (bottom - top) // 3)  # top third -- where the eyes live
+    holes = _bg_components(px, left, top, right, band)
+    eyes = [c for c in holes if len(c) <= 6]
+    if len(eyes) != 2:
+        return
+    eyes.sort(key=lambda c: min(x for x, _ in c))
+    eye_l, eye_r = eyes
+    inner_l = max(x for x, _ in eye_l) + 1
+    inner_r = min(x for x, _ in eye_r) - 1
+    if inner_r < inner_l:
+        return
+    eye_bottom = max(max(y for _, y in eye_l), max(y for _, y in eye_r))
+    for y in range(eye_bottom + 1, min(SIZE - 1, eye_bottom + 3) + 1):
+        for x in range(inner_l, inner_r + 1):
+            if px[x, y] == BG:
+                px[x, y] = MASCOT
+
+
+def _standing_anchor() -> Image.Image:
+    """The exact `standing` anchor pixels -- idle.gif frame 0 -- for the loop
+    boundary contract the sheet variants below guarantee mechanically."""
+    return mascot_at()
+
+
+def _sheet_frames(sheet: Path) -> list:
+    """
+    Slice, recolour and repair one 36-frame sheet into panel-ready tiles.
+
+    Deliberately separate from this file's own `imported()`: that function reads
+    an already-32x32-native GIF frame by frame, while a sheet is a single
+    screenshot that first has to be cut into 36 tiles (sheet_import.slice_sheet)
+    before any per-frame processing is possible.
+    """
+    tiles = sheet_import.slice_sheet(sheet)
+    out = []
+    for index, tile in enumerate(tiles):
+        px = tile.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                px[x, y] = sheet_classify(px[x, y])
+        sheet_repair(index, tile)
+        out.append(tile)
+    return out
+
+
+def thinking_alt():
+    """
+    Thinking variant: a thought bubble forms and fades, from the sprite sheet.
+
+    MEASURED against the procedural standing anchor before anything else: the
+    sheet's own rest frame (frame 0, sliced and recoloured) differs from
+    idle.gif's frame 0 at 123 of 1024 pixels, and its body's own bounding box is
+    21w x14h against the anchor's 24w x16h -- about 87% in both dimensions, both
+    still flush with the panel's bottom row. Smaller, not a different creature:
+    same silhouette, same standing pose, same floor line, just drawn a few
+    percent smaller by the screenshot's own crop -- not the "wildly different
+    figure size" the chunk brief says to stop and report on. So the anchor-frame
+    prepend/append below is the right fix, not a symptom to re-author the sheet
+    over.
+
+    The 36-frame thinking sheet is not one loop -- it is four distinct beats (a
+    "..." thought, a "?" confusion, a "!" realisation, and a second, shorter
+    "..." trailing off), each one leaving and returning to the same standing
+    rest pose. This clip uses just the first: sheet frames 0-4 are the sheet's
+    own held rest, 5-6 lean into the thought, 7-11 grow and hold the "..."
+    bubble, and 12 is back at rest -- a clean start/end point to cut on. The "?"
+    (12-23), "!" (24-28) and trailing "..." (29-35) beats are left unused for
+    now; nothing requires every sheet frame to ship, and splitting the richer
+    beats into their own variants is future work, not this chunk's.
+
+    The sheet carries no frame durations (see sheet_import.py's module
+    docstring), so this is a hand-authored timing table, not a uniform one -- a
+    steady mechanical cadence is exactly what would give away that it is not
+    idle()'s own art.
+    """
+    frames = _sheet_frames(THINKING_SHEET)[0:13]  # sheet frames 0-12
+    durations = [
+        160, 150, 150, 160, 140,  # 0-4: the held rest breath
+        130, 120,                 # 5-6: leaning in
+        170, 150, 150,            # 7-9: the bubble grows
+        150, 160,                 # 10-11: it fades, leaning back out
+        170,                      # 12: back at rest
+    ]
+    out = [(_standing_anchor(), 70)]  # anchor contract: exact standing pixels first...
+    out += list(zip(frames, durations))
+    out.append((_standing_anchor(), 70))  # ...and last.
+    return out
+
+
+def idle_think():
+    """
+    Idle variant: a quiet held breath with a blink, from the sprite sheet.
+
+    The thinking sheet's frames 12-16 sit between the "..." and "?" beats
+    (thinking_alt() above ends its cut at 12, the next lean starts at 17) -- a
+    small, calm hold with a blink at frame 14, the quieter beat this variant is
+    named for. At variantGroup "idle" and weight 0.3 it should read as a
+    lower-key cousin of idle_alt()'s own lean, not another thinking clip.
+    """
+    frames = _sheet_frames(THINKING_SHEET)[12:17]  # sheet frames 12-16
+    durations = [300, 300, 140, 300, 300]  # frame 14's blink is the one quick beat
+    out = [(_standing_anchor(), 70)]
+    out += list(zip(frames, durations))
+    out.append((_standing_anchor(), 70))
+    return out
+
+
+def working_alt():
+    """
+    Working variant: a full pass through the seated-at-a-laptop sheet.
+
+    Unlike the thinking sheet, this one is not several beats stitched together --
+    36 frames of one continuous work session (a typing burst, a coffee, a glance
+    at the screen, code scrolling by, a satisfied checkmark) -- so the whole
+    thing ships as a single loop, in sheet order.
+
+    No anchor-frame prepend/append here, unlike thinking_alt()/idle_think()
+    above: those guarantee the `standing` anchor contract, but this clip is
+    `pose: "sitting"`, and there is no established sitting anchor to guarantee
+    against yet -- sweep()'s own imported art is what currently defines
+    "sitting", and stand<->sit transition edges are explicitly out of scope for
+    this chunk (see the chunk brief). Swapping straight to/from this clip at a
+    pose boundary is exactly the graceful-degradation path the choreographer
+    already covers when an edge is missing.
+    """
+    frames = _sheet_frames(WORKING_SHEET)
+    # Typing has a steady rhythm; the handful of named beats below get a longer
+    # dwell so each reads as a beat instead of blurring past mid-loop.
+    durations = [130] * 36
+    for i in (3, 17, 22):
+        durations[i] = 170  # "!" typing-burst reactions
+    for i in (9, 10):
+        durations[i] = 220  # the coffee-mug pause
+    durations[27] = 200      # a stray thought bubble
+    durations[30] = 260      # code scrolls up the screen -- let it be read
+    durations[32] = 260      # the checkmark -- the satisfying beat
+    return list(zip(frames, durations))
+
+
 def off():
     """
     Fully dark frame.
@@ -451,12 +967,174 @@ def off():
 STATES = {
     "starting": appear,
     "idle": idle,
+    "idle-alt": idle_alt,
+    "idle-think": idle_think,
     "sleeping": sleeping,
     "thinking": thinking,
+    "thinking-alt": thinking_alt,
     "working": sweep,
+    "working-alt": working_alt,
     "waiting": waiting,
     "done": done,
+    "done-enter": done_enter,
+    "fidget-stretch": fidget_stretch,
+    "fidget-look": fidget_look,
+    "fidget-doze": fidget_doze,
+    "stand-to-lie": stand_to_lie,
+    "lie-to-stand": lie_to_stand,
+    "walk-off-left": walk_off_left,
+    "walk-in-left": walk_in_left,
+    "walk-off-right": walk_off_right,
+    "walk-in-right": walk_in_right,
+    "sink": sink,
     "off": off,
+}
+
+
+# Metadata for each clip: pose, variant group, loops flag, and transition endpoints.
+# This drives both the clips.json manifest and the Swift animation layer.
+CLIP_METADATA = {
+    "starting": {
+        "loops": False,
+        "fromPose": "offBottom",
+        "toPose": "standing",
+    },
+    "idle": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 1.0,
+    },
+    "idle-alt": {
+        # Same variantGroup as "idle" -- that is what makes this a variant rather
+        # than a new state -- at a lower weight so plain idle stays the common sight.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.4,
+    },
+    "idle-think": {
+        # A second, quieter "idle" variant, imported from the thinking sheet's
+        # own held-rest frames -- see idle_think()'s docstring.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.3,
+    },
+    "thinking": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "thinking",
+        "weight": 1.0,
+    },
+    "thinking-alt": {
+        # Same variantGroup as "thinking" -- imported from the sprite sheet's
+        # "..." thought-bubble beat, see thinking_alt()'s docstring.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "thinking",
+        "weight": 0.5,
+    },
+    "waiting": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "waiting",
+        "weight": 1.0,
+    },
+    "done": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "done",
+        "weight": 1.0,
+    },
+    "done-enter": {
+        # Non-looping one-shot played once on arriving at "done", before the
+        # "done" loop above takes over -- the celebration in front of the
+        # satisfied idle. Id must end in "-enter" for the choreographer to
+        # recognise it as an entrance rather than a fidget.
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+    },
+    "fidget-stretch": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+    },
+    "fidget-look": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+    },
+    "fidget-doze": {
+        "loops": False,
+        "fromPose": "lying",
+        "toPose": "lying",
+    },
+    "working": {
+        "loops": True,
+        "pose": "sitting",
+        "variantGroup": "working",
+        "weight": 1.0,
+    },
+    "working-alt": {
+        # Same variantGroup as "working" -- imported from the seated-at-a-laptop
+        # sprite sheet, see working_alt()'s docstring for why it carries no
+        # anchor-frame prepend/append the way the standing-pose variants above do.
+        "loops": True,
+        "pose": "sitting",
+        "variantGroup": "working",
+        "weight": 0.5,
+    },
+    "sleeping": {
+        "loops": True,
+        "pose": "lying",
+        "variantGroup": "sleeping",
+        "weight": 1.0,
+    },
+    "stand-to-lie": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "lying",
+    },
+    "lie-to-stand": {
+        "loops": False,
+        "fromPose": "lying",
+        "toPose": "standing",
+    },
+    "walk-off-left": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "offLeft",
+    },
+    "walk-in-left": {
+        "loops": False,
+        "fromPose": "offLeft",
+        "toPose": "standing",
+    },
+    "walk-off-right": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "offRight",
+    },
+    "walk-in-right": {
+        "loops": False,
+        "fromPose": "offRight",
+        "toPose": "standing",
+    },
+    "sink": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "offBottom",
+    },
+    "off": {
+        # Fallback asset never uploaded to hardware (see off()'s docstring).
+        # Included in the manifest to keep the state mapping total.
+        "loops": True,
+        "pose": "offBottom",
+        "variantGroup": "off",
+        "weight": 1.0,
+    },
 }
 
 
@@ -483,6 +1161,12 @@ def pad_palette(im: Image.Image) -> Image.Image:
         px[x, y] = (MASCOT[0], MASCOT[1], min(255, MASCOT[2] + bump))
         bump += 1
     return im
+
+
+def body_pixel_count(im: Image.Image) -> int:
+    """Count of pixels still holding the raw MASCOT colour -- pad_palette's budget."""
+    px = im.load()
+    return sum(1 for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT)
 
 
 def save(name: str, frames) -> Path:
@@ -515,22 +1199,87 @@ def preview(all_frames) -> Path:
 
 if __name__ == "__main__":
     produced = {}
+    clips_data = {}
+
     for name, fn in STATES.items():
         frames = fn()
         produced[name] = frames
         path = save(name, frames)
+
+        # PIL merges consecutive identical frames during GIF encoding and sums their
+        # durations. Swift schedules against the saved file, not the in-memory frame
+        # list, so we must read frameCount, durationMs, and motionMs back from the
+        # encoded GIF file to match what will actually play.
+        from PIL import GifImagePlugin
+        GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_FIRST
+        gif = Image.open(path)
+        frame_count = gif.n_frames
+        durations = []
+        for frame_idx in range(frame_count):
+            gif.seek(frame_idx)
+            durations.append(gif.info.get("duration") or 140)
+        duration_ms = sum(durations)
+
+        # motionMs is the sum of all frame durations except the last for
+        # non-looping clips (the last frame is a deliberate dwell).
+        # For looping clips, motionMs equals durationMs.
+        if CLIP_METADATA[name]["loops"]:
+            motion_ms = duration_ms
+        else:
+            motion_ms = sum(durations[:-1])
+
+        # Build the clip entry: sort looping vs. non-looping fields as per the schema.
+        clip_entry = {
+            "file": path.name,
+            "frameCount": frame_count,
+            "durationMs": duration_ms,
+            "motionMs": motion_ms,
+            "loops": CLIP_METADATA[name]["loops"],
+        }
+
+        if CLIP_METADATA[name]["loops"]:
+            clip_entry["pose"] = CLIP_METADATA[name]["pose"]
+            clip_entry["variantGroup"] = CLIP_METADATA[name]["variantGroup"]
+            clip_entry["weight"] = CLIP_METADATA[name]["weight"]
+        else:
+            clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
+            clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
+
+        clips_data[name] = clip_entry
+
+        # Print status for all clips except off (which is never uploaded).
         if name == "off":
             # Never uploaded to real hardware -- see off()'s docstring.
-            print(f"{path.name:14s} {len(frames)} frames  (fallback asset, palette check skipped)")
+            print(f"{path.name:14s} {frame_count} frames  (fallback asset, palette check skipped)")
             continue
-        n = min(len(pad_palette(im).getcolors(maxcolors=1 << 20)) for im, _ in frames)
+
+        # The walk/sink transitions end (or start) with the mascot partly or fully
+        # off-panel by design -- that is the offLeft/offRight/offBottom anchor, not
+        # a bug. A frame with fewer than MIN_COLORS raw MASCOT pixels on it cannot
+        # reach MIN_COLORS distinct colours even with pad_palette's full nudge
+        # budget (it only has those pixels to nudge), so such frames are exempt
+        # from the check the same way off() is exempt entirely -- same reasoning,
+        # just applied per frame instead of per clip.
+        dense = [im for im, _ in frames if body_pixel_count(im) >= MIN_COLORS]
+        if not dense:
+            print(f"{path.name:14s} {frame_count} frames  "
+                  f"(all frames legitimately sparse, palette check skipped)")
+            continue
+
+        n = min(len(pad_palette(im).getcolors(maxcolors=1 << 20)) for im in dense)
         assert n >= MIN_COLORS, f"{name}: only {n} colors, need >= {MIN_COLORS}"
-        print(f"{path.name:14s} {len(frames)} frames  {n:2d} colors  {path.stat().st_size:5d} bytes")
-        if name == "starting":
-            # PanelTimings.startingHold must equal the motion length -- everything
-            # except the deliberate dwell on the last frame. Print it so the two
-            # cannot drift silently apart.
-            motion_ms = sum(ms for _, ms in frames[:-1])
-            print(f"{'':14s} motion {motion_ms} ms  -> PanelTimings.startingHold = "
-                  f"{motion_ms / 1000:.2f}s (+ {frames[-1][1]} ms tail)")
+        skipped = len(frames) - len(dense)
+        suffix = f"  ({skipped} sparse frame(s) skipped)" if skipped else ""
+        print(f"{path.name:14s} {frame_count} frames  {n:2d} colors  "
+              f"{path.stat().st_size:5d} bytes{suffix}")
+
+    # Write clips.json with sorted keys for stable diffs.
+    manifest = {
+        "version": 1,
+        "clips": dict(sorted(clips_data.items())),
+    }
+    manifest_path = OUT / "clips.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"clips.json -> {manifest_path} ({len(clips_data)} clips)")
+
     print(f"preview.png -> {preview(produced)}")

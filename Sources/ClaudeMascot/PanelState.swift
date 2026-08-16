@@ -25,3 +25,22 @@ import Foundation
 enum PanelState: String, CaseIterable, Sendable, Equatable {
   case starting, idle, sleeping, thinking, working, waiting, done, off
 }
+
+extension PanelState {
+  /// The pose a state is shown at. `nil` for `.starting`, which is a
+  /// transition rather than somewhere the mascot can be.
+  var pose: Pose? {
+    switch self {
+    case .starting:
+      return nil
+    case .idle, .thinking, .waiting, .done:
+      return .standing
+    case .working:
+      return .sitting
+    case .sleeping:
+      return .lying
+    case .off:
+      return .offBottom
+    }
+  }
+}

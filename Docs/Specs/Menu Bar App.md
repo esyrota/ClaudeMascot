@@ -56,16 +56,53 @@ The pane is a grouped `Form` with four sections: General, Panel, Device, and Plu
 
 Defaults live in `Settings.swift` (`@AppStorage`); the idle timings are read once at launch because `PanelController` treats its timings as immutable.
 
+## Event handling and session tracking
+
+Incoming hook events are applied to `SessionTracker`, which holds per-session state and reduces multiple live sessions to one desired `PanelState` by priority: `waiting > working > thinking > done > idle`. This fixes the case where session A's `Stop` cancels session B's `thinking`. Sessions are reaped on `SessionEnd` and on a staleness timeout (default 30m); without the timeout, one crashed session would pin the panel in `thinking` with no way out.
+
+Subagent count (tracked via `PreToolUse` / `SubagentStop` events) feeds *intensity* — more agents makes the mascot look busier without changing pose.
+
+## State machine choreography
+
+The mascot is a **pose graph**: nodes are poses (`standing`, `sitting`, `lying`, `offLeft`, `offRight`, `offBottom`); looping animation clips live *at* a node; transition clips are *edges* between nodes. `idle`, `thinking`, `waiting` and `done` live at `standing`; `working` lives at `sitting`; `sleeping` lives at `lying` (see `PanelState.pose`). When desired state changes, the choreographer computes one edge at a time along the shortest path to the target pose, never queueing a whole route. If the target flips mid-walk, the next decision simply recomputes from where the displayed clip says the mascot is, with no plan to cancel or unwind. This is how a burst of state changes (`thinking → working → thinking → working`) coalesces to a single swap at the next boundary instead of four.
+
+### Boundary scheduling
+
+Clips are either looping (variant loops at their pose, eligible for fidgets) or non-looping (entrances and transitions). Swaps land only on clip boundaries:
+
+- **Looping clips** hand off once a full loop has played, at the most recent seam (`floor(elapsed / duration)`). A swap therefore waits at most one loop. Computing the *next* seam instead is a trap: it is always `>= now`, so the "are we there yet" test can only pass at exact equality, and a 1s poll against a floating-point clock never lands there — the panel locks onto its first looping clip forever. That shipped once; see `PanelController.nextBoundary`.
+- **Non-looping clips** hand off at `motion`, *not* `duration`. A transition ends on a long dwell frame so the panel has something to hold; waiting out the whole dwell would park a motionless mascot on screen long after its motion finished.
+- **Power transitions** (wake, power-off) bypass boundary gating entirely, for immediate panel response.
+- **The target is held, never queued.** When a decision is made and the clip is already on screen, nothing uploads; the mascot simply sits and displays the current clip until the boundary arrives. This collapsing of bursts is implicit — the scheduler holds the latest desired state and recomputes the next clip on every tick.
+
+### Variants and fidgets
+
+Loop clips at a pose can have multiple variants (same pose, different animation). The choreographer selects one deterministically based on a time epoch, never storing "last played"; called twice in the same epoch with the same inputs, it returns the same clip, so the answer is stable and reproducible from three inputs alone (`target`, `displayed`, `now`).
+
+Ambient fidgets (blinks, look-arounds, stretches) play during long holds at a pose, selected with the same deterministic epoch-based method. They are self-edges (`fromPose == toPose`), so they return the mascot exactly where it stood, and fire when the epoch's seeded roll falls under `fidgetChance` — never during a transition, and never for `.off`.
+
+`<group>-enter` one-shots play exactly once when arriving at a pose, if the manifest has one (e.g., a celebration on `done`). Declaring one wrong fails silently, so the test coverage is important.
+
+### Event logging
+
+Two JSONL streams record input and decisions to `~/Library/Application Support/ClaudeMascot/logs/`:
+
+- **input.jsonl** — every hook event as received: timestamp, event name, tool name (if any), session id (if any), mode.
+- **decision.jsonl** — every panel decision: timestamp, desired state, target clip (if resolved), clip displayed before the swap, action (upload/powerOff/wake/noop), outcome (ok/failed/skipped), and a short reason if interesting.
+
+Both are always on, size-capped, and rotated; tool input is never logged, matching the relay's privacy rule. Paired, they answer *where the mascot felt wrong*, which either stream alone cannot.
+
 ## Behaviour
 
-- Listen for JSON events on the socket and drive the panel state from the event name via `EventPolicy.swift`.
+- Listen for JSON events on the socket and drive the panel through the choreographer.
 - States: `idle`, `thinking`, `working`, `waiting`, `done`, `sleeping`, plus `starting` (the entrance) and `off` (written by `SessionEnd`, blanks the panel immediately).
-- **The entrance** plays at the three moments the mascot arrives from nothing: app launch, `SessionStart`, and a wake from a dark panel — so a prompt arriving at a black panel shows the mascot appear before it is seen thinking. It is never sat in: `PanelController` holds it for `startingHold` (the motion length of `starting.gif`) and then hands off to the state actually wanted.
-- `done` holds a minimum of **30s** before reverting to `idle`, unless another state arrives first.
-- Idle escalation: `idle` → `sleeping` at 5m → **panel off** at 10m.
+- **The entrance** plays at the three moments the mascot arrives from nothing: app launch, `SessionStart`, and a wake from a dark panel — so a prompt arriving at a black panel shows the mascot appear before it is seen thinking. It is never sat in: `PanelController` holds it for `startingHold` (the motion length of `starting.gif`, read from clips.json) and then hands off to the state actually wanted.
+- `done` is a one-shot celebration (chunk 9's `done-enter`), followed by a satisfied-idle loop, held for a minimum of **30s** before reverting to `idle`, unless another state arrives first.
+- Idle escalation becomes physical: `idle` → lie down (`stand-to-lie`) → `sleeping` → get up (`lie-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**; a wake walks back in from a random side. The timings come from settings: default 5m to sleeping, 10m to off.
 - `off` short-circuits straight to panel-off, without waiting out that escalation.
 - No 15-minute quit — a resident native app is cheap, and reconnecting is the slow part. It keeps the BLE connection.
 - Reconnect automatically if the panel drops off: exponential backoff to a 30s ceiling, plus a **connect timeout**, because CoreBluetooth's own `connect` has none and will pend forever — see [[macOS Bluetooth TCC]].
+- **Connection stability is a design constraint.** Only a new BLE connection flashes the panel's own icon; everything else stays visible. Dropping and reconnecting is the only visible artefact we cannot hide.
 
 ## Observability
 
@@ -88,21 +125,30 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
 
 ## Architecture
 
+Data flow: `HookServer` → `SessionTracker` → `Choreographer` → `PanelController` → `PanelAdapter` → `BLEClient`
+
 ```
 ~/Library/Application Support/ClaudeMascot/hook.sock
                  │
                  ├─ relay.sh (in plugin) ──> HookServer (Unix domain socket)
-                 │                                    │
-                 └────────────────────────────> EventPolicy (event → state)
-                                                      │
-                                                      v
-                                            PanelController (state machine)
-                                                      │
-                                                      v
-                                            BLEClient (CoreBluetooth)
-                                                      │
-                                                      v
-                                          iDotMatrix panel
+                 │
+                 v
+          SessionTracker (per-session state → priority reduction)
+                 │
+                 v
+           Choreographer (pose graph → one edge per boundary)
+                 │
+                 v
+          PanelController (clip scheduling, power, entrance, retry)
+                 │
+                 v
+           PanelAdapter (clip → GIF bytes)
+                 │
+                 v
+            BLEClient (CoreBluetooth, one boundary-gated write at a time)
+                 │
+                 v
+            iDotMatrix panel
 ```
 
 Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comments — the *reasons* for its isolation, its retry rules and its quirks live there, not here.
@@ -110,14 +156,20 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 | File | Role |
 |---|---|
 | `ClaudeMascotApp.swift` | `@main` scene; the single-instance guard runs from its `init()` |
-| `AppModel.swift` | Owns and wires everything; the `enabled` switch; the tick timer |
+| `AppModel.swift` | Owns and wires everything; the `enabled` switch; the tick timer; event logging |
 | `HookServer.swift` | Socket listener, one connection per event, publishes decoded JSON |
 | `HookEvent.swift` | The four-field wire payload |
 | `EventPolicy.swift` | Event name → `PanelState`. **All policy lives here** |
+| `SessionTracker.swift` | Per-session state; reduces multiple sessions to one desired state by priority; reaps stale sessions |
+| `Choreographer.swift` | Pose graph walker; selects variants and fidgets deterministically from time; computes one edge at a time, never a route |
 | `PanelState.swift` | The state set, and what each one means |
-| `PanelController.swift` | State machine: `done` hold, idle escalation, entrance, power, upload retry |
+| `Pose.swift` | The pose enum: `standing`, `sitting`, `lying`, `offLeft`, `offRight`, `offBottom` |
+| `Clip.swift` | One animation clip: id, file, frame count, duration, motion, looping, pose, variant group, weight, transition endpoints |
+| `ClipManifest.swift` | Loads `clips.json`; resolves clip ids to `Clip` instances |
+| `EventLog.swift` | Always-on JSONL logging to `~/Library/Application Support/ClaudeMascot/logs/` |
+| `PanelController.swift` | Clip scheduling: boundary gating, done hold, idle escalation, entrance, power, upload retry. See `Choreographer.swift` for the pose-graph logic |
 | `PanelAdapter.swift` | The only place `AnimationLibrary` and `BLEClient` meet |
-| `AnimationLibrary.swift` | Resolves a state to GIF bytes, honouring user overrides |
+| `AnimationLibrary.swift` | Resolves a clip to GIF bytes, honouring user overrides |
 | `BLEClient.swift` | CoreBluetooth: scan, connect, write. See [[BLE Protocol]] |
 | `GifPacketizer.swift` | Pure bytes-in/packets-out; pinned by golden fixtures, no hardware |
 | `SingleInstance.swift` | Newest-launch-wins duplicate guard |
