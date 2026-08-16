@@ -279,46 +279,78 @@ def thinking_pace():
     return out
 
 
+# The half-raised frame that gets `waiting` onto the standing anchor. Every frame of
+# the wave itself has the arm at full lift with the flag already arcing overhead, so
+# the clip used to open and close mid-gesture: it was the last clip in the manifest
+# failing the anchor contract, and swapping into it snapped the arm up four rows and
+# conjured the flag in one frame. This is the arm halfway and the flag just clearing
+# the head -- one frame each side, which is all the contract needs.
+WAITING_RAISE_ARM = -2
+WAITING_RAISE_TIP = (24, 13)
+WAITING_RAISE_FLAG = 3  # a smaller flag than the wave's 4x4: it is still unfurling
+
+
+def _flag_frame(tip_x, tip_y, arm_lift, flag_size):
+    """The mascot with one arm up and a flag on a pole running out to (tip_x, tip_y)."""
+    im = frame()
+    d = ImageDraw.Draw(im)
+    mascot(d, HOME_Y, arms=(0, arm_lift))
+    hand_x = TORSO_X + TORSO_W + ARM_W // 2
+    hand_y = HOME_Y + ARM_TOP + arm_lift + ARM_H // 2
+    d.line([hand_x, hand_y, tip_x, tip_y], fill=PROP)
+    rect(d, tip_x - flag_size, tip_y, flag_size, flag_size, PROP)
+    return im
+
+
 def waiting():
-    """Flag Waver: waving for your attention, flag held up over one shoulder."""
-    out = []
-    # The arm sits at full lift throughout (MAX_ARM_LIFT keeps it joined to the
+    """Flag Waver: raises a flag, waves it over one shoulder, lowers it again."""
+    # The arm sits at full lift through the wave (MAX_ARM_LIFT keeps it joined to the
     # torso); the wave is carried entirely by the flag arcing over its head.
     arc = [(20, 10), (22, 7), (24, 4), (25, 2), (24, 4), (22, 7), (20, 10), (21, 9)]
+    raise_frame = _flag_frame(*WAITING_RAISE_TIP, WAITING_RAISE_ARM, WAITING_RAISE_FLAG)
+    out = [(_standing_anchor(), 200), (raise_frame, 120)]
     for tip_x, tip_y in arc:
-        im = frame()
-        d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y, arms=(0, MAX_ARM_LIFT))
-        hand_x = TORSO_X + TORSO_W + ARM_W // 2
-        hand_y = HOME_Y + ARM_TOP + MAX_ARM_LIFT + ARM_H // 2
-        d.line([hand_x, hand_y, tip_x, tip_y], fill=PROP)
-        rect(d, tip_x - 4, tip_y, 4, 4, PROP)
-        out.append((im, 140))
+        out.append((_flag_frame(tip_x, tip_y, MAX_ARM_LIFT, 4), 140))
+    out.append((raise_frame.copy(), 120))
+    out.append((_standing_anchor(), 300))
     return out
 
 
-# Where the celebration's props go, as offsets into the jump slice (APPEAR_JUMP):
-# local 0 is the crouch, 1-8 airborne, 9-11 the landing squash, 12-14 the settle.
+# Where the celebration's props go, as offsets into the celebration (see
+# `_celebration_frames()`): local 0 is the crouch, 1-8 airborne, 9-11 the landing
+# squash, 12-14 standing again.
 #
 # Both props have to wait for the landing, and that is a constraint, not a choice: at
 # the apex the mascot spans rows 1-22 and there is simply no clear panel left to draw
 # on. From touchdown onward the top half is empty again. Landing on the beat reads as
 # "stuck it" rather than the old stomp's "threw it in the air", which is the same
 # celebration told the other way round.
-DONE_BURSTS = (9, 11)       # confetti fires twice, on impact and on the rebound
-DONE_CHECK_AT = (10, 11, 12)  # the checkmark flashes across the settle
+DONE_BURSTS = (9, 11)             # confetti fires twice, on impact and on the rebound
+DONE_CHECK_AT = (10, 11, 12, 13)  # the checkmark flashes across the landing
 CHECK_STROKE = (((11, 6), (14, 9)), ((14, 9), (21, 2)))
+# Standing frames appended after the jump. Trimming the turn off APPEAR_JUMP left the
+# props running past the end of the clip -- the second confetti burst had one frame to
+# live on and the checkmark two, at 140ms. These are the mascot already landed and
+# still, so the props finish over art that is not doing anything else.
+DONE_SETTLE, DONE_SETTLE_MS = 3, 140
 
 
-def _jump_frames():
-    """The bare jump lifted out of appear.gif -- see APPEAR_JUMP."""
-    return appear_frames()[APPEAR_JUMP]
+def _celebration_frames():
+    """The jump out of appear.gif, then a few standing frames for the props.
+
+    Deliberately not part of APPEAR_JUMP: the jump is imported art with a meaning of
+    its own, and these are filler the celebrations need. Keeping them separate is
+    what lets the slice above be described purely in terms of what appear.gif draws.
+    """
+    out = appear_frames()[APPEAR_JUMP]
+    out += [(_standing_anchor(), DONE_SETTLE_MS) for _ in range(DONE_SETTLE)]
+    return out
 
 
 def done():
     """Confetti Claude: the entrance's jump again, with two bursts on the landing."""
     out = [(_standing_anchor(), 70)]  # loop contract: start on the standing anchor...
-    for i, (im, ms) in enumerate(_jump_frames()):
+    for i, (im, ms) in enumerate(_celebration_frames()):
         d = ImageDraw.Draw(im)
         # Each burst starts just above the head and rises out of the panel, the same
         # spread the drawn stomp used -- only the frames it fires on have moved.
@@ -519,7 +551,7 @@ def done_enter():
     loop invisible while still making the entrance the beat you notice.
     """
     out = [(_standing_anchor(), 70)]  # the jump opens on a crouch, not the anchor
-    for i, (im, ms) in enumerate(_jump_frames()):
+    for i, (im, ms) in enumerate(_celebration_frames()):
         if i in DONE_CHECK_AT:
             d = ImageDraw.Draw(im)
             for a, b in CHECK_STROKE:
@@ -755,10 +787,12 @@ APPEAR_TAIL_MS = 2500
 # beats after the landing has already finished. They belong to the sway.
 APPEAR_RISE = 15
 # The jump inside the entrance, on its own: frame 3 is the crouch that anticipates it,
-# 4-11 are airborne, 12-14 the landing squash and 15-17 the settle. Frames 0-2 are the
-# mascot still emerging through the floor, which only makes sense as an entrance, so
-# the reusable jump starts after them. `done()` and `done_enter()` both play this.
-APPEAR_JUMP = slice(3, 18)
+# 4-11 are airborne and 12-14 the landing squash. Frames 0-2 are the mascot still
+# emerging through the floor, which only makes sense as an entrance, so the reusable
+# jump starts after them; and it ends at 14 for the same reason APPEAR_RISE does --
+# 15-17 are the turn, and they belong to the sway. `done()` and `done_enter()` both
+# play this, over the settle frames below.
+APPEAR_JUMP = slice(3, 15)
 
 
 def _appear_recolour(rgb):

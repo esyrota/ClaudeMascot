@@ -16,8 +16,8 @@
     ]
   },
   "done": {
-    "gif_bytes": 3488,
-    "crc32": 913440323,
+    "gif_bytes": 3457,
+    "crc32": 534386545,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -27,22 +27,21 @@
       509,
       509,
       509,
-      450
+      419
     ]
   },
   "done-enter": {
-    "gif_bytes": 3415,
-    "crc32": 4100888825,
+    "gif_bytes": 3007,
+    "crc32": 1281740594,
     "outer_chunks": 1,
-    "ble_packets": 7,
+    "ble_packets": 6,
     "packet_lengths": [
       509,
       509,
       509,
       509,
       509,
-      509,
-      377
+      478
     ]
   },
   "doze-to-stand": {
@@ -198,15 +197,16 @@
     ]
   },
   "waiting": {
-    "gif_bytes": 1739,
-    "crc32": 1298930632,
+    "gif_bytes": 2519,
+    "crc32": 3907080714,
     "outer_chunks": 1,
-    "ble_packets": 4,
+    "ble_packets": 5,
     "packet_lengths": [
       509,
       509,
       509,
-      228
+      509,
+      499
     ]
   },
   "walk-in-left": {

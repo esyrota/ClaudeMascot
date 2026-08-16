@@ -29,8 +29,13 @@ is why `motion` (the real movement) is much shorter than `duration`.
 
 **The anchor contract binds all of them:** every loop begins and ends on its pose's
 pixel-identical anchor frame, and every transition starts and ends on the anchor of the
-pose at each end. `idle` frame 0 defines `standing`;
-an offscreen anchor is an empty frame. Break this once and every swap visibly jumps.
+pose at each end. `idle` frame 0 defines `standing`, `sleeping` frame 0 defines `dozing`,
+and an offscreen anchor is an empty frame. Break this once and every swap visibly jumps.
+
+**Every clip in the manifest now satisfies it.** `waiting` was the last holdout: its wave
+opened and closed mid-gesture, so a swap into it snapped the arm up four rows and conjured
+the flag in one frame. It gains one half-raised frame at each end — the arm halfway, the
+flag just clearing the head — which is all the contract needs.
 
 ---
 
@@ -54,10 +59,10 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 
 **waiting** and **done** — one each.
 
-| | |
-|---|---|
-| ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif) |
-| **waiting** · 8f · 1.12s · w 1.0 | **done** · 17f · 3.71s · w 1.0 |
+|                                     |                                |
+| ----------------------------------- | ------------------------------ |
+| ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif)  |
+| **waiting** · 12f · 1.86s · w 1.0 | **done** · 17f · 3.29s · w 1.0 |
 
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
@@ -161,14 +166,18 @@ cuts it into three clips rather than playing the whole 32-frame strip once a ses
 | Coalesced frames | Becomes | Why |
 |---|---|---|
 | 0–14 | `starting` | Bursting up through the floor only makes sense as an entrance. |
-| 3–17 | `done` / `done-enter` | A clean crouch → leap → land → settle. It reads as a jump anywhere, not just on arrival. |
+| 3–14 | `done` / `done-enter` | A clean crouch → leap → land. It reads as a jump anywhere, not just on arrival. |
 | 15–31 | `dancing` | A shaded sway that never leaves the floor — an idle that was stranded at the tail of a clip that plays once. |
 
-The split between the entrance and the sway falls at **15**, where the shading starts:
-frames 15–17 carry 46 shaded pixels each against 0 in every frame before them, and they
-are the mascot *turning*. On the end of an entrance they read as three extra beats after
-the landing has already finished, so they go with the sway they belong to. The jump keeps
-them, where the same three frames are a recovery wobble after touching down.
+The split falls at **15**, where the shading starts: frames 15–17 carry 46 shaded pixels
+each against 0 in every frame before them, and they are the mascot *turning*. Anywhere
+but in the sway they read as extra beats after the motion has already finished, so
+neither the entrance nor the jump takes them.
+
+Cutting the jump there left the celebrations' props running past the end of the clip —
+the second confetti burst had one frame to live on and the checkmark two. Both now append
+three plain standing frames (`DONE_SETTLE`) for the props to finish over: the mascot has
+landed and is still, and the confetti keeps rising out of the top of the panel.
 
 The frame numbers are indices into the **coalesced** strip — PIL merges runs of identical
 frames when it encodes the GIF, so the raw import is numbered differently. `coalesce()` in
@@ -180,7 +189,7 @@ same numbers.
 | | | |
 |---|---|---|
 | ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif) |
-| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **done-enter**<br>standing, 17f · motion 3.01s |
+| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **done-enter**<br>standing, 15f · motion 2.45s |
 
 #### The wander fidgets
 
@@ -280,13 +289,7 @@ stall.
 5. **No fidgets at `sitting` or `dozing`** — the mascot is perfectly still at the laptop
    between loops, and `fidget-doze` was drawn against the retired floor blob and went with
    it, so a doze fidget is a clean slot to fill.
-6. **`thinking` and `waiting` do not satisfy the anchor contract.** Both open and close
-   holding a prop — the barbell resting on the head, the flag mid-arc — so neither end is
-   the bare `standing` anchor, and swapping into or out of either pops the prop into
-   existence. Every other `standing` clip now checks out. The fix is the same bookending
-   `idle-think` and `dancing` use: an anchor frame at each end, with the prop entering on
-   the frame after it.
-8. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
+6. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
    diagonal stroke has zero height, so the smaller one degenerates into a square. It has
    always been that way — it reads as distance rather than as a letter, which is
    survivable, but a 2-wide Z drawn deliberately would be better than one that collapses.
