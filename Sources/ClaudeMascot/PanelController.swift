@@ -61,6 +61,9 @@ final class PanelController: ObservableObject {
   private let timings: PanelTimings
   private let brightness: () -> Int
   private let clock: () -> TimeInterval
+  /// Where every decision this machine makes gets logged, for later tuning.
+  /// `nil` in every existing test, which is how they construct unchanged.
+  private let eventLog: EventLog?
 
   /// The latest state requested via `handle(_:)`. What the machine is
   /// trying to show, before idle escalation or the done hold reshape it
@@ -99,12 +102,14 @@ final class PanelController: ObservableObject {
     panel: any PanelDriving,
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
-    clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 }
+    clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
+    eventLog: EventLog? = nil
   ) {
     self.panel = panel
     self.timings = timings
     self.brightness = brightness
     self.clock = clock
+    self.eventLog = eventLog
     self.idleSince = clock()
     self.appearingUntil = timings.startingHold > 0 ? clock() + timings.startingHold : nil
   }
@@ -114,6 +119,18 @@ final class PanelController: ObservableObject {
   /// the panel.
   func handle(_ newState: PanelState) {
     let now = clock()
+    let previousDesired = desired
+
+    // Logged once, on exit, rather than at each mutation site below: `desired`
+    // has several paths to a new value (the `.starting` reset, the `.done`
+    // hold, the general case) and this is cheaper to keep in sync than three
+    // separate call sites, especially since `.starting` only sometimes
+    // actually changes `desired` (not when it was already `.idle`).
+    defer {
+      if desired != previousDesired {
+        logDecision(target: nil, displayed: displayed?.rawValue, action: "noop", outcome: "ok", detail: nil)
+      }
+    }
 
     // `.starting` is a request to replay the entrance, not a state to sit in:
     // the mascot appears and then settles into idle on its own. Handled ahead
@@ -221,19 +238,25 @@ final class PanelController: ObservableObject {
   // MARK: - I/O attempts
 
   private func attemptPowerOff() async {
+    let displayedBefore = displayed?.rawValue
     do {
       try await panel.setPower(on: false)
       isPanelOff = true
       displayed = nil
       nextRetryAt = nil
       Self.log.notice("panel off (desired \(self.desired.rawValue, privacy: .public))")
+      logDecision(target: nil, displayed: displayedBefore, action: "powerOff", outcome: "ok", detail: nil)
     } catch {
       Self.log.error("power off failed: \(error.localizedDescription, privacy: .public)")
       scheduleRetry()
+      logDecision(
+        target: nil, displayed: displayedBefore, action: "powerOff", outcome: "failed",
+        detail: error.localizedDescription)
     }
   }
 
   private func attemptWake(now: TimeInterval) async {
+    let displayedBefore = displayed?.rawValue
     do {
       try await panel.setPower(on: true)
       try await panel.setBrightness(brightness())
@@ -248,27 +271,55 @@ final class PanelController: ObservableObject {
       displayed = target
       nextRetryAt = nil
       Self.log.notice("panel woke showing \(target.rawValue, privacy: .public)")
+      logDecision(target: target.rawValue, displayed: displayedBefore, action: "wake", outcome: "ok", detail: nil)
     } catch {
       Self.log.error("wake failed: \(error.localizedDescription, privacy: .public)")
       scheduleRetry()
+      logDecision(
+        target: nil, displayed: displayedBefore, action: "wake", outcome: "failed",
+        detail: error.localizedDescription)
     }
   }
 
   private func attemptUpload(_ target: PanelState) async {
+    let displayedBefore = displayed?.rawValue
     do {
       try await panel.upload(target)
       displayed = target
       nextRetryAt = nil
       Self.log.notice("showing \(target.rawValue, privacy: .public)")
+      logDecision(
+        target: target.rawValue, displayed: displayedBefore, action: "upload", outcome: "ok", detail: nil)
     } catch {
       let reason = error.localizedDescription
       Self.log.error(
         "upload of \(target.rawValue, privacy: .public) failed: \(reason, privacy: .public)")
       scheduleRetry()
+      logDecision(
+        target: target.rawValue, displayed: displayedBefore, action: "upload", outcome: "failed",
+        detail: reason)
     }
   }
 
   private func scheduleRetry() {
     nextRetryAt = clock() + Self.retryBackoff
+  }
+
+  /// Fire-and-forget: never `await`ed inline, so a slow or failing log write
+  /// can never delay or reorder the state machine. `DecisionRecord.at` uses
+  /// real wall time rather than `clock()` because the fake clock tests inject
+  /// is not wall time and would make logged timestamps meaningless.
+  private func logDecision(target: String?, displayed: String?, action: String, outcome: String, detail: String?) {
+    guard let eventLog else { return }
+    let record = DecisionRecord(
+      at: Date(),
+      desired: desired.rawValue,
+      target: target,
+      displayed: displayed,
+      action: action,
+      outcome: outcome,
+      detail: detail
+    )
+    Task { await eventLog.record(record) }
   }
 }

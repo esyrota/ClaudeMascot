@@ -45,6 +45,13 @@ final class AppModel: ObservableObject {
 
   private var lastAppliedBrightness: Int?
 
+  /// Always-on record of every hook event received and every panel decision
+  /// made, so the choreography work can be tuned against real sessions
+  /// instead of guesses. Held here because it is the one place that sees
+  /// hook input directly; `panelController` gets its own reference for
+  /// decision logging.
+  private let eventLog: EventLog
+
   init(
     settings: AppSettings = AppSettings(),
     bleClient: BLEClient = BLEClient(),
@@ -58,6 +65,7 @@ final class AppModel: ObservableObject {
     self.hookServer = hookServer
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
+    self.eventLog = EventLog()
 
     // Clean up old state directory (can be deleted once no installed build
     // predates the socket).
@@ -76,7 +84,8 @@ final class AppModel: ObservableObject {
         // on every run, so the entrance plays exactly once before handing off.
         startingHold: 6.02
       ),
-      brightness: { settings.brightness }
+      brightness: { settings.brightness },
+      eventLog: eventLog
     )
 
     self.enabled = settings.autoConnect
@@ -113,6 +122,14 @@ final class AppModel: ObservableObject {
       .sink { [weak self] event in
         guard let self else { return }
         guard let event else { return }
+
+        // Logged before the `enabled` and `EventPolicy` guards below, on
+        // purpose: the whole point of this log is to see what Claude Code
+        // actually emits, including everything we currently drop.
+        let inputRecord = InputRecord(
+          at: Date(), event: event.event, tool: event.tool, session: event.session, mode: event.mode)
+        Task { await self.eventLog.record(inputRecord) }
+
         guard self.enabled else {
           Self.log.debug("\(event.event, privacy: .public) ignored (disabled)")
           return
