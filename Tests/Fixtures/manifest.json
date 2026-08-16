@@ -22,6 +22,17 @@
       196
     ]
   },
+  "idle-think": {
+    "gif_bytes": 1301,
+    "crc32": 1888127872,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      299
+    ]
+  },
   "sleeping": {
     "gif_bytes": 1374,
     "crc32": 2680603367,
@@ -42,6 +53,20 @@
       509,
       509,
       40
+    ]
+  },
+  "thinking-alt": {
+    "gif_bytes": 2931,
+    "crc32": 3001385244,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      402
     ]
   },
   "working": {
@@ -66,6 +91,30 @@
       509,
       509,
       188
+    ]
+  },
+  "working-alt": {
+    "gif_bytes": 7188,
+    "crc32": 220580282,
+    "outer_chunks": 2,
+    "ble_packets": 16,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      54
     ]
   },
   "waiting": {

@@ -67,6 +67,16 @@
       "variantGroup": "idle",
       "weight": 0.4
     },
+    "idle-think": {
+      "file": "idle-think.gif",
+      "frameCount": 7,
+      "durationMs": 1480,
+      "motionMs": 1480,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.3
+    },
     "lie-to-stand": {
       "file": "lie-to-stand.gif",
       "frameCount": 6,
@@ -133,6 +143,16 @@
       "variantGroup": "thinking",
       "weight": 1.0
     },
+    "thinking-alt": {
+      "file": "thinking-alt.gif",
+      "frameCount": 15,
+      "durationMs": 2100,
+      "motionMs": 2100,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "thinking",
+      "weight": 0.5
+    },
     "waiting": {
       "file": "waiting.gif",
       "frameCount": 8,
@@ -188,6 +208,16 @@
       "pose": "sitting",
       "variantGroup": "working",
       "weight": 1.0
+    },
+    "working-alt": {
+      "file": "working-alt.gif",
+      "frameCount": 36,
+      "durationMs": 5310,
+      "motionMs": 5310,
+      "loops": true,
+      "pose": "sitting",
+      "variantGroup": "working",
+      "weight": 0.5
     }
   }
 }

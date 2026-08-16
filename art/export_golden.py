@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 ANIMATIONS = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 FIXTURES = ROOT / "Tests" / "Fixtures"
 
-STATES = ["idle", "idle-alt", "sleeping", "thinking", "working", "waiting", "done",
+STATES = ["idle", "idle-alt", "idle-think", "sleeping", "thinking", "thinking-alt",
+          "working", "working-alt", "waiting", "done",
           "done-enter", "fidget-stretch", "fidget-look", "fidget-doze",
           "stand-to-lie", "lie-to-stand", "walk-off-left", "walk-in-left",
           "walk-off-right", "walk-in-right", "sink"]

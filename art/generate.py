@@ -29,6 +29,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+import sheet_import
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 SOURCES = Path(__file__).resolve().parent / "sources"
@@ -706,6 +708,245 @@ def sweep():
                     scale=WORKING_SCALE, at=working_at, repair=working_repair)
 
 
+# --------------------------------------------------------------------------
+# Imported sprite sheets -- hand-authored loop variants, sliced by sheet_import.py
+# rather than a GIF read frame by frame (see "Edge art is procedural, loop art is
+# imported" in Task.md). Two 36-frame contact-sheet screenshots: a standing
+# "thinking" set with speech/thought/question/exclamation beats, and a seated
+# "working" set at a grey laptop. Both are screenshots, not clean exports -- see
+# sheet_import.py's module docstring for the tile-detection and resampling this
+# rests on.
+# --------------------------------------------------------------------------
+
+THINKING_SHEET = SOURCES / "F85A47A0-4D7B-420B-9F9E-4C75DE1EE34E.png"
+WORKING_SHEET = SOURCES / "186F7A97-0B62-4283-9DC4-65E953629BDC.png"
+
+# Anti-aliasing/JPEG noise in a screenshot means source pixels never land exactly on
+# a named constant, so classification here is by shape, not by exact match:
+#   - dark (background, eyes)            -> BG
+#   - achromatic but not dark (R=G=B-ish) -> PROP
+#   - everything else (the orange body)   -> MASCOT
+# The achromatic bucket is what makes this safe rather than fragile: it catches the
+# working sheet's grey laptop (~(134,134,134), brightest channel 134) and its white
+# speech/exclamation marks (~(255,255,255)) with the same rule, and it is why
+# neither sheet ever hits MASCOT_DARK/MASCOT_SHADE -- neither draws a second body
+# tone, so the classifier never has to choose between them.
+#
+# Plain nearest-neighbour against the full named palette (the way working_class()
+# above snaps sweep()'s already-clean colours) was tried first and rejected: in
+# Euclidean RGB distance, grey (134,134,134) is closer to MASCOT (255,68,4) -- ~190
+# -- than to PROP (255,255,255) -- ~210 -- so it would have painted the laptop
+# orange, exactly the panel-colour-rule violation this palette exists to prevent
+# (see the module docstring above: a colour whose brightest channel is under 255
+# renders blue-violet, and there is deliberately no grey constant to reach for
+# instead).
+SHEET_DARK = 40
+SHEET_ACHROMATIC_SPREAD = 40
+
+
+def sheet_classify(rgb):
+    if max(rgb) < SHEET_DARK:
+        return BG
+    if max(rgb) - min(rgb) < SHEET_ACHROMATIC_SPREAD:
+        return PROP
+    return MASCOT
+
+
+def _bg_components(px, left, top, right, bottom):
+    """4-connected BG-coloured blobs within [left,right]x[top,bottom], inclusive."""
+    seen = set()
+    comps = []
+    for y in range(top, bottom + 1):
+        for x in range(left, right + 1):
+            if (x, y) in seen or px[x, y] != BG:
+                continue
+            stack, comp = [(x, y)], []
+            seen.add((x, y))
+            while stack:
+                cx, cy = stack.pop()
+                comp.append((cx, cy))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = cx + dx, cy + dy
+                    if (left <= nx <= right and top <= ny <= bottom
+                            and (nx, ny) not in seen and px[nx, ny] == BG):
+                        seen.add((nx, ny))
+                        stack.append((nx, ny))
+            comps.append(comp)
+    return comps
+
+
+def sheet_repair(index, im) -> None:
+    """
+    Erase whatever is drawn directly below the eyes, back to MASCOT.
+
+    Both sheets draw the eyes as a pair of small squares near the top of the head.
+    The working sheet's three-quarter view also draws a mouth immediately beneath
+    them -- confirmed by inspecting the source screenshot at native resolution, a
+    stepped ~3px dark mark, absent from the thinking sheet's flat front-on view. At
+    32x32 the mascot is ~16px tall, so that mark reads as noise rather than an
+    expression: the eyes already carry the face in every other clip (idle,
+    thinking, waiting, ...), so it comes off here rather than riding along as a
+    stray mark.
+
+    Unlike WORKING_REPAIRS above, there is no fixed coordinate table -- each
+    tile's own bounding box (and so the head's exact placement) differs slightly
+    frame to frame, by design; see sheet_import.py's module docstring on why tiles
+    are never assumed to share a pitch. Instead: find the two small BG blobs in
+    the top third of the body (the eyes), and clear any BG pixel in the two rows
+    directly beneath them, between their inner edges. Requiring exactly two small
+    blobs is what keeps this a safe no-op on frames where the pose (a raised arm,
+    a turned head) makes the eyes ambiguous, or on the thinking sheet, which has
+    no mouth to begin with, rather than mangling a frame it cannot read
+    confidently -- following `imported()`'s own `repair=` callback pattern, called
+    per-frame on the already-resampled image.
+    """
+    px = im.load()
+    body = [(x, y) for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT]
+    if not body:
+        return
+    left = min(x for x, _ in body)
+    right = max(x for x, _ in body)
+    top = min(y for _, y in body)
+    bottom = max(y for _, y in body)
+    band = top + max(1, (bottom - top) // 3)  # top third -- where the eyes live
+    holes = _bg_components(px, left, top, right, band)
+    eyes = [c for c in holes if len(c) <= 6]
+    if len(eyes) != 2:
+        return
+    eyes.sort(key=lambda c: min(x for x, _ in c))
+    eye_l, eye_r = eyes
+    inner_l = max(x for x, _ in eye_l) + 1
+    inner_r = min(x for x, _ in eye_r) - 1
+    if inner_r < inner_l:
+        return
+    eye_bottom = max(max(y for _, y in eye_l), max(y for _, y in eye_r))
+    for y in range(eye_bottom + 1, min(SIZE - 1, eye_bottom + 3) + 1):
+        for x in range(inner_l, inner_r + 1):
+            if px[x, y] == BG:
+                px[x, y] = MASCOT
+
+
+def _standing_anchor() -> Image.Image:
+    """The exact `standing` anchor pixels -- idle.gif frame 0 -- for the loop
+    boundary contract the sheet variants below guarantee mechanically."""
+    return mascot_at()
+
+
+def _sheet_frames(sheet: Path) -> list:
+    """
+    Slice, recolour and repair one 36-frame sheet into panel-ready tiles.
+
+    Deliberately separate from this file's own `imported()`: that function reads
+    an already-32x32-native GIF frame by frame, while a sheet is a single
+    screenshot that first has to be cut into 36 tiles (sheet_import.slice_sheet)
+    before any per-frame processing is possible.
+    """
+    tiles = sheet_import.slice_sheet(sheet)
+    out = []
+    for index, tile in enumerate(tiles):
+        px = tile.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                px[x, y] = sheet_classify(px[x, y])
+        sheet_repair(index, tile)
+        out.append(tile)
+    return out
+
+
+def thinking_alt():
+    """
+    Thinking variant: a thought bubble forms and fades, from the sprite sheet.
+
+    MEASURED against the procedural standing anchor before anything else: the
+    sheet's own rest frame (frame 0, sliced and recoloured) differs from
+    idle.gif's frame 0 at 123 of 1024 pixels, and its body's own bounding box is
+    21w x14h against the anchor's 24w x16h -- about 87% in both dimensions, both
+    still flush with the panel's bottom row. Smaller, not a different creature:
+    same silhouette, same standing pose, same floor line, just drawn a few
+    percent smaller by the screenshot's own crop -- not the "wildly different
+    figure size" the chunk brief says to stop and report on. So the anchor-frame
+    prepend/append below is the right fix, not a symptom to re-author the sheet
+    over.
+
+    The 36-frame thinking sheet is not one loop -- it is four distinct beats (a
+    "..." thought, a "?" confusion, a "!" realisation, and a second, shorter
+    "..." trailing off), each one leaving and returning to the same standing
+    rest pose. This clip uses just the first: sheet frames 0-4 are the sheet's
+    own held rest, 5-6 lean into the thought, 7-11 grow and hold the "..."
+    bubble, and 12 is back at rest -- a clean start/end point to cut on. The "?"
+    (12-23), "!" (24-28) and trailing "..." (29-35) beats are left unused for
+    now; nothing requires every sheet frame to ship, and splitting the richer
+    beats into their own variants is future work, not this chunk's.
+
+    The sheet carries no frame durations (see sheet_import.py's module
+    docstring), so this is a hand-authored timing table, not a uniform one -- a
+    steady mechanical cadence is exactly what would give away that it is not
+    idle()'s own art.
+    """
+    frames = _sheet_frames(THINKING_SHEET)[0:13]  # sheet frames 0-12
+    durations = [
+        160, 150, 150, 160, 140,  # 0-4: the held rest breath
+        130, 120,                 # 5-6: leaning in
+        170, 150, 150,            # 7-9: the bubble grows
+        150, 160,                 # 10-11: it fades, leaning back out
+        170,                      # 12: back at rest
+    ]
+    out = [(_standing_anchor(), 70)]  # anchor contract: exact standing pixels first...
+    out += list(zip(frames, durations))
+    out.append((_standing_anchor(), 70))  # ...and last.
+    return out
+
+
+def idle_think():
+    """
+    Idle variant: a quiet held breath with a blink, from the sprite sheet.
+
+    The thinking sheet's frames 12-16 sit between the "..." and "?" beats
+    (thinking_alt() above ends its cut at 12, the next lean starts at 17) -- a
+    small, calm hold with a blink at frame 14, the quieter beat this variant is
+    named for. At variantGroup "idle" and weight 0.3 it should read as a
+    lower-key cousin of idle_alt()'s own lean, not another thinking clip.
+    """
+    frames = _sheet_frames(THINKING_SHEET)[12:17]  # sheet frames 12-16
+    durations = [300, 300, 140, 300, 300]  # frame 14's blink is the one quick beat
+    out = [(_standing_anchor(), 70)]
+    out += list(zip(frames, durations))
+    out.append((_standing_anchor(), 70))
+    return out
+
+
+def working_alt():
+    """
+    Working variant: a full pass through the seated-at-a-laptop sheet.
+
+    Unlike the thinking sheet, this one is not several beats stitched together --
+    36 frames of one continuous work session (a typing burst, a coffee, a glance
+    at the screen, code scrolling by, a satisfied checkmark) -- so the whole
+    thing ships as a single loop, in sheet order.
+
+    No anchor-frame prepend/append here, unlike thinking_alt()/idle_think()
+    above: those guarantee the `standing` anchor contract, but this clip is
+    `pose: "sitting"`, and there is no established sitting anchor to guarantee
+    against yet -- sweep()'s own imported art is what currently defines
+    "sitting", and stand<->sit transition edges are explicitly out of scope for
+    this chunk (see the chunk brief). Swapping straight to/from this clip at a
+    pose boundary is exactly the graceful-degradation path the choreographer
+    already covers when an edge is missing.
+    """
+    frames = _sheet_frames(WORKING_SHEET)
+    # Typing has a steady rhythm; the handful of named beats below get a longer
+    # dwell so each reads as a beat instead of blurring past mid-loop.
+    durations = [130] * 36
+    for i in (3, 17, 22):
+        durations[i] = 170  # "!" typing-burst reactions
+    for i in (9, 10):
+        durations[i] = 220  # the coffee-mug pause
+    durations[27] = 200      # a stray thought bubble
+    durations[30] = 260      # code scrolls up the screen -- let it be read
+    durations[32] = 260      # the checkmark -- the satisfying beat
+    return list(zip(frames, durations))
+
+
 def off():
     """
     Fully dark frame.
@@ -727,9 +968,12 @@ STATES = {
     "starting": appear,
     "idle": idle,
     "idle-alt": idle_alt,
+    "idle-think": idle_think,
     "sleeping": sleeping,
     "thinking": thinking,
+    "thinking-alt": thinking_alt,
     "working": sweep,
+    "working-alt": working_alt,
     "waiting": waiting,
     "done": done,
     "done-enter": done_enter,
@@ -769,11 +1013,27 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 0.4,
     },
+    "idle-think": {
+        # A second, quieter "idle" variant, imported from the thinking sheet's
+        # own held-rest frames -- see idle_think()'s docstring.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.3,
+    },
     "thinking": {
         "loops": True,
         "pose": "standing",
         "variantGroup": "thinking",
         "weight": 1.0,
+    },
+    "thinking-alt": {
+        # Same variantGroup as "thinking" -- imported from the sprite sheet's
+        # "..." thought-bubble beat, see thinking_alt()'s docstring.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "thinking",
+        "weight": 0.5,
     },
     "waiting": {
         "loops": True,
@@ -816,6 +1076,15 @@ CLIP_METADATA = {
         "pose": "sitting",
         "variantGroup": "working",
         "weight": 1.0,
+    },
+    "working-alt": {
+        # Same variantGroup as "working" -- imported from the seated-at-a-laptop
+        # sprite sheet, see working_alt()'s docstring for why it carries no
+        # anchor-frame prepend/append the way the standing-pose variants above do.
+        "loops": True,
+        "pose": "sitting",
+        "variantGroup": "working",
+        "weight": 0.5,
     },
     "sleeping": {
         "loops": True,
