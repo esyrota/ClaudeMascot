@@ -37,4 +37,38 @@ enum EventPolicy {
     default: return nil
     }
   }
+
+  /// Whether `event` announces a new session. `SessionTracker` treats this
+  /// as a lifecycle transition — reset the session to `.idle` and raise the
+  /// entrance pulse — rather than taking `state(for:)`'s `.starting` at face
+  /// value, since `.starting` is never a state a *session* sits in, only a
+  /// transition `PanelController` plays (see `PanelState`'s doc comment).
+  static func isSessionStart(_ event: HookEvent) -> Bool {
+    event.event == "SessionStart"
+  }
+
+  /// Whether `event` ends a session. `SessionTracker` removes the session
+  /// entirely rather than storing `state(for:)`'s `.off`, since `.off` is a
+  /// panel-wide power state, not something one session among several can be
+  /// in — the panel only goes `.off` once *every* session has ended this
+  /// way.
+  static func isSessionEnd(_ event: HookEvent) -> Bool {
+    event.event == "SessionEnd"
+  }
+
+  /// Whether `event` is a subagent finishing. Unlike every other recognised
+  /// event it carries no `PanelState` of its own (see `state(for:)`, which
+  /// deliberately maps it to `nil`) — it only decrements the session's
+  /// subagent depth, which feeds panel *intensity*, not state.
+  static func isSubagentStop(_ event: HookEvent) -> Bool {
+    event.event == "SubagentStop"
+  }
+
+  /// Whether `event` is a subagent spawning: a `PreToolUse` whose tool is
+  /// `Task`. This rides alongside `state(for:)`'s `.working` mapping for the
+  /// same event rather than replacing it — a subagent launch is still a
+  /// tool call — and increments the session's subagent depth.
+  static func isSubagentSpawn(_ event: HookEvent) -> Bool {
+    event.event == "PreToolUse" && event.tool == "Task"
+  }
 }
