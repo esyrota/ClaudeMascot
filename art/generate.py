@@ -288,6 +288,15 @@ SLEEP_SRC = SOURCES / "sleep.gif"
 # are the only thing moving, so their cadence IS the clip's cadence, and this is what
 # sets it.
 SLEEP_FRAME_MS = 500
+# The doze pose read off sleep.gif frame 0, so the transition below can land exactly
+# on it: the arms drop 4 rows (to 24-27, resting on the legs) and the face slides down
+# with a bowed head -- the anchor's 2x2 open eyes at rows 18-19 become 4x1 shut lids at
+# row 24. `stand_to_doze()`'s middle frame is halfway along both of those.
+DOZE_ARM_DROP = 4
+DOZE_MID_ARM_DROP = 2
+DOZE_MID_LID_Y = 21
+DOZE_MID_LID_W = 3
+DOZE_MID_LID_XS = (10, 19)
 
 
 def sleep_frames():
@@ -302,21 +311,36 @@ def sleep_frames():
     return [(im, SLEEP_FRAME_MS) for im, _ in imported(SLEEP_SRC, recolour)]
 
 
+def _dozing_anchor() -> Image.Image:
+    """The `dozing` anchor: sleep.gif frame 0, bare -- no Zs over it yet.
+
+    `dozing` is a pose in its own right, not a dressed-up `standing`. It was the
+    old `lying` node, which died with the floor-blob art it was drawn for; the node
+    itself was never the problem, and `sleeping` still needs somewhere to be that
+    `stand_to_doze()` can carry the mascot to and back from.
+    """
+    return sleep_frames()[0][0]
+
+
 def sleeping():
     """Dozed off standing: eyes shut, arms slumped, Zs drifting up.
 
-    The `standing` anchor bookends this the way idle_think() and dancing() are
-    bookended, and the cut into the slumped pose is a real pop -- arms falling four
-    rows and the eyes closing, all on one frame. Unlike the imported sheets' size
-    pop, this one is at least *diegetic*: it is the mascot falling asleep and waking
-    up, and it happens at the two moments the panel is swapping clips anyway.
+    Frame 0 and the last frame are the bare `dozing` anchor -- the Zs are skipped on
+    both -- so this loop begins and ends pixel-identical to what `stand_to_doze()`
+    lands on and `doze_to_stand()` departs from, the same contract idle()'s own
+    frame 0 satisfies for `standing`.
     """
-    out = [(_standing_anchor(), 70)]
-    for i, (im, ms) in enumerate(sleep_frames()):
+    out = []
+    frames = sleep_frames()
+    last = len(frames) - 1
+    for i, (im, ms) in enumerate(frames):
+        if i in (0, last):
+            out.append((im, ms))
+            continue
         d = ImageDraw.Draw(im)
-        # Two Zs rising out of the top-right. This is the pre-lying-pose geometry,
-        # restored: it was drawn for exactly this standing figure, and the slumped
-        # arms clear even more of that corner than the anchor's do.
+        # Two Zs rising out of the top-right, drawn for exactly this standing
+        # figure -- the slumped arms clear even more of that corner than the
+        # anchor's do.
         for j in (0, 1):
             step = (i + j * 2) % 4
             zx = 22 + step
@@ -328,8 +352,46 @@ def sleeping():
             rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
             rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
         out.append((im, ms))
-    out.append((_standing_anchor(), 70))
     return out
+
+
+def _doze_mid() -> Image.Image:
+    """The one drawn frame between standing and dozing: hands and eyes half down.
+
+    Everything else in this clip is either the standing anchor or sleep.gif's own
+    art; this is the single in-between, and it exists because the cut straight from
+    one to the other dropped the arms four rows and shut the eyes on a single frame.
+    """
+    im = frame()
+    d = ImageDraw.Draw(im)
+    mascot(d, HOME_Y, arms=(DOZE_MID_ARM_DROP, DOZE_MID_ARM_DROP))
+    # mascot() has already drawn the open eyes at their standing rows; paint them
+    # out and drop half-lidded ones down the face instead. Adding an eye offset to
+    # mascot() for one frame would put a parameter no other clip uses in the one
+    # function every clip goes through.
+    for ex in EYE_XS:
+        rect(d, ex, HOME_Y + EYE_TOP, EYE_W, EYE_H, MASCOT)
+    for lx in DOZE_MID_LID_XS:
+        rect(d, lx, DOZE_MID_LID_Y, DOZE_MID_LID_W, 1, EYE)
+    return im
+
+
+def stand_to_doze():
+    """Transition: nods off where it stands -- hands and eyes down, then asleep."""
+    return [
+        (_standing_anchor(), 700),
+        (_doze_mid(), 700),
+        (_dozing_anchor(), APPEAR_TAIL_MS),  # long dwell -- the dozing anchor
+    ]
+
+
+def doze_to_stand():
+    """Transition: wakes back up to standing, the settle run backwards."""
+    return [
+        (_dozing_anchor(), 700),
+        (_doze_mid(), 700),
+        (_standing_anchor(), APPEAR_TAIL_MS),  # long dwell -- the standing anchor
+    ]
 
 
 # --------------------------------------------------------------------------
@@ -479,6 +541,46 @@ def sink():
         out.append((mascot_at(0, oy, by=HOME_Y), 140))
     out.append((frame(), APPEAR_TAIL_MS))  # below the panel -- the offBottom anchor
     return out
+
+
+# --------------------------------------------------------------------------
+# Wander fidgets -- the mascot steps out and comes back.
+#
+# Each is one exit clip and one entrance clip played end to end. That works
+# because the exits above already close on an empty panel with a long dwell and
+# the entrances open on one, so the join IS the beat spent offscreen: no extra
+# frame is needed for it, and the pair reads as leaving, being gone a moment,
+# and returning. It also means the pair inherits the anchor contract from its
+# halves -- the exit opens on the standing anchor, the entrance closes on it --
+# which is exactly the self-edge shape a fidget has to be.
+#
+# The exits and entrances are deliberately mixed rather than paired by side.
+# Walking off left and strolling back in from the right is the joke; sinking
+# through the floor and rising out of it again is the other one. Nothing in
+# between is on screen to contradict either.
+#
+# Nine of these against two ordinary fidgets would drown fidget-stretch and
+# fidget-look, so each carries a low weight -- see WANDER_WEIGHT.
+# --------------------------------------------------------------------------
+
+# Named, not referenced: `appear` is defined further down this file, so binding the
+# functions here would read it before it exists. The lookup happens when the clip is
+# built instead, by which point the module is whole.
+WANDER_EXITS = {"sink": "sink", "off-left": "walk_off_left", "off-right": "walk_off_right"}
+WANDER_ENTRANCES = {"in-left": "walk_in_left", "in-right": "walk_in_right", "rise": "appear"}
+# Nine clips sharing the weight two clips used to have on their own. At 0.2 each
+# the wanders total 1.8 against fidget-stretch and fidget-look's 2.0, so a fidget
+# is still slightly more likely to be a small one than a whole trip offscreen.
+WANDER_WEIGHT = 0.2
+
+
+def wander(exit_name: str, entrance_name: str):
+    """One exit clip followed by one entrance clip -- see the block comment above."""
+    def build():
+        out = globals()[WANDER_EXITS[exit_name]]()
+        out += globals()[WANDER_ENTRANCES[entrance_name]]()
+        return out
+    return build
 
 
 # --------------------------------------------------------------------------
@@ -905,24 +1007,6 @@ def thinking_alt():
     return out
 
 
-def idle_think():
-    """
-    Idle variant: a quiet held breath with a blink, from the sprite sheet.
-
-    The thinking sheet's frames 12-16 sit between the "..." and "?" beats
-    (thinking_alt() above ends its cut at 12, the next lean starts at 17) -- a
-    small, calm hold with a blink at frame 14, the quieter beat this variant is
-    named for. At variantGroup "idle" and weight 0.3 it should read as a
-    lower-key cousin of idle_alt()'s own lean, not another thinking clip.
-    """
-    frames = _sheet_frames(THINKING_SHEET)[12:17]  # sheet frames 12-16
-    durations = [300, 300, 140, 300, 300]  # frame 14's blink is the one quick beat
-    out = [(_standing_anchor(), 70)]
-    out += list(zip(frames, durations))
-    out.append((_standing_anchor(), 70))
-    return out
-
-
 def working_alt():
     """
     Working variant: a full pass through the seated-at-a-laptop sheet.
@@ -976,7 +1060,6 @@ STATES = {
     "starting": appear,
     "idle": idle,
     "idle-alt": idle_alt,
-    "idle-think": idle_think,
     "dancing": dancing,
     "sleeping": sleeping,
     "thinking": thinking,
@@ -988,6 +1071,8 @@ STATES = {
     "done-enter": done_enter,
     "fidget-stretch": fidget_stretch,
     "fidget-look": fidget_look,
+    "stand-to-doze": stand_to_doze,
+    "doze-to-stand": doze_to_stand,
     "walk-off-left": walk_off_left,
     "walk-in-left": walk_in_left,
     "walk-off-right": walk_off_right,
@@ -995,6 +1080,14 @@ STATES = {
     "sink": sink,
     "off": off,
 }
+
+# The nine wander fidgets, added to STATES rather than written out one by one --
+# they differ only in which exit and which entrance they splice.
+STATES.update({
+    f"wander-{exit_name}-{entrance_name}": wander(exit_name, entrance_name)
+    for exit_name in WANDER_EXITS
+    for entrance_name in WANDER_ENTRANCES
+})
 
 
 # Metadata for each clip: pose, variant group, loops flag, and transition endpoints.
@@ -1018,14 +1111,6 @@ CLIP_METADATA = {
         "pose": "standing",
         "variantGroup": "idle",
         "weight": 0.4,
-    },
-    "idle-think": {
-        # A second, quieter "idle" variant, imported from the thinking sheet's
-        # own held-rest frames -- see idle_think()'s docstring.
-        "loops": True,
-        "pose": "standing",
-        "variantGroup": "idle",
-        "weight": 0.3,
     },
     "dancing": {
         # A fourth "idle" variant: appear.gif's own second half, which used to be
@@ -1098,13 +1183,25 @@ CLIP_METADATA = {
         "weight": 0.5,
     },
     "sleeping": {
-        # A `standing` loop now, not a pose of its own: the mascot sleeps on its
-        # feet. `lying` and its two edges are gone -- see sleeping()'s docstring
-        # and the catalogue.
+        # At `dozing`, its own pose: the mascot sleeps standing but the slumped
+        # shape is a resting place of its own, not a dressed-up `standing`, and
+        # stand-to-doze/doze-to-stand are the edges onto and off it.
         "loops": True,
-        "pose": "standing",
+        "pose": "dozing",
         "variantGroup": "sleeping",
         "weight": 1.0,
+    },
+    "stand-to-doze": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "dozing",
+    },
+    "doze-to-stand": {
+        # The way back. Without it `dozing` is a one-way trap: the choreographer
+        # would walk the mascot in and then have to swap out of sleep gracelessly.
+        "loops": False,
+        "fromPose": "dozing",
+        "toPose": "standing",
     },
     "walk-off-left": {
         "loops": False,
@@ -1140,6 +1237,23 @@ CLIP_METADATA = {
         "weight": 1.0,
     },
 }
+
+# Wander fidgets are standing self-edges like fidget-stretch and fidget-look, plus
+# one thing those two do not carry: a variantGroup. Fidget selection is by POSE, so
+# an untagged standing fidget can fire in any standing state -- fine for a stretch,
+# not fine for walking off the panel while `waiting` is asking the user for
+# something. `Choreographer.selectFidget` keeps a tagged fidget to its own group.
+CLIP_METADATA.update({
+    f"wander-{exit_name}-{entrance_name}": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+        "variantGroup": "idle",
+        "weight": WANDER_WEIGHT,
+    }
+    for exit_name in WANDER_EXITS
+    for entrance_name in WANDER_ENTRANCES
+})
 
 
 def pad_palette(im: Image.Image) -> Image.Image:
@@ -1257,6 +1371,11 @@ if __name__ == "__main__":
         else:
             clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
+            # Optional on a transition, and only the wander fidgets carry them:
+            # a group to scope fidget selection to, and a weight to pick within it.
+            for key in ("variantGroup", "weight"):
+                if key in CLIP_METADATA[name]:
+                    clip_entry[key] = CLIP_METADATA[name][key]
 
         clips_data[name] = clip_entry
 

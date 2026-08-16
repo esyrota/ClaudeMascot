@@ -115,7 +115,9 @@ final class AnimationLibraryTests: XCTestCase {
     let manifest = try XCTUnwrap(library.manifest)
     XCTAssertEqual(manifest.version, 1)
 
+    // 3.36s since appear.gif was split: `starting` is now the rise out of the floor
+    // alone, and the sway that used to follow it ships as the `dancing` idle variant.
     let starting = try XCTUnwrap(library.clip(id: "starting"))
-    XCTAssertEqual(starting.motion, 5.6, accuracy: 0.0001)
+    XCTAssertEqual(starting.motion, 3.36, accuracy: 0.0001)
   }
 }

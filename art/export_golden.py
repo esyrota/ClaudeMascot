@@ -23,18 +23,19 @@ ROOT = Path(__file__).resolve().parent.parent
 ANIMATIONS = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 FIXTURES = ROOT / "Tests" / "Fixtures"
 
-# Every clip the manifest ships, minus "off" -- that one is never uploaded, so there
-# are no packets to golden (see off()'s docstring in generate.py). Read from
-# clips.json rather than listed here: a hand-kept list silently drops whatever was
-# added since it was last edited, and this one had already lost "starting" that way.
-# GifPacketizerTests iterates the fixture manifest, so a clip added to the art is
-# covered by the suite the moment it appears.
-SKIP = {"off"}
-
-
+# Every clip the manifest ships, "off" included. Read from clips.json rather than
+# listed here: a hand-kept list silently drops whatever was added since it was last
+# edited, and this one had already lost "starting" that way. GifPacketizerTests
+# iterates the fixture manifest, so a clip added to the art is covered by the suite
+# the moment it appears.
+#
+# "off" is never uploaded to hardware, so goldening its packets proves nothing about
+# the protocol -- but AnimationLibraryTests builds a mock bundle out of one fixture
+# per PanelState and asserts every one of them resolves, and `.off` is a PanelState.
+# Excluding it here is what broke that test.
 def clip_names():
     manifest = json.loads((ANIMATIONS / "clips.json").read_text())["clips"]
-    return [name for name in sorted(manifest) if name not in SKIP]
+    return sorted(manifest)
 
 CHUNK_SIZE = 4096
 HEADER_SIZE = 16

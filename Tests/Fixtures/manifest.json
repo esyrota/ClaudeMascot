@@ -43,6 +43,16 @@
       377
     ]
   },
+  "doze-to-stand": {
+    "gif_bytes": 591,
+    "crc32": 2045309020,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      98
+    ]
+  },
   "fidget-look": {
     "gif_bytes": 963,
     "crc32": 2582506224,
@@ -87,15 +97,13 @@
       192
     ]
   },
-  "idle-think": {
-    "gif_bytes": 1301,
-    "crc32": 1888127872,
+  "off": {
+    "gif_bytes": 119,
+    "crc32": 3889287003,
     "outer_chunks": 1,
-    "ble_packets": 3,
+    "ble_packets": 1,
     "packet_lengths": [
-      509,
-      509,
-      299
+      135
     ]
   },
   "sink": {
@@ -109,8 +117,8 @@
     ]
   },
   "sleeping": {
-    "gif_bytes": 4004,
-    "crc32": 3833808269,
+    "gif_bytes": 3608,
+    "crc32": 3893500952,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -121,7 +129,17 @@
       509,
       509,
       509,
-      457
+      61
+    ]
+  },
+  "stand-to-doze": {
+    "gif_bytes": 591,
+    "crc32": 650835342,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      98
     ]
   },
   "starting": {
@@ -215,6 +233,126 @@
     "packet_lengths": [
       509,
       320
+    ]
+  },
+  "wander-off-left-in-left": {
+    "gif_bytes": 1507,
+    "crc32": 3830169906,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      505
+    ]
+  },
+  "wander-off-left-in-right": {
+    "gif_bytes": 1507,
+    "crc32": 3696165172,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      505
+    ]
+  },
+  "wander-off-left-rise": {
+    "gif_bytes": 4451,
+    "crc32": 2277769452,
+    "outer_chunks": 2,
+    "ble_packets": 10,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      371
+    ]
+  },
+  "wander-off-right-in-left": {
+    "gif_bytes": 1507,
+    "crc32": 648153596,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      505
+    ]
+  },
+  "wander-off-right-in-right": {
+    "gif_bytes": 1507,
+    "crc32": 514247162,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      505
+    ]
+  },
+  "wander-off-right-rise": {
+    "gif_bytes": 4451,
+    "crc32": 4054046008,
+    "outer_chunks": 2,
+    "ble_packets": 10,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      371
+    ]
+  },
+  "wander-sink-in-left": {
+    "gif_bytes": 1471,
+    "crc32": 1280625275,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      469
+    ]
+  },
+  "wander-sink-in-right": {
+    "gif_bytes": 1471,
+    "crc32": 1951402621,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      469
+    ]
+  },
+  "wander-sink-rise": {
+    "gif_bytes": 4415,
+    "crc32": 2841005198,
+    "outer_chunks": 2,
+    "ble_packets": 10,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      335
     ]
   },
   "working": {

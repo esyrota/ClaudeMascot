@@ -64,7 +64,7 @@ Subagent count (tracked via `PreToolUse` / `SubagentStop` events) feeds *intensi
 
 ## State machine choreography
 
-The mascot is a **pose graph**: nodes are poses (`standing`, `sitting`, `offLeft`, `offRight`, `offBottom`); looping animation clips live *at* a node; transition clips are *edges* between nodes. `idle`, `thinking`, `waiting`, `done` and `sleeping` all live at `standing` — the mascot sleeps on its feet — and `working` lives at `sitting` (see `PanelState.pose`). When desired state changes, the choreographer computes one edge at a time along the shortest path to the target pose, never queueing a whole route. If the target flips mid-walk, the next decision simply recomputes from where the displayed clip says the mascot is, with no plan to cancel or unwind. This is how a burst of state changes (`thinking → working → thinking → working`) coalesces to a single swap at the next boundary instead of four.
+The mascot is a **pose graph**: nodes are poses (`standing`, `sitting`, `dozing`, `offLeft`, `offRight`, `offBottom`); looping animation clips live *at* a node; transition clips are *edges* between nodes. `idle`, `thinking`, `waiting` and `done` live at `standing`; `working` lives at `sitting`; `sleeping` lives at `dozing`, where the mascot sleeps on its feet (see `PanelState.pose`). When desired state changes, the choreographer computes one edge at a time along the shortest path to the target pose, never queueing a whole route. If the target flips mid-walk, the next decision simply recomputes from where the displayed clip says the mascot is, with no plan to cancel or unwind. This is how a burst of state changes (`thinking → working → thinking → working`) coalesces to a single swap at the next boundary instead of four.
 
 ### Boundary scheduling
 
@@ -98,7 +98,7 @@ Both are always on, size-capped, and rotated; tool input is never logged, matchi
 - States: `idle`, `thinking`, `working`, `waiting`, `done`, `sleeping`, plus `starting` (the entrance) and `off` (written by `SessionEnd`, blanks the panel immediately).
 - **The entrance** plays at the three moments the mascot arrives from nothing: app launch, `SessionStart`, and a wake from a dark panel — so a prompt arriving at a black panel shows the mascot appear before it is seen thinking. It is never sat in: `PanelController` holds it for `startingHold` (the motion length of `starting.gif`, read from clips.json) and then hands off to the state actually wanted.
 - `done` is a one-shot celebration (chunk 9's `done-enter`), followed by a satisfied-idle loop, held for a minimum of **30s** before reverting to `idle`, unless another state arrives first.
-- Idle escalation becomes physical: `idle` → `sleeping` (a swap in place, both at `standing`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**; a wake walks back in from a random side. The timings come from settings: default 5m to sleeping, 10m to off.
+- Idle escalation becomes physical: `idle` → nod off (`stand-to-doze`) → `sleeping` → wake up (`doze-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**; a wake walks back in from a random side. The timings come from settings: default 5m to sleeping, 10m to off.
 - `off` short-circuits straight to panel-off, without waiting out that escalation.
 - No 15-minute quit — a resident native app is cheap, and reconnecting is the slow part. It keeps the BLE connection.
 - Reconnect automatically if the panel drops off: exponential backoff to a 30s ceiling, plus a **connect timeout**, because CoreBluetooth's own `connect` has none and will pend forever — see [[macOS Bluetooth TCC]].
@@ -163,7 +163,7 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 | `SessionTracker.swift` | Per-session state; reduces multiple sessions to one desired state by priority; reaps stale sessions |
 | `Choreographer.swift` | Pose graph walker; selects variants and fidgets deterministically from time; computes one edge at a time, never a route |
 | `PanelState.swift` | The state set, and what each one means |
-| `Pose.swift` | The pose enum: `standing`, `sitting`, `offLeft`, `offRight`, `offBottom` |
+| `Pose.swift` | The pose enum: `standing`, `sitting`, `dozing`, `offLeft`, `offRight`, `offBottom` |
 | `Clip.swift` | One animation clip: id, file, frame count, duration, motion, looping, pose, variant group, weight, transition endpoints |
 | `ClipManifest.swift` | Loads `clips.json`; resolves clip ids to `Clip` instances |
 | `EventLog.swift` | Always-on JSONL logging to `~/Library/Application Support/ClaudeMascot/logs/` |

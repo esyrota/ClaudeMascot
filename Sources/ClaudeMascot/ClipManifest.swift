@@ -21,9 +21,13 @@ struct ClipManifest: Sendable {
   subscript(id: String) -> Clip? { clips[id] }
 
   /// Loop clips in a variant group, sorted by `id` so selection is deterministic.
+  ///
+  /// `loops` is part of the filter, not an assumption: a `variantGroup` also scopes
+  /// non-looping clips (the wander fidgets carry `"idle"`), and handing one of those
+  /// back as a variant would leave a one-shot on screen where a loop belongs.
   func clips(inGroup group: String) -> [Clip] {
     clips.values
-      .filter { $0.variantGroup == group }
+      .filter { $0.loops && $0.variantGroup == group }
       .sorted { $0.id < $1.id }
   }
 

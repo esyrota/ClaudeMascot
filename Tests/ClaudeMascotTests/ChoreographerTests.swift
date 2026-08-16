@@ -38,11 +38,16 @@ private func edgeClip(_ id: String, from: Pose, to: Pose, motion: TimeInterval =
 }
 
 /// A non-looping self-edge at `pose` — the shape both `"<group>-enter"`
-/// one-shots and fidgets have (`fromPose == toPose`).
-private func selfEdgeClip(_ id: String, pose: Pose, motion: TimeInterval = 1, duration: TimeInterval = 1) -> Clip {
+/// one-shots and fidgets have (`fromPose == toPose`). `group` is nil for a
+/// fidget that suits any state at the pose, and set for one scoped to a single
+/// state the way the wander fidgets are scoped to `idle`.
+private func selfEdgeClip(
+  _ id: String, pose: Pose, group: String? = nil, motion: TimeInterval = 1,
+  duration: TimeInterval = 1
+) -> Clip {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: motion, loops: false,
-    pose: nil, variantGroup: nil, weight: 1, fromPose: pose, toPose: pose)
+    pose: nil, variantGroup: group, weight: 1, fromPose: pose, toPose: pose)
 }
 
 private func manifest(_ clips: [Clip]) -> ClipManifest {
@@ -297,4 +302,38 @@ func neverFidgetsDuringATransitionOrForOff() {
   // `.off` never fidgets, even with a matching pose and a forced-due roll.
   let offTarget = choreographer.clip(for: .off, displayed: offLoop)
   #expect(offTarget?.id != "blink")
+}
+
+@Test @MainActor
+func aGroupedFidgetOnlyFiresForItsOwnGroup() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let waiting = loopClip("waiting", pose: .standing, group: "waiting")
+  // The shape of a wander clip: a standing self-edge scoped to `idle`. It is the
+  // only fidget in the manifest, so whichever state does not get it gets no
+  // fidget at all — which is the point. Walking off the panel is fine while
+  // idling and wrong while `waiting` is asking the user for something.
+  let wander = selfEdgeClip("wander-off-left-in-right", pose: .standing, group: "idle")
+  let choreographer = Choreographer(
+    manifest: manifest([idle, waiting, wander]), clock: { clock() }, fidgetChance: 1)
+
+  #expect(choreographer.clip(for: .idle, displayed: idle)?.id == "wander-off-left-in-right")
+  #expect(choreographer.clip(for: .waiting, displayed: waiting)?.id == "waiting")
+}
+
+@Test @MainActor
+func aGroupedFidgetIsNeverPickedAsAVariant() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  // Same group as the loop above, but non-looping. Variant rotation must skip it
+  // outright — returning it would leave a one-shot on screen where a loop belongs,
+  // and the panel would hold its last frame forever.
+  let wander = selfEdgeClip("wander-sink-rise", pose: .standing, group: "idle")
+  let choreographer = Choreographer(
+    manifest: manifest([idle, wander]), clock: { clock() }, fidgetChance: 0)
+
+  for _ in 0..<8 {
+    #expect(choreographer.clip(for: .idle, displayed: idle)?.id == "idle")
+    clock.advance(30)
+  }
 }

@@ -30,6 +30,15 @@
       "fromPose": "standing",
       "toPose": "standing"
     },
+    "doze-to-stand": {
+      "file": "doze-to-stand.gif",
+      "frameCount": 3,
+      "durationMs": 3900,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "dozing",
+      "toPose": "standing"
+    },
     "fidget-look": {
       "file": "fidget-look.gif",
       "frameCount": 5,
@@ -68,16 +77,6 @@
       "variantGroup": "idle",
       "weight": 0.4
     },
-    "idle-think": {
-      "file": "idle-think.gif",
-      "frameCount": 7,
-      "durationMs": 1480,
-      "motionMs": 1480,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "idle",
-      "weight": 0.3
-    },
     "off": {
       "file": "off.gif",
       "frameCount": 1,
@@ -99,13 +98,22 @@
     },
     "sleeping": {
       "file": "sleeping.gif",
-      "frameCount": 20,
-      "durationMs": 9140,
-      "motionMs": 9140,
+      "frameCount": 18,
+      "durationMs": 9000,
+      "motionMs": 9000,
       "loops": true,
-      "pose": "standing",
+      "pose": "dozing",
       "variantGroup": "sleeping",
       "weight": 1.0
+    },
+    "stand-to-doze": {
+      "file": "stand-to-doze.gif",
+      "frameCount": 3,
+      "durationMs": 3900,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "dozing"
     },
     "starting": {
       "file": "starting.gif",
@@ -181,6 +189,105 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "offRight"
+    },
+    "wander-off-left-in-left": {
+      "file": "wander-off-left-in-left.gif",
+      "frameCount": 9,
+      "durationMs": 6400,
+      "motionMs": 3900,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-off-left-in-right": {
+      "file": "wander-off-left-in-right.gif",
+      "frameCount": 9,
+      "durationMs": 6400,
+      "motionMs": 3900,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-off-left-rise": {
+      "file": "wander-off-left-rise.gif",
+      "frameCount": 24,
+      "durationMs": 9060,
+      "motionMs": 6560,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-off-right-in-left": {
+      "file": "wander-off-right-in-left.gif",
+      "frameCount": 9,
+      "durationMs": 6400,
+      "motionMs": 3900,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-off-right-in-right": {
+      "file": "wander-off-right-in-right.gif",
+      "frameCount": 9,
+      "durationMs": 6400,
+      "motionMs": 3900,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-off-right-rise": {
+      "file": "wander-off-right-rise.gif",
+      "frameCount": 24,
+      "durationMs": 9060,
+      "motionMs": 6560,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-sink-in-left": {
+      "file": "wander-sink-in-left.gif",
+      "frameCount": 9,
+      "durationMs": 6400,
+      "motionMs": 3900,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-sink-in-right": {
+      "file": "wander-sink-in-right.gif",
+      "frameCount": 9,
+      "durationMs": 6400,
+      "motionMs": 3900,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
+    },
+    "wander-sink-rise": {
+      "file": "wander-sink-rise.gif",
+      "frameCount": 24,
+      "durationMs": 9060,
+      "motionMs": 6560,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.2
     },
     "working": {
       "file": "working.gif",

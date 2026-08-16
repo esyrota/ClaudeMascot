@@ -220,11 +220,21 @@ final class Choreographer {
   /// A fidget clip at `pose` — a non-looping clip that starts and ends at
   /// the same pose, distinguishing it from a real transition (which moves
   /// between two different poses) and from the group's own one-shot
-  /// entrance (excluded by id). `nil` until chunks 8-9 author any.
+  /// entrance (excluded by id).
+  ///
+  /// A fidget with no `variantGroup` fits any state at this pose — that is what
+  /// `fidget-stretch` and `fidget-look` are, small motion that suits standing
+  /// whatever the mascot is standing there for. One that declares a group is
+  /// kept to it: the wander fidgets walk the mascot off the panel entirely, which
+  /// is charming during `idle` and alarming during `waiting`, where the whole
+  /// point of the clip on screen is that Claude needs the user.
   private func selectFidget(group: String, pose: Pose, now: TimeInterval) -> Clip? {
     let candidates =
       manifest.clips.values
-      .filter { !$0.loops && $0.fromPose == pose && $0.toPose == pose && $0.id != "\(group)-enter" }
+      .filter {
+        !$0.loops && $0.fromPose == pose && $0.toPose == pose && $0.id != "\(group)-enter"
+          && ($0.variantGroup == nil || $0.variantGroup == group)
+      }
       .sorted { $0.id < $1.id }
     guard !candidates.isEmpty else { return nil }
     let epoch = Int(now / rotationPeriod)
