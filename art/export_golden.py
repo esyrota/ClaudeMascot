@@ -23,7 +23,9 @@ ROOT = Path(__file__).resolve().parent.parent
 ANIMATIONS = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 FIXTURES = ROOT / "Tests" / "Fixtures"
 
-STATES = ["idle", "sleeping", "thinking", "working", "waiting", "done"]
+STATES = ["idle", "sleeping", "thinking", "working", "waiting", "done",
+          "stand-to-lie", "lie-to-stand", "walk-off-left", "walk-in-left",
+          "walk-off-right", "walk-in-right", "sink"]
 
 CHUNK_SIZE = 4096
 HEADER_SIZE = 16

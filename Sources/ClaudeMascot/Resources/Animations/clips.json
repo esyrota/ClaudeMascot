@@ -21,6 +21,15 @@
       "variantGroup": "idle",
       "weight": 1.0
     },
+    "lie-to-stand": {
+      "file": "lie-to-stand.gif",
+      "frameCount": 6,
+      "durationMs": 3200,
+      "motionMs": 700,
+      "loops": false,
+      "fromPose": "lying",
+      "toPose": "standing"
+    },
     "off": {
       "file": "off.gif",
       "frameCount": 1,
@@ -31,6 +40,15 @@
       "variantGroup": "off",
       "weight": 1.0
     },
+    "sink": {
+      "file": "sink.gif",
+      "frameCount": 5,
+      "durationMs": 3200,
+      "motionMs": 560,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "offBottom"
+    },
     "sleeping": {
       "file": "sleeping.gif",
       "frameCount": 8,
@@ -40,6 +58,15 @@
       "pose": "lying",
       "variantGroup": "sleeping",
       "weight": 1.0
+    },
+    "stand-to-lie": {
+      "file": "stand-to-lie.gif",
+      "frameCount": 6,
+      "durationMs": 3200,
+      "motionMs": 700,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "lying"
     },
     "starting": {
       "file": "starting.gif",
@@ -69,6 +96,42 @@
       "pose": "standing",
       "variantGroup": "waiting",
       "weight": 1.0
+    },
+    "walk-in-left": {
+      "file": "walk-in-left.gif",
+      "frameCount": 5,
+      "durationMs": 3200,
+      "motionMs": 700,
+      "loops": false,
+      "fromPose": "offLeft",
+      "toPose": "standing"
+    },
+    "walk-in-right": {
+      "file": "walk-in-right.gif",
+      "frameCount": 5,
+      "durationMs": 3200,
+      "motionMs": 700,
+      "loops": false,
+      "fromPose": "offRight",
+      "toPose": "standing"
+    },
+    "walk-off-left": {
+      "file": "walk-off-left.gif",
+      "frameCount": 5,
+      "durationMs": 3200,
+      "motionMs": 560,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "offLeft"
+    },
+    "walk-off-right": {
+      "file": "walk-off-right.gif",
+      "frameCount": 5,
+      "durationMs": 3200,
+      "motionMs": 560,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "offRight"
     },
     "working": {
       "file": "working.gif",

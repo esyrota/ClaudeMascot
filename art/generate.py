@@ -97,6 +97,20 @@ HOME_Y = 16
 # lifts an arm clamps to it; expression comes from the props instead of a bigger reach.
 MAX_ARM_LIFT = -ARM_TOP
 
+# `lying` geometry. The standing figure is a 24w x16h footprint (TORSO_X-ARM_W to
+# TORSO_X+TORSO_W+ARM_W, HOME_Y to HOME_Y+LEG_TOP+LEG_H); lying keeps the same
+# creature at a lower profile. The legs merge into the body instead of hanging
+# separately below it -- that merge, not just the horizontal posture, is what stops
+# it reading as "hovering asleep" -- and a shallow raised hump at one end reads as
+# the head.
+LYING_BODY_W, LYING_BODY_H = 20, 6
+LYING_BODY_X = (SIZE - LYING_BODY_W) // 2
+LYING_HEAD_W, LYING_HEAD_H = 8, 3
+LYING_HEAD_X = LYING_BODY_X + 2
+LYING_HEAD_Y = SIZE - LYING_BODY_H - LYING_HEAD_H
+LYING_EYE_XS = (LYING_HEAD_X + 1, LYING_HEAD_X + 4)
+LYING_EYE_Y = LYING_HEAD_Y + 1
+
 
 def frame() -> Image.Image:
     return Image.new("RGB", (SIZE, SIZE), BG)
@@ -149,6 +163,45 @@ def mascot(
             rect(d, ex + dx, ey + EYE_H // 2, EYE_W, 1, EYE)
         else:
             rect(d, ex + dx, ey, EYE_W, EYE_H, EYE)
+
+
+def lying_pose(d, *, pulse: int = 0) -> None:
+    """
+    Draw the mascot resting flat on the floor -- the `lying` anchor.
+
+    Legs merge into the body instead of hanging separately below it the way they do
+    standing; that merge is what stops it reading as "hovering asleep". Called with
+    pulse=0 (the default) this is the exact pose sleeping()'s first/last frame and
+    the stand<->lie transition clips below must all land on -- the anchor-pose
+    contract in Task.md. `pulse` grows the body a pixel at a time from the floor up
+    and out to either side, so breathing reads as a chest swelling rather than the
+    standing idle's vertical bob -- a lying creature does not hop.
+    """
+    body_h = LYING_BODY_H + pulse
+    body_w = LYING_BODY_W + pulse * 2
+    rect(d, LYING_BODY_X - pulse, SIZE - body_h, body_w, body_h, MASCOT)
+    rect(d, LYING_HEAD_X, LYING_HEAD_Y, LYING_HEAD_W, LYING_HEAD_H, MASCOT)
+    for ex in LYING_EYE_XS:
+        rect(d, ex, LYING_EYE_Y, EYE_W, 1, EYE)
+
+
+def mascot_at(ox: int = 0, oy: int = 0, **kwargs) -> Image.Image:
+    """
+    Draw the mascot at an arbitrary offset from its home origin.
+
+    mascot()'s own `dx` is documented safe only to +/-4 -- past that the figure
+    starts leaving the panel, which is exactly what walking fully off-panel needs,
+    but silently passing it a huge dx would be exceeding a documented contract
+    rather than working within one. So the walk/sink transitions below draw the
+    ordinary on-panel figure once, then paste it at whatever offset the step
+    needs; Image.paste clips to the destination canvas the same way rect() clips
+    to it, so this is safe at any offset, including fully off-panel in either axis.
+    """
+    scratch = frame()
+    mascot(ImageDraw.Draw(scratch), **kwargs)
+    canvas = frame()
+    canvas.paste(scratch, (ox, oy))
+    return canvas
 
 
 # --------------------------------------------------------------------------
@@ -232,27 +285,153 @@ def done():
 
 
 def sleeping():
-    """Dozed off: eyes shut, slow deep breathing, Zs drifting up."""
+    """Dozed off on the floor: eyes shut, slow deep breathing, Zs drifting up."""
     out = []
-    # (bob, z phase) -- deliberately slow so it reads as asleep, not idle.
+    # (pulse, z phase) -- deliberately slow so it reads as asleep, not idle.
     poses = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 2), (1, 2), (1, 3), (0, 3)]
-    for bob, phase in poses:
+    last = len(poses) - 1
+    for i, (pulse, phase) in enumerate(poses):
         im = frame()
         d = ImageDraw.Draw(im)
-        # Eyes shut: a single closed lid line instead of the open eye.
-        mascot(d, HOME_Y - bob, blink=True, legs=(1, 0, 0, 1))
-        # Two Zs rising and fading out of the top-right.
-        for i in (0, 1):
-            step = (phase + i * 2) % 4
-            zx = 22 + step
-            zy = 13 - step * 4
-            if zy < 0:
-                continue
-            size = 3 if i == 0 else 2
-            rect(d, zx, zy, size, 1, PROP)                  # top bar
-            rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
-            rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
+        lying_pose(d, pulse=pulse)
+        # Frame 0 and the last frame are the bare lying_pose() anchor (no Zs), so
+        # this loop starts and ends on the pixel-identical `lying` anchor the
+        # transition clips below also draw -- the same contract idle()'s own frame
+        # 0/last already satisfy for `standing`.
+        if i not in (0, last):
+            # Two Zs rising and fading out of the top-right.
+            for j in (0, 1):
+                step = (phase + j * 2) % 4
+                zx = 22 + step
+                zy = 18 - step * 7
+                if zy < 0:
+                    continue
+                size = 3 if j == 0 else 2
+                rect(d, zx, zy, size, 1, PROP)                  # top bar
+                rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
+                rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
         out.append((im, 600))
+    return out
+
+
+# --------------------------------------------------------------------------
+# Transition clips -- the pose graph's edges. Drawn procedurally, like the states
+# above, because that is what lands them exactly on the anchor frame; see
+# "Edge art is procedural, loop art is imported" in Task.md. Each ends on a long
+# dwell frame, same as appear()'s APPEAR_TAIL_MS below: the panel loops whatever it
+# holds, so the dwell is what makes a hand-off during it look like a still mascot
+# rather than a restarted clip.
+#
+# stand<->sit is deliberately not here -- see the chunk brief's scope note. The
+# sitting anchor comes from imported, hand-drawn art (`sweep()`) that a later chunk
+# replaces; matching it procedurally now would be building against art about to
+# change. The choreographer's graceful degradation (direct swap when no edge
+# exists) covers stand<->sit until then.
+# --------------------------------------------------------------------------
+
+def stand_to_lie():
+    """Transition: settles from standing down onto the floor to sleep."""
+    out = []
+    # mascot() and lying_pose() don't share a parameter space to morph between, so
+    # the settle eases the standing figure down through a crouch and cuts to the
+    # lying blob for the last couple of frames -- the same keyframe-then-cut
+    # approach done()'s stomp uses.
+    crouch = [(0, (0, 0, 0, 0), False), (1, (1, 1, 1, 1), True),
+              (3, (2, 2, 2, 2), True), (4, (3, 3, 3, 3), True)]
+    for squash, legs, blink in crouch:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, legs=legs, squash=squash, blink=blink)
+        out.append((im, 140))
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d, pulse=1)
+    out.append((im, 140))
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d)
+    out.append((im, APPEAR_TAIL_MS))  # long dwell -- the lying anchor
+    return out
+
+
+def lie_to_stand():
+    """Transition: pushes back up from lying to standing."""
+    out = []
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d)
+    out.append((im, 140))
+    im = frame()
+    d = ImageDraw.Draw(im)
+    lying_pose(d, pulse=1)
+    out.append((im, 140))
+    rise = [(3, (3, 3, 3, 3), True), (4, (2, 2, 2, 2), True),
+            (2, (1, 1, 1, 1), True), (0, (0, 0, 0, 0), False)]
+    for squash, legs, blink in rise:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, legs=legs, squash=squash, blink=blink)
+        out.append((im, 140))
+    last_im, _ = out[-1]
+    out[-1] = (last_im, APPEAR_TAIL_MS)  # long dwell -- the standing anchor
+    return out
+
+
+def walk_off_left():
+    """Transition: walks out of frame to the left."""
+    out = []
+    # ox carries the mascot's origin left of the panel via mascot_at() -- well
+    # past the +/-4 mascot()'s own dx documents as safe -- while legs alternate
+    # through mascot()'s per-leg shortening for the stride.
+    steps = [(0, (0, 0, 0, 0)), (-7, (2, 0, 0, 2)), (-14, (0, 0, 0, 0)),
+             (-21, (0, 2, 2, 0)), (-28, (0, 0, 0, 0))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((frame(), APPEAR_TAIL_MS))  # clear of the panel -- the offLeft anchor
+    return out
+
+
+def walk_in_left():
+    """Transition: walks in from the left to home."""
+    out = [(frame(), 140)]  # starts fully offscreen -- the offLeft anchor
+    steps = [(-28, (0, 0, 0, 0)), (-21, (0, 2, 2, 0)), (-14, (0, 0, 0, 0)),
+             (-7, (2, 0, 0, 2))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((mascot_at(0, 0, by=HOME_Y), APPEAR_TAIL_MS))  # long dwell -- standing anchor
+    return out
+
+
+def walk_off_right():
+    """Transition: walks out to the right."""
+    out = []
+    steps = [(0, (0, 0, 0, 0)), (7, (0, 2, 2, 0)), (14, (0, 0, 0, 0)),
+             (21, (2, 0, 0, 2)), (28, (0, 0, 0, 0))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((frame(), APPEAR_TAIL_MS))  # clear of the panel -- the offRight anchor
+    return out
+
+
+def walk_in_right():
+    """Transition: walks in from the right."""
+    out = [(frame(), 140)]  # starts fully offscreen -- the offRight anchor
+    steps = [(28, (0, 0, 0, 0)), (21, (2, 0, 0, 2)), (14, (0, 0, 0, 0)),
+             (7, (0, 2, 2, 0))]
+    for ox, legs in steps:
+        out.append((mascot_at(ox, 0, by=HOME_Y, legs=legs), 140))
+    out.append((mascot_at(0, 0, by=HOME_Y), APPEAR_TAIL_MS))  # long dwell -- standing anchor
+    return out
+
+
+def sink():
+    """Transition: standing drops straight down and out through the floor."""
+    out = []
+    # oy carries the mascot below its own drawn canvas, the same paste offset
+    # mascot_at() uses horizontally for the walks above.
+    for oy in (0, 4, 9, 14, 19):
+        out.append((mascot_at(0, oy, by=HOME_Y), 140))
+    out.append((frame(), APPEAR_TAIL_MS))  # below the panel -- the offBottom anchor
     return out
 
 
@@ -457,6 +636,13 @@ STATES = {
     "working": sweep,
     "waiting": waiting,
     "done": done,
+    "stand-to-lie": stand_to_lie,
+    "lie-to-stand": lie_to_stand,
+    "walk-off-left": walk_off_left,
+    "walk-in-left": walk_in_left,
+    "walk-off-right": walk_off_right,
+    "walk-in-right": walk_in_right,
+    "sink": sink,
     "off": off,
 }
 
@@ -500,12 +686,45 @@ CLIP_METADATA = {
         "weight": 1.0,
     },
     "sleeping": {
-        # Declared as lying even though current art draws it standing.
-        # Chunk 8 will redraw sleeping() to actually lie down.
         "loops": True,
         "pose": "lying",
         "variantGroup": "sleeping",
         "weight": 1.0,
+    },
+    "stand-to-lie": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "lying",
+    },
+    "lie-to-stand": {
+        "loops": False,
+        "fromPose": "lying",
+        "toPose": "standing",
+    },
+    "walk-off-left": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "offLeft",
+    },
+    "walk-in-left": {
+        "loops": False,
+        "fromPose": "offLeft",
+        "toPose": "standing",
+    },
+    "walk-off-right": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "offRight",
+    },
+    "walk-in-right": {
+        "loops": False,
+        "fromPose": "offRight",
+        "toPose": "standing",
+    },
+    "sink": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "offBottom",
     },
     "off": {
         # Fallback asset never uploaded to hardware (see off()'s docstring).
@@ -541,6 +760,12 @@ def pad_palette(im: Image.Image) -> Image.Image:
         px[x, y] = (MASCOT[0], MASCOT[1], min(255, MASCOT[2] + bump))
         bump += 1
     return im
+
+
+def body_pixel_count(im: Image.Image) -> int:
+    """Count of pixels still holding the raw MASCOT colour -- pad_palette's budget."""
+    px = im.load()
+    return sum(1 for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT)
 
 
 def save(name: str, frames) -> Path:
@@ -627,9 +852,25 @@ if __name__ == "__main__":
             print(f"{path.name:14s} {frame_count} frames  (fallback asset, palette check skipped)")
             continue
 
-        n = min(len(pad_palette(im).getcolors(maxcolors=1 << 20)) for im, _ in frames)
+        # The walk/sink transitions end (or start) with the mascot partly or fully
+        # off-panel by design -- that is the offLeft/offRight/offBottom anchor, not
+        # a bug. A frame with fewer than MIN_COLORS raw MASCOT pixels on it cannot
+        # reach MIN_COLORS distinct colours even with pad_palette's full nudge
+        # budget (it only has those pixels to nudge), so such frames are exempt
+        # from the check the same way off() is exempt entirely -- same reasoning,
+        # just applied per frame instead of per clip.
+        dense = [im for im, _ in frames if body_pixel_count(im) >= MIN_COLORS]
+        if not dense:
+            print(f"{path.name:14s} {frame_count} frames  "
+                  f"(all frames legitimately sparse, palette check skipped)")
+            continue
+
+        n = min(len(pad_palette(im).getcolors(maxcolors=1 << 20)) for im in dense)
         assert n >= MIN_COLORS, f"{name}: only {n} colors, need >= {MIN_COLORS}"
-        print(f"{path.name:14s} {frame_count} frames  {n:2d} colors  {path.stat().st_size:5d} bytes")
+        skipped = len(frames) - len(dense)
+        suffix = f"  ({skipped} sparse frame(s) skipped)" if skipped else ""
+        print(f"{path.name:14s} {frame_count} frames  {n:2d} colors  "
+              f"{path.stat().st_size:5d} bytes{suffix}")
 
     # Write clips.json with sorted keys for stable diffs.
     manifest = {

@@ -11,15 +11,14 @@
     ]
   },
   "sleeping": {
-    "gif_bytes": 1585,
-    "crc32": 491249604,
+    "gif_bytes": 1374,
+    "crc32": 2680603367,
     "outer_chunks": 1,
-    "ble_packets": 4,
+    "ble_packets": 3,
     "packet_lengths": [
       509,
       509,
-      509,
-      74
+      372
     ]
   },
   "thinking": {
@@ -79,6 +78,78 @@
       509,
       509,
       144
+    ]
+  },
+  "stand-to-lie": {
+    "gif_bytes": 1064,
+    "crc32": 3944405394,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      62
+    ]
+  },
+  "lie-to-stand": {
+    "gif_bytes": 1063,
+    "crc32": 3588914083,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      61
+    ]
+  },
+  "walk-off-left": {
+    "gif_bytes": 813,
+    "crc32": 1576751028,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "walk-in-left": {
+    "gif_bytes": 813,
+    "crc32": 2195636767,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "walk-off-right": {
+    "gif_bytes": 813,
+    "crc32": 2543213075,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "walk-in-right": {
+    "gif_bytes": 813,
+    "crc32": 3134849561,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      320
+    ]
+  },
+  "sink": {
+    "gif_bytes": 777,
+    "crc32": 907374700,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      284
     ]
   }
 }
