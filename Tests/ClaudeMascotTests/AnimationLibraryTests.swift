@@ -67,6 +67,7 @@ final class AnimationLibraryTests: XCTestCase {
         loops: true,
         pose: nil,
         variantGroup: nil,
+        fidgetGroup: nil,
         weight: 1,
         fromPose: nil,
         toPose: nil
@@ -90,7 +91,7 @@ final class AnimationLibraryTests: XCTestCase {
 
     let clip = Clip(
       id: "idle", file: "idle.gif", frameCount: 1, duration: 1, motion: 1, loops: true,
-      pose: nil, variantGroup: nil, weight: 1, fromPose: nil, toPose: nil)
+      pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: nil, toPose: nil)
 
     XCTAssertThrowsError(try library.data(for: clip)) { error in
       guard case AnimationLibraryError.clipNotFound("idle") = error else {

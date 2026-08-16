@@ -198,7 +198,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-off-left-in-right": {
@@ -209,7 +209,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-off-left-rise": {
@@ -220,7 +220,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-off-right-in-left": {
@@ -231,7 +231,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-off-right-in-right": {
@@ -242,7 +242,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-off-right-rise": {
@@ -253,7 +253,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-sink-in-left": {
@@ -264,7 +264,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-sink-in-right": {
@@ -275,7 +275,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "wander-sink-rise": {
@@ -286,7 +286,7 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "standing",
-      "variantGroup": "idle",
+      "fidgetGroup": "idle",
       "weight": 0.2
     },
     "working": {

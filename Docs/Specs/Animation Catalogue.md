@@ -173,8 +173,11 @@ other one. Nothing is on screen in between to contradict either.
 **These are the one kind of fidget that is scoped to a state.** Fidget selection is by
 *pose*, so an untagged standing fidget fires in every standing state — fine for a stretch,
 wrong for walking off the panel while `waiting` is asking the user for something. So each
-wander carries `variantGroup: "idle"`, and `Choreographer.selectFidget` keeps a tagged
-fidget to its own group. At weight 0.2 each they total 1.8 against `fidget-stretch` and
+wander carries `fidgetGroup: "idle"`, and `Choreographer.selectFidget` keeps a tagged
+fidget to its own group. `fidgetGroup` is deliberately its own field rather than a reuse
+of `variantGroup`: both would read as "which group is this in", but one says which pool a
+*loop* rotates within and the other which state a *one-shot* may fire for, and a single
+field answering both could only be read by first checking `loops`. At weight 0.2 each they total 1.8 against `fidget-stretch` and
 `fidget-look`'s 2.0, so a fidget is still slightly more likely to be a small one than a
 whole trip offscreen.
 
@@ -250,10 +253,6 @@ stall.
    existence. Every other `standing` clip now checks out. The fix is the same bookending
    `idle-think` and `dancing` use: an anchor frame at each end, with the prop entering on
    the frame after it.
-7. **The wander fidgets are the only clips scoped to a state.** `variantGroup` on a
-   non-looping clip is a second meaning for one field — a variant pool for loops, a fidget
-   scope for one-shots — and it is only documented here and in `selectFidget`. A
-   `fidgetGroup` of its own would say what it means.
 8. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
    diagonal stroke has zero height, so the smaller one degenerates into a square. It has
    always been that way — it reads as distance rather than as a letter, which is

@@ -25,7 +25,7 @@ private func loopClip(_ id: String, pose: Pose, group: String, weight: Double = 
 {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: duration, loops: true,
-    pose: pose, variantGroup: group, weight: weight, fromPose: nil, toPose: nil)
+    pose: pose, variantGroup: group, fidgetGroup: nil, weight: weight, fromPose: nil, toPose: nil)
 }
 
 /// A non-looping transition edge between two different poses.
@@ -34,20 +34,21 @@ private func edgeClip(_ id: String, from: Pose, to: Pose, motion: TimeInterval =
 {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: motion, loops: false,
-    pose: nil, variantGroup: nil, weight: 1, fromPose: from, toPose: to)
+    pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: from, toPose: to)
 }
 
 /// A non-looping self-edge at `pose` — the shape both `"<group>-enter"`
-/// one-shots and fidgets have (`fromPose == toPose`). `group` is nil for a
+/// one-shots and fidgets have (`fromPose == toPose`). `fidgetGroup` is nil for a
 /// fidget that suits any state at the pose, and set for one scoped to a single
 /// state the way the wander fidgets are scoped to `idle`.
 private func selfEdgeClip(
-  _ id: String, pose: Pose, group: String? = nil, motion: TimeInterval = 1,
-  duration: TimeInterval = 1
+  _ id: String, pose: Pose, fidgetGroup: String? = nil, variantGroup: String? = nil,
+  motion: TimeInterval = 1, duration: TimeInterval = 1
 ) -> Clip {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: motion, loops: false,
-    pose: nil, variantGroup: group, weight: 1, fromPose: pose, toPose: pose)
+    pose: nil, variantGroup: variantGroup, fidgetGroup: fidgetGroup, weight: 1,
+    fromPose: pose, toPose: pose)
 }
 
 private func manifest(_ clips: [Clip]) -> ClipManifest {
@@ -313,7 +314,7 @@ func aGroupedFidgetOnlyFiresForItsOwnGroup() {
   // only fidget in the manifest, so whichever state does not get it gets no
   // fidget at all — which is the point. Walking off the panel is fine while
   // idling and wrong while `waiting` is asking the user for something.
-  let wander = selfEdgeClip("wander-off-left-in-right", pose: .standing, group: "idle")
+  let wander = selfEdgeClip("wander-off-left-in-right", pose: .standing, fidgetGroup: "idle")
   let choreographer = Choreographer(
     manifest: manifest([idle, waiting, wander]), clock: { clock() }, fidgetChance: 1)
 
@@ -325,10 +326,12 @@ func aGroupedFidgetOnlyFiresForItsOwnGroup() {
 func aGroupedFidgetIsNeverPickedAsAVariant() {
   let clock = FakeClock()
   let idle = loopClip("idle", pose: .standing, group: "idle")
-  // Same group as the loop above, but non-looping. Variant rotation must skip it
-  // outright — returning it would leave a one-shot on screen where a loop belongs,
-  // and the panel would hold its last frame forever.
-  let wander = selfEdgeClip("wander-sink-rise", pose: .standing, group: "idle")
+  // A non-looping clip that declares a variantGroup. Nothing in the shipped
+  // manifest does this — fidget scoping is its own field — but `clips(inGroup:)`
+  // has to make it impossible rather than merely unused: returning a one-shot as
+  // a variant would leave it on screen and the panel would hold its last frame
+  // forever.
+  let wander = selfEdgeClip("wander-sink-rise", pose: .standing, variantGroup: "idle")
   let choreographer = Choreographer(
     manifest: manifest([idle, wander]), clock: { clock() }, fidgetChance: 0)
 

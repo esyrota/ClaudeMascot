@@ -22,9 +22,11 @@ struct ClipManifest: Sendable {
 
   /// Loop clips in a variant group, sorted by `id` so selection is deterministic.
   ///
-  /// `loops` is part of the filter, not an assumption: a `variantGroup` also scopes
-  /// non-looping clips (the wander fidgets carry `"idle"`), and handing one of those
-  /// back as a variant would leave a one-shot on screen where a loop belongs.
+  /// `loops` is part of the filter, not an assumption. Nothing in the manifest
+  /// declares a `variantGroup` on a one-shot today — fidget scoping is its own
+  /// field — but handing a non-looping clip back as a variant would leave a
+  /// one-shot on screen where a loop belongs, and the panel would hold its last
+  /// frame forever. Cheap to make impossible rather than merely untrue.
   func clips(inGroup group: String) -> [Clip] {
     clips.values
       .filter { $0.loops && $0.variantGroup == group }
@@ -56,6 +58,7 @@ private struct ClipDTO: Decodable {
   let loops: Bool
   let pose: Pose?
   let variantGroup: String?
+  let fidgetGroup: String?
   let weight: Double?
   let fromPose: Pose?
   let toPose: Pose?
@@ -70,6 +73,7 @@ private struct ClipDTO: Decodable {
       loops: loops,
       pose: pose,
       variantGroup: variantGroup,
+      fidgetGroup: fidgetGroup,
       weight: weight ?? 1.0,
       fromPose: fromPose,
       toPose: toPose

@@ -222,7 +222,7 @@ final class Choreographer {
   /// between two different poses) and from the group's own one-shot
   /// entrance (excluded by id).
   ///
-  /// A fidget with no `variantGroup` fits any state at this pose — that is what
+  /// A fidget with no `fidgetGroup` fits any state at this pose — that is what
   /// `fidget-stretch` and `fidget-look` are, small motion that suits standing
   /// whatever the mascot is standing there for. One that declares a group is
   /// kept to it: the wander fidgets walk the mascot off the panel entirely, which
@@ -233,7 +233,7 @@ final class Choreographer {
       manifest.clips.values
       .filter {
         !$0.loops && $0.fromPose == pose && $0.toPose == pose && $0.id != "\(group)-enter"
-          && ($0.variantGroup == nil || $0.variantGroup == group)
+          && ($0.fidgetGroup == nil || $0.fidgetGroup == group)
       }
       .sorted { $0.id < $1.id }
     guard !candidates.isEmpty else { return nil }

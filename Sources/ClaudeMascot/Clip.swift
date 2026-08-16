@@ -12,8 +12,13 @@ struct Clip: Sendable, Equatable, Identifiable {
   let motion: TimeInterval  // SECONDS; == duration for looping clips
   let loops: Bool
   let pose: Pose?  // loop clips only
-  let variantGroup: String?  // loop clips only
-  let weight: Double  // loop clips only; 1.0 when absent
+  let variantGroup: String?  // loop clips only: the rotation pool this belongs to
+  /// Non-looping self-edges only: the one state this fidget suits, or `nil` for
+  /// one that suits any state at its pose. `fidget-stretch` and `fidget-look`
+  /// leave it nil; the wander clips set `"idle"`, because walking off the panel
+  /// is charming while idling and wrong while `waiting` needs the user.
+  let fidgetGroup: String?
+  let weight: Double  // 1.0 when absent
   let fromPose: Pose?  // transition clips only
   let toPose: Pose?  // transition clips only
 }

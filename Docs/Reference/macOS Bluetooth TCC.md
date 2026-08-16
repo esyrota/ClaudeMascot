@@ -75,8 +75,34 @@ log stream --predicate 'subsystem == "com.eugene.claudemascot"' --info
 
 **No `ble` category output at all** — not even `off -> scanning` — means
 `centralManagerDidUpdateState` never fired, which normally takes milliseconds. That is
-the signature of the permission grant not applying (a re-signed bundle gets a new
-identity, and ad-hoc signing re-signs on every build), *not* of a missing panel.
+the signature of the permission grant not applying, *not* of a missing panel.
+
+## The grant must be re-earned on every build — unless the signature is stable
+
+macOS records a TCC grant against the bundle's **designated requirement**, and how that
+requirement is written depends entirely on how the bundle was signed:
+
+```
+ad-hoc  (codesign --sign -)          designated => cdhash H"d11d4b58a0…"
+identity (codesign --sign "Apple…")  designated => identifier "com.eugene.claudemascot"
+                                                   and anchor apple generic
+                                                   and certificate leaf[subject.CN] = "…"
+```
+
+The cdhash is a hash of the binary, so **every rebuild produces a different one** and
+macOS sees a different app: the Bluetooth prompt comes back, and until it is answered
+`centralManagerDidUpdateState` never fires. The certificate form names the bundle id and
+the signing leaf, neither of which the build changes, so the grant carries over.
+
+`make-app.sh` therefore signs with the first codesigning identity in the keychain
+(override with `CODESIGN_IDENTITY`), falling back to ad-hoc with a loud warning. Any
+identity works — an Apple Development certificate, or a self-signed one from Keychain
+Access ▸ Certificate Assistant ▸ Create a Certificate, type "Code Signing". Nothing here
+needs Apple's notarisation or a paid account; the certificate is only a stable name to
+hang the grant on.
+
+Switching signing identity is itself an identity change, so expect the prompt **once**
+more on the first build after the switch, then not again.
 
 ## Testing note
 

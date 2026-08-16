@@ -83,9 +83,35 @@ if [ ! -x "$APP_RESOURCES/ClaudeCodePlugin/plugin/hooks/relay.sh" ]; then
 fi
 echo "  plugin payload bundled"
 
-# Ad-hoc sign the app
+# Sign the app with a STABLE identity if one exists.
+#
+# This is a Bluetooth requirement, not a distribution one. macOS records the TCC
+# grant against the bundle's designated requirement. Signed with a certificate,
+# that requirement is "this bundle id, signed by this leaf" -- identical on every
+# rebuild, so the grant survives. Ad-hoc signing (`--sign -`) has no certificate to
+# name, so the requirement falls back to the *cdhash* of the binary, which changes
+# on every build: macOS then sees each build as a different app and asks for
+# Bluetooth permission again, every time. That is exactly the symptom
+# `Docs/Reference/macOS Bluetooth TCC.md` describes.
+#
+# Any codesigning identity in the keychain does the job -- an Apple Development
+# certificate, or a self-signed one from Keychain Access > Certificate Assistant.
+# Set CODESIGN_IDENTITY to pick a specific one; otherwise the first is used.
 echo "Code signing..."
-codesign --force --deep --sign - "$APP_BUNDLE"
+if [ -z "${CODESIGN_IDENTITY:-}" ]; then
+  CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+    | sed -n 's/.*) [0-9A-F]* "\(.*\)"$/\1/p' | head -n 1)
+fi
+
+if [ -n "$CODESIGN_IDENTITY" ]; then
+  echo "  identity: $CODESIGN_IDENTITY"
+  codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
+else
+  echo "  WARNING: no codesigning identity found -- falling back to ad-hoc." >&2
+  echo "  macOS will re-prompt for Bluetooth on EVERY rebuild. Create a" >&2
+  echo "  self-signed code-signing certificate in Keychain Access to stop that." >&2
+  codesign --force --deep --sign - "$APP_BUNDLE"
+fi
 
 # Print the final app path
 FINAL_PATH="$(pwd)/$APP_BUNDLE"

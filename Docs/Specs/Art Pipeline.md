@@ -44,7 +44,7 @@ own override folder, is `AnimationLibrary.swift`.
 The choreographer keys off three clip shapes; declaring one wrong fails silently.
 
 - **Looping variant** — loops indefinitely, shares a `variantGroup` (e.g. "idle", "thinking"), has a `weight` for selection against other variants in the group. Multiple variants at one pose are rotated by the choreographer, deterministically from time, never the same twice in a row. The loop begins and ends on the anchor frame.
-- **Fidget** — non-looping, self-edge (`fromPose == toPose`), id does *not* end in `-enter`. Blinks, look-arounds, a stretch — motion with no cause, injected at randomised intervals during long holds to separate "animated" from "alive".
+- **Fidget** — non-looping, self-edge (`fromPose == toPose`), id does *not* end in `-enter`. Blinks, look-arounds, a stretch — motion with no cause, injected at randomised intervals during long holds to separate "animated" from "alive". Selection is by **pose**, so a fidget fires in every state at that pose; an optional `fidgetGroup` (and `weight`) narrows it to one state, which is what keeps the wander clips to `idle`. `fidgetGroup` is a separate field from `variantGroup` on purpose — a variant pool for loops and a fidget scope for one-shots are different questions.
 - **Entrance one-shot** — id ends in `-enter` (e.g. `done-enter`). Plays exactly once when arriving at a pose, if present in the manifest. The only way to re-entrance is to leave the pose and return. Declaring one wrong is silent, so test coverage is essential.
 
 Transition clips are never looping; they end on a long dwell frame so a hand-off inside the dwell reads as a still mascot, not as interrupting mid-motion.

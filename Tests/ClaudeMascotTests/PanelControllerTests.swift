@@ -96,6 +96,7 @@ private func testClip(_ state: PanelState, loops: Bool = true, duration: TimeInt
     loops: loops,
     pose: state.pose,
     variantGroup: nil,
+    fidgetGroup: nil,
     weight: 1,
     fromPose: nil,
     toPose: nil

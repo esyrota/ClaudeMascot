@@ -1242,16 +1242,21 @@ CLIP_METADATA = {
 }
 
 # Wander fidgets are standing self-edges like fidget-stretch and fidget-look, plus
-# one thing those two do not carry: a variantGroup. Fidget selection is by POSE, so
+# one thing those two do not carry: a fidgetGroup. Fidget selection is by POSE, so
 # an untagged standing fidget can fire in any standing state -- fine for a stretch,
 # not fine for walking off the panel while `waiting` is asking the user for
 # something. `Choreographer.selectFidget` keeps a tagged fidget to its own group.
+#
+# A separate field from `variantGroup` on purpose. Both would read as "which group
+# is this in", but they answer different questions -- which pool a LOOP rotates
+# within, and which state a ONE-SHOT is allowed to fire for -- and one field
+# answering both is a field you have to know the clip's `loops` value to read.
 CLIP_METADATA.update({
     f"wander-{exit_name}-{entrance_name}": {
         "loops": False,
         "fromPose": "standing",
         "toPose": "standing",
-        "variantGroup": "idle",
+        "fidgetGroup": "idle",
         "weight": WANDER_WEIGHT,
     }
     for exit_name in WANDER_EXITS
@@ -1376,7 +1381,7 @@ if __name__ == "__main__":
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
             # Optional on a transition, and only the wander fidgets carry them:
             # a group to scope fidget selection to, and a weight to pick within it.
-            for key in ("variantGroup", "weight"):
+            for key in ("fidgetGroup", "weight"):
                 if key in CLIP_METADATA[name]:
                     clip_entry[key] = CLIP_METADATA[name][key]
 
