@@ -68,7 +68,7 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 | | | |
 |---|---|---|
 | ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif) | ![doze-to-stand](_animations/doze-to-stand.gif) |
-| **sleeping** · 18f · 9.0s · w 1.0 | **stand-to-doze**<br>standing → dozing<br>3f · motion 1.4s | **doze-to-stand**<br>dozing → standing<br>3f · motion 1.4s |
+| **sleeping** · 19f · 9.5s · w 1.0 | **stand-to-doze**<br>standing → dozing<br>3f · motion 1.4s | **doze-to-stand**<br>dozing → standing<br>3f · motion 1.4s |
 
 The mascot sleeps **on its feet**: same silhouette as every standing clip, arms slumped
 four rows down onto the legs, the face bowed so the eyes read as shut lids at row 24, two

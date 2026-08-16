@@ -325,16 +325,18 @@ def _dozing_anchor() -> Image.Image:
 def sleeping():
     """Dozed off standing: eyes shut, arms slumped, Zs drifting up.
 
-    Frame 0 and the last frame are the bare `dozing` anchor -- the Zs are skipped on
-    both -- so this loop begins and ends pixel-identical to what `stand_to_doze()`
-    lands on and `doze_to_stand()` departs from, the same contract idle()'s own
-    frame 0 satisfies for `standing`.
+    Frame 0 is the bare `dozing` anchor -- no Zs drawn over it -- and the anchor is
+    appended again at the end, so this loop begins and ends pixel-identical to what
+    `stand_to_doze()` lands on and `doze_to_stand()` departs from, the same contract
+    idle()'s own frame 0 satisfies for `standing`.
+
+    The append is not belt-and-braces: sleep.gif's LAST frame is one of its two
+    one-eye peeks, not a second copy of its first, so ending on it would leave the
+    loop a blinked eye away from the anchor and pop on every swap.
     """
     out = []
-    frames = sleep_frames()
-    last = len(frames) - 1
-    for i, (im, ms) in enumerate(frames):
-        if i in (0, last):
+    for i, (im, ms) in enumerate(sleep_frames()):
+        if i == 0:
             out.append((im, ms))
             continue
         d = ImageDraw.Draw(im)
@@ -352,6 +354,7 @@ def sleeping():
             rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
             rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
         out.append((im, ms))
+    out.append((_dozing_anchor(), SLEEP_FRAME_MS))
     return out
 
 

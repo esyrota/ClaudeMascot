@@ -117,8 +117,8 @@
     ]
   },
   "sleeping": {
-    "gif_bytes": 3608,
-    "crc32": 3893500952,
+    "gif_bytes": 3805,
+    "crc32": 998834705,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -129,7 +129,7 @@
       509,
       509,
       509,
-      61
+      258
     ]
   },
   "stand-to-doze": {

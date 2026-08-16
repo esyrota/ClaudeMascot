@@ -98,9 +98,9 @@
     },
     "sleeping": {
       "file": "sleeping.gif",
-      "frameCount": 18,
-      "durationMs": 9000,
-      "motionMs": 9000,
+      "frameCount": 19,
+      "durationMs": 9500,
+      "motionMs": 9500,
       "loops": true,
       "pose": "dozing",
       "variantGroup": "sleeping",
