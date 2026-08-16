@@ -77,6 +77,10 @@ final class AppModel: ObservableObject {
     let adapter = PanelAdapter(library: animationLibrary, ble: bleClient)
     self.panelController = PanelController(
       panel: adapter,
+      // A direct port of today's behaviour: the state's own name is the
+      // clip id. Chunk 6 supersedes this with a choreographer that walks a
+      // pose graph instead of looking states up 1:1.
+      resolve: { [animationLibrary] state in animationLibrary.clip(id: state.rawValue) },
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),

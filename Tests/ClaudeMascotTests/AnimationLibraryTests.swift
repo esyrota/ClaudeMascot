@@ -24,8 +24,11 @@ final class AnimationLibraryTests: XCTestCase {
   }
 
   @MainActor
-  func testBundledFallbackResolvesForAllStates() throws {
-    // Create a mock bundled directory with all states
+  func testBundledFallbackResolvesForAllManifestClips() throws {
+    // Create a mock bundled directory with every clip the real manifest
+    // lists, using the same fixture GIFs the old per-state test used
+    // (fixture filenames match `PanelState.rawValue`, which lines up with
+    // every non-transition clip id in the shipped manifest).
     let tmpID = UUID().uuidString
     let bundledDir = FileManager.default.temporaryDirectory
       .appendingPathComponent(tmpID)
@@ -38,7 +41,6 @@ final class AnimationLibraryTests: XCTestCase {
       .appendingPathComponent("Animations")
     try FileManager.default.createDirectory(at: animationsDir, withIntermediateDirectories: true)
 
-    // Copy fixture GIFs to the mock bundled directory
     for state in PanelState.allCases {
       let sourceURL = fixturesDirectory.appendingPathComponent("\(state.rawValue).gif")
       let destURL =
@@ -54,24 +56,24 @@ final class AnimationLibraryTests: XCTestCase {
     let mockBundle = Bundle(path: bundledDir.path)
     library.bundleOverride = mockBundle
 
-    // All states should resolve
+    // Every state's clip (a synthetic one, id == file == "<state>.gif") should resolve.
     for state in PanelState.allCases {
-      let url = library.url(for: state)
-      XCTAssertNotNil(url, "Should find animation for state: \(state.rawValue)")
-
-      // Verify we can read the data
-      let data = try library.data(for: state)
+      let clip = Clip(
+        id: state.rawValue,
+        file: "\(state.rawValue).gif",
+        frameCount: 1,
+        duration: 1,
+        motion: 1,
+        loops: true,
+        pose: nil,
+        variantGroup: nil,
+        weight: 1,
+        fromPose: nil,
+        toPose: nil
+      )
+      let data = try library.data(for: clip)
       XCTAssertGreaterThan(
-        data.count, 0, "Animation data should not be empty for state: \(state.rawValue)")
-    }
-  }
-
-  @MainActor
-  func testUrlReturnsNilForMissingWhenNoBundle() throws {
-    // No bundleOverride is set, and the test target bundles no Animations
-    // resource of its own, so nothing can resolve for any state.
-    for state in PanelState.allCases {
-      XCTAssertNil(library.url(for: state), "Should not find animation for state: \(state)")
+        data.count, 0, "Animation data should not be empty for clip: \(clip.id)")
     }
   }
 
@@ -86,9 +88,13 @@ final class AnimationLibraryTests: XCTestCase {
 
     library.bundleOverride = Bundle(path: bundledDir.path)
 
-    XCTAssertThrowsError(try library.data(for: .idle)) { error in
-      guard case AnimationLibraryError.notFound(.idle) = error else {
-        XCTFail("Expected AnimationLibraryError.notFound(.idle), got \(error)")
+    let clip = Clip(
+      id: "idle", file: "idle.gif", frameCount: 1, duration: 1, motion: 1, loops: true,
+      pose: nil, variantGroup: nil, weight: 1, fromPose: nil, toPose: nil)
+
+    XCTAssertThrowsError(try library.data(for: clip)) { error in
+      guard case AnimationLibraryError.clipNotFound("idle") = error else {
+        XCTFail("Expected AnimationLibraryError.clipNotFound(\"idle\"), got \(error)")
         return
       }
     }

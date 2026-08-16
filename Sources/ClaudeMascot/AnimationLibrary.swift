@@ -1,33 +1,9 @@
 import Foundation
 
-/// Resolves animation GIFs for panel states.
+/// Resolves animation GIFs for manifest clips.
 @MainActor final class AnimationLibrary {
   /// For testing: allows overriding the bundle to load animations from.
   var bundleOverride: Bundle?
-
-  /// Resolves the URL for an animation in this precedence order:
-  /// 1. bundled `Animations/custom/<state>.gif`
-  /// 2. bundled `Animations/<state>.gif`
-  /// Returns `nil` if nothing is found.
-  func url(for state: PanelState) -> URL? {
-    let filename = "\(state.rawValue).gif"
-
-    // Check bundled animations
-    if let bundledURL = bundledURL(for: filename) {
-      return bundledURL
-    }
-
-    return nil
-  }
-
-  /// Returns the data for an animation, following the same resolution order as `url(for:)`.
-  /// Throws if the file cannot be read.
-  func data(for state: PanelState) throws -> Data {
-    guard let url = url(for: state) else {
-      throw AnimationLibraryError.notFound(state)
-    }
-    return try Data(contentsOf: url)
-  }
 
   /// The decoded clip manifest, loaded once (through the same bundle search
   /// as GIFs) and cached. `nil` when `clips.json` is absent or unreadable —
@@ -40,8 +16,11 @@ import Foundation
     manifest?[id]
   }
 
-  /// Returns the data for a manifest clip, resolved through the same
-  /// bundle-search fallbacks as `data(for: PanelState)`.
+  /// Returns the data for a manifest clip, resolved in this precedence
+  /// order:
+  /// 1. bundled `Animations/custom/<file>`
+  /// 2. bundled `Animations/<file>`
+  /// Throws if neither is found or the file cannot be read.
   func data(for clip: Clip) throws -> Data {
     guard let url = bundledURL(for: clip.file) else {
       throw AnimationLibraryError.clipNotFound(clip.id)
@@ -116,13 +95,10 @@ import Foundation
 }
 
 enum AnimationLibraryError: LocalizedError {
-  case notFound(PanelState)
   case clipNotFound(String)
 
   var errorDescription: String? {
     switch self {
-    case .notFound(let state):
-      return "Animation not found for state: \(state.rawValue)"
     case .clipNotFound(let id):
       return "Animation not found for clip: \(id)"
     }
