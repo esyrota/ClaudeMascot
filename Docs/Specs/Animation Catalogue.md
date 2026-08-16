@@ -79,8 +79,8 @@ read as the mascot hovering; it now rests on the panel floor and breathes as a w
 
 ### offBottom
 
-| |
-|---|
+|                             |
+| --------------------------- |
 | ![off](_animations/off.gif) |
 | **off** · 1f · 1.0s · w 1.0 |
 
@@ -93,9 +93,9 @@ Never uploaded. `PanelController` cuts power for `.off` instead. It exists only 
 
 ### Pose edges
 
-| | | | |
-|---|---|---|---|
-| ![starting](_animations/starting.gif) | ![sink](_animations/sink.gif) | ![stand-to-lie](_animations/stand-to-lie.gif) | ![lie-to-stand](_animations/lie-to-stand.gif) |
+|                                                           |                                                       |                                                          |                                                          |
+| --------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
+| ![starting](_animations/starting.gif)                     | ![sink](_animations/sink.gif)                         | ![stand-to-lie](_animations/stand-to-lie.gif)            | ![lie-to-stand](_animations/lie-to-stand.gif)            |
 | **starting**<br>offBottom → standing<br>32f · motion 5.6s | **sink**<br>standing → offBottom<br>5f · motion 0.56s | **stand-to-lie**<br>standing → lying<br>6f · motion 0.7s | **lie-to-stand**<br>lying → standing<br>6f · motion 0.7s |
 
 | | | | |
