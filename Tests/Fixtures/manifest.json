@@ -170,8 +170,8 @@
     ]
   },
   "thinking-alt": {
-    "gif_bytes": 2931,
-    "crc32": 3001385244,
+    "gif_bytes": 2863,
+    "crc32": 2010383003,
     "outer_chunks": 1,
     "ble_packets": 6,
     "packet_lengths": [
@@ -180,7 +180,7 @@
       509,
       509,
       509,
-      402
+      334
     ]
   },
   "waiting": {

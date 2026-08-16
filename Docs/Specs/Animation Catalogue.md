@@ -43,10 +43,10 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
 | ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) |
 | **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **dancing** · 15f · 2.87s · w 0.5 |
 
-| | | | |
-|---|---|---|---|
-| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif) |
-| **thinking** · 5f · 1.12s · w 1.0 | **thinking-alt** · 15f · 2.1s · w 0.5 | **waiting** · 8f · 1.12s · w 1.0 | **done** · 17f · 3.71s · w 1.0 |
+|                                       |                                               |                                     |                                |
+| ------------------------------------- | --------------------------------------------- | ----------------------------------- | ------------------------------ |
+| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif)  |
+| **thinking** · 5f · 1.12s · w 1.0     | **thinking-alt** · 14f · 6.06s · w 0.5         | **waiting** · 8f · 1.12s · w 1.0    | **done** · 17f · 3.71s · w 1.0 |
 
 - `idle` group has three variants — the richest set, because idle is on screen most.
   A fourth, `idle-think`, was cut: sliced out of the thinking sheet, it carried that
@@ -55,8 +55,16 @@ an offscreen anchor is an empty frame. Break this once and every swap visibly ju
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle`/`idle-alt` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing`, `sleeping` and `thinking-alt` are imported; `idle`, `idle-alt`, `thinking`,
-  `waiting` and `done` are drawn or assembled in `art/generate.py`.
+- `dancing` and `sleeping` are imported; everything else in these two rows is drawn or
+  assembled in `art/generate.py`.
+- `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
+  and fills in a "..." one dot at a time, holds, then retreats the way it came. It was
+  sliced out of the 36-frame thinking sheet until that cost it three things at once — the
+  sheet's figure is 21×14 against the anchor's 24×16, so the mascot shrank for the length
+  of the clip; each tile's own crop differs by a pixel or three, so the silhouette
+  juddered side to side; and the whole beat ran in 2.1s, too quick to read as thought.
+  Only the last of those is a timing problem, so it was re-authored on the standard
+  geometry instead. The body breathes underneath with idle's own torso squash.
 - `waiting` is the flag wave: it means Claude is asking *you* for something, so it should
   stay the most legible clip on the panel from across a room.
 - `done` is the *same jump* as the `done-enter` celebration, held as a loop with confetti
@@ -233,11 +241,11 @@ stall.
    mascot teleports into and out of it. They were deliberately deferred because the
    sitting art was being replaced in the same run and a transition drawn against art that
    is about to change is wasted work.
-2. **The imported sheets are ~87% the scale of the drawn art** (21×14 against 24×16 at
-   rest). `thinking-alt`, `idle-think` and `working-alt` satisfy the anchor contract by
-   being bookended with the drawn anchor frame, so they are *correct* — but there is a
-   visible size pop at each end. Rescaling the sheet art to the drawn silhouette is the
-   real fix.
+2. **`working-alt` is ~87% the scale of the drawn art** (21×14 against 24×16 at rest),
+   the last clip still cut from a sprite sheet. `thinking-alt` and `idle-think` had the
+   same problem and were re-authored and dropped respectively, which leaves the thinking
+   sheet unused entirely; this one is harder, because there is no drawn `sitting` art to
+   re-author it against.
 3. **The laptop in `working-alt` is a featureless white slab.** The panel renders any
    colour whose brightest channel is under 255 as blue-violet (see [[Panel Quirks]]), so
    its grey had to become pure white and the screen detail flattened out. Black outlines

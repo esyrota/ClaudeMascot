@@ -136,9 +136,9 @@
     },
     "thinking-alt": {
       "file": "thinking-alt.gif",
-      "frameCount": 15,
-      "durationMs": 2100,
-      "motionMs": 2100,
+      "frameCount": 14,
+      "durationMs": 6060,
+      "motionMs": 6060,
       "loops": true,
       "pose": "standing",
       "variantGroup": "thinking",

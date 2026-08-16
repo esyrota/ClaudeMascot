@@ -831,7 +831,10 @@ def sweep():
 # rests on.
 # --------------------------------------------------------------------------
 
-THINKING_SHEET = SOURCES / "F85A47A0-4D7B-420B-9F9E-4C75DE1EE34E.png"
+# The thinking sheet is no longer a source: thinking_alt() is drawn now, and
+# idle-think, the only other clip cut from it, was dropped for the same reason --
+# the sheet's figure is 87% of the drawn silhouette. Only the working sheet below
+# is still imported. The file stays in art/sources as reference art.
 WORKING_SHEET = SOURCES / "186F7A97-0B62-4283-9DC4-65E953629BDC.png"
 
 # Anti-aliasing/JPEG noise in a screenshot means source pixels never land exactly on
@@ -966,47 +969,89 @@ def _sheet_frames(sheet: Path) -> list:
     return out
 
 
+# The thought bubble, drawn rather than imported. Centred where the panel is empty
+# above the mascot's right shoulder: the figure tops out at row 16, so everything
+# here lives in rows 0-15 and never overlaps the body at any stage.
+BUBBLE_CX, BUBBLE_CY = 24, 6
+# (width, height) per growth stage. The last is the full bubble, 12x7 spanning
+# x 18..29 -- two columns clear of the panel's right edge.
+BUBBLE_STAGES = ((4, 3), (8, 5), (12, 7))
+# Three "..." dots inside the full bubble, 2x1 each on its centre row.
+BUBBLE_DOT_XS = (19, 23, 27)
+# The tail: two puffs trailing down from the bubble toward the head, (x, y, size).
+BUBBLE_PUFFS = ((21, 11, 2), (19, 14, 1))
+
+
+def _thought_bubble(d, stage: int, dots: int, puffs: int) -> None:
+    """Draw the bubble at growth `stage` with `dots` of its "..." and `puffs` of its tail."""
+    for x, y, size in BUBBLE_PUFFS[:puffs]:
+        rect(d, x, y, size, size, PROP)
+    if stage < 0:
+        return
+    w, h = BUBBLE_STAGES[stage]
+    left, top = BUBBLE_CX - w // 2, BUBBLE_CY - h // 2
+    rect(d, left, top, w, h, PROP)
+    if stage == len(BUBBLE_STAGES) - 1:
+        # Knock the four corners off the full bubble only -- at 4x3 and 8x5 there is
+        # not enough bubble left to round without it reading as a cross.
+        for cx in (left, left + w - 1):
+            for cy in (top, top + h - 1):
+                rect(d, cx, cy, 1, 1, BG)
+    for x in BUBBLE_DOT_XS[:dots]:
+        rect(d, x, BUBBLE_CY, 2, 1, BG)
+
+
 def thinking_alt():
     """
-    Thinking variant: a thought bubble forms and fades, from the sprite sheet.
+    Thinking variant: one eye lifts, a thought bubble grows a "..." and fades.
 
-    MEASURED against the procedural standing anchor before anything else: the
-    sheet's own rest frame (frame 0, sliced and recoloured) differs from
-    idle.gif's frame 0 at 123 of 1024 pixels, and its body's own bounding box is
-    21w x14h against the anchor's 24w x16h -- about 87% in both dimensions, both
-    still flush with the panel's bottom row. Smaller, not a different creature:
-    same silhouette, same standing pose, same floor line, just drawn a few
-    percent smaller by the screenshot's own crop -- not the "wildly different
-    figure size" the chunk brief says to stop and report on. So the anchor-frame
-    prepend/append below is the right fix, not a symptom to re-author the sheet
-    over.
+    DRAWN, not imported, and that is the whole point of this version. It used to be
+    sliced out of the 36-frame thinking sheet, which cost it three things at once:
+    the sheet's figure is 21x14 against the anchor's 24x16, so the mascot shrank for
+    the length of the clip; each tile's own crop differs by a pixel or three, so the
+    silhouette juddered side to side frame to frame; and the whole beat ran in 2.1s,
+    far too quick to read as thought. Retiming fixes only the last of those -- the
+    other two are properties of the source art -- so the beat is re-authored here on
+    the same geometry every other standing clip uses.
 
-    The 36-frame thinking sheet is not one loop -- it is four distinct beats (a
-    "..." thought, a "?" confusion, a "!" realisation, and a second, shorter
-    "..." trailing off), each one leaving and returning to the same standing
-    rest pose. This clip uses just the first: sheet frames 0-4 are the sheet's
-    own held rest, 5-6 lean into the thought, 7-11 grow and hold the "..."
-    bubble, and 12 is back at rest -- a clean start/end point to cut on. The "?"
-    (12-23), "!" (24-28) and trailing "..." (29-35) beats are left unused for
-    now; nothing requires every sheet frame to ship, and splitting the richer
-    beats into their own variants is future work, not this chunk's.
+    The idea is kept exactly: one eye raises (a quizzical brow, the only asymmetry
+    the mascot's face can carry), a tail of puffs trails up, the bubble swells, the
+    "..." fills in one dot at a time, it holds, and everything retreats the way it
+    came. `mascot()` has no per-eye offset -- nothing else needs one -- so the eye is
+    painted over and redrawn a row higher.
 
-    The sheet carries no frame durations (see sheet_import.py's module
-    docstring), so this is a hand-authored timing table, not a uniform one -- a
-    steady mechanical cadence is exactly what would give away that it is not
-    idle()'s own art.
+    The body is not still underneath it: `breath` is idle()'s own torso squash, feet
+    planted, so the mascot is visibly alive while it thinks rather than a prop stand
+    for the bubble.
     """
-    frames = _sheet_frames(THINKING_SHEET)[0:13]  # sheet frames 0-12
-    durations = [
-        160, 150, 150, 160, 140,  # 0-4: the held rest breath
-        130, 120,                 # 5-6: leaning in
-        170, 150, 150,            # 7-9: the bubble grows
-        150, 160,                 # 10-11: it fades, leaning back out
-        170,                      # 12: back at rest
+    # (eye lift, bubble stage, dots, puffs, breath, ms). Stage -1 is no bubble.
+    steps = [
+        (0, -1, 0, 0, 0, 500),   # the standing anchor
+        (1, -1, 0, 0, 0, 420),   # an eye goes up: something occurred to it
+        (1, -1, 0, 1, 0, 380),
+        (1, 0, 0, 2, 1, 380),    # the bubble starts
+        (1, 1, 0, 2, 1, 340),
+        (1, 2, 0, 2, 0, 340),    # full size, still empty
+        (1, 2, 1, 2, 0, 320),
+        (1, 2, 2, 2, 1, 320),
+        (1, 2, 3, 2, 1, 700),    # "..." complete -- the beat to hold on
+        (1, 2, 3, 2, 0, 700),
+        (1, 1, 0, 2, 0, 320),    # and back down
+        (1, 0, 0, 1, 0, 320),
+        (1, -1, 0, 0, 0, 420),
+        (0, -1, 0, 0, 0, 600),   # the anchor again, closing the loop
     ]
-    out = [(_standing_anchor(), 70)]  # anchor contract: exact standing pixels first...
-    out += list(zip(frames, durations))
-    out.append((_standing_anchor(), 70))  # ...and last.
+    out = []
+    for lift, stage, dots, puffs, breath, ms in steps:
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, HOME_Y, squash=breath)
+        if lift:
+            eye_y = HOME_Y + breath + EYE_TOP
+            rect(d, EYE_XS[1], eye_y, EYE_W, EYE_H, MASCOT)      # erase the drawn eye
+            rect(d, EYE_XS[1], eye_y - lift, EYE_W, EYE_H, EYE)  # and lift it
+        _thought_bubble(d, stage, dots, puffs)
+        out.append((im, ms))
     return out
 
 
