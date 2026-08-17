@@ -96,6 +96,15 @@
       "fromPose": "standing",
       "toPose": "offBottom"
     },
+    "sit-to-stand": {
+      "file": "sit-to-stand.gif",
+      "frameCount": 3,
+      "durationMs": 3900,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "standing"
+    },
     "sleeping": {
       "file": "sleeping.gif",
       "frameCount": 19,
@@ -114,6 +123,15 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "dozing"
+    },
+    "stand-to-sit": {
+      "file": "stand-to-sit.gif",
+      "frameCount": 3,
+      "durationMs": 3900,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "sitting"
     },
     "starting": {
       "file": "starting.gif",

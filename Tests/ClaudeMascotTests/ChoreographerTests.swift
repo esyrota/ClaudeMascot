@@ -421,11 +421,30 @@ func leavingResolvesToNothingOnceAlreadyGone() {
 @Test @MainActor
 func leavingResolvesToNothingWhenNoExitExists() {
   let clock = FakeClock()
-  // `sitting` is an island in the shipped manifest: no edges at all.
+  // A synthetic manifest, not the shipped one: `sitting` has no edge back to
+  // `standing` here, so this proves the graceful-degradation path rather than
+  // anything about what the real manifest ships.
   let working = loopClip("working", pose: .sitting, group: "working")
   let walkOffLeft = edgeClip("walk-off-left", from: .standing, to: .offLeft)
   let choreographer = Choreographer(
     manifest: manifest([working, walkOffLeft]), clock: { clock() })
 
   #expect(choreographer.clip(for: .away, displayed: working) == nil)
+}
+
+@Test @MainActor
+func sitAndStandRouteThroughTheSitEdges() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let working = loopClip("working", pose: .sitting, group: "working")
+  let standToSit = edgeClip("stand-to-sit", from: .standing, to: .sitting)
+  let sitToStand = edgeClip("sit-to-stand", from: .sitting, to: .standing)
+  let choreographer = Choreographer(
+    manifest: manifest([idle, working, standToSit, sitToStand]), clock: { clock() })
+
+  // Standing, wants to be sitting: the drawn sit edge, not a direct swap onto `working`.
+  #expect(choreographer.clip(for: .working, displayed: idle)?.id == "stand-to-sit")
+
+  // Seated, wants to be standing: the reverse edge.
+  #expect(choreographer.clip(for: .idle, displayed: working)?.id == "sit-to-stand")
 }

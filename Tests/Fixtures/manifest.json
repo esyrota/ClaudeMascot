@@ -117,6 +117,16 @@
       284
     ]
   },
+  "sit-to-stand": {
+    "gif_bytes": 641,
+    "crc32": 3703179780,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      148
+    ]
+  },
   "sleeping": {
     "gif_bytes": 3805,
     "crc32": 998834705,
@@ -141,6 +151,16 @@
     "packet_lengths": [
       509,
       98
+    ]
+  },
+  "stand-to-sit": {
+    "gif_bytes": 641,
+    "crc32": 1542973963,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      148
     ]
   },
   "starting": {

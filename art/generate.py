@@ -587,12 +587,10 @@ def done_enter():
 # holds, so the dwell is what makes a hand-off during it look like a still mascot
 # rather than a restarted clip.
 #
-# stand<->sit is deliberately not here -- see the chunk brief's scope note. Chunk 3
-# drew the `sitting` anchor (`_sitting_anchor()`), but the edges onto and off it are
-# a later chunk's own scope; matching them procedurally now would be building ahead
-# of the fidgets and beats those edges have to line up with. The choreographer's
-# graceful degradation (direct swap when no edge exists) covers stand<->sit until
-# then.
+# stand<->sit lives with the seated art instead of here: `stand_to_sit()` and
+# `sit_to_stand()` sit just below `working()`, needing `_sitting_anchor()` and
+# `laptop()` in scope the same way `stand_to_doze()`/`doze_to_stand()` sit right
+# after `_dozing_anchor()` above.
 # --------------------------------------------------------------------------
 
 def walk_off_left():
@@ -1303,6 +1301,56 @@ def working():
     return out
 
 
+# The two edges connecting `standing` and `sitting` -- `stand_to_sit()` lowers him to
+# the desk as the lid slides in, `sit_to_stand()` is the reverse. Same three-frame
+# register as `stand_to_doze()`/`doze_to_stand()` above: an anchor, one drawn halfway
+# frame, the anchor at the other end held as a long dwell.
+SIT_MID_LID_OX = 6  # the lid mid-slide: LAPTOP_X+ox=24, clipped to columns 24-31
+
+
+def _sit_mid() -> Image.Image:
+    """The one drawn frame between standing and sitting: the figure halfway down and
+    left, legs half-folded, the lid halfway through its slide in from off-panel right.
+
+    Halfway on every axis at once, so the sit reads as one fold rather than the body
+    finishing its move and a laptop popping in afterwards. Both arms are still drawn
+    (unlike the sitting anchor's hidden near arm) -- the lid has not slid far enough
+    in yet to justify hiding it outright, and `laptop()` (drawn last, as always)
+    paints over whatever corner of the arm its own partial slide already reaches.
+    """
+    im = frame()
+    d = ImageDraw.Draw(im)
+    mascot(d, (HOME_Y + SIT_TORSO_Y) // 2, dx=SIT_DX // 2, arms=(0, 0),
+           legs=(SIT_LEG_FOLD // 2,) * 4)
+    laptop(d, ox=SIT_MID_LID_OX)
+    return im
+
+
+def stand_to_sit():
+    """Transition: lowers himself to the desk as the laptop lid slides in from the
+    right -- one action, not a sit followed by a laptop handed to him."""
+    return [
+        (_standing_anchor(), 700),
+        (_sit_mid(), 700),
+        (_sitting_anchor(), APPEAR_TAIL_MS),  # long dwell -- the sitting anchor
+    ]
+
+
+def sit_to_stand():
+    """Transition: the reverse -- the lid recedes as he straightens back up.
+
+    No checkmark, no celebration: this edge fires on every departure from the desk,
+    including into `waiting` and into a panel shutdown, not only on a finished turn.
+    The checkmark belongs to `done_enter()` alone -- see its own docstring -- so a
+    genuine completion plays this clip and then that one, back to back.
+    """
+    return [
+        (_sitting_anchor(), 700),
+        (_sit_mid(), 700),
+        (_standing_anchor(), APPEAR_TAIL_MS),  # long dwell -- the standing anchor
+    ]
+
+
 def off():
     """
     Fully dark frame.
@@ -1332,6 +1380,8 @@ STATES = {
     "workout": workout,
     "working": working,
     "working-alt": working_alt,
+    "stand-to-sit": stand_to_sit,
+    "sit-to-stand": sit_to_stand,
     "waiting": waiting,
     "done": done,
     "done-enter": done_enter,
@@ -1467,6 +1517,19 @@ CLIP_METADATA = {
         "pose": "sitting",
         "variantGroup": "working",
         "weight": 0.5,
+    },
+    "stand-to-sit": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "sitting",
+    },
+    "sit-to-stand": {
+        # The way back. Without it `sitting` is a one-way trap: the choreographer
+        # would walk the mascot to the desk and have no route off it, including into
+        # `waiting` when the user's turn comes, or into a graceful shutdown.
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "standing",
     },
     "sleeping": {
         # At `dozing`, its own pose: the mascot sleeps standing but the slumped
