@@ -17,9 +17,9 @@ are built to match** — see the one deliberate exception under
 
 | Script | Purpose |
 |---|---|
-| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + clips.json + a 6× contact sheet `preview.png`. Draws six states; imports two (see below) |
+| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + clips.json + a 6× contact sheet `preview.png`. Draws most states; imports the rest from hand-drawn GIFs (see below) |
 | `art/import_gif.py` | Converts an *oversized* arbitrary GIF into a panel-ready animation in `Animations/custom/` — coalesce, crop, downscale, subsample |
-| `art/sheet_import.py` | Slices a *screenshot* contact sheet (grey page, gaps, label strips, irregular tiles) into 32×32 frames — detects each tile's own bbox, never a fixed pitch |
+| `art/sheet_import.py` | Standalone tool, not called by `generate.py`: slices a *screenshot* contact sheet (grey page, gaps, label strips, irregular tiles) into 32×32 frames — detects each tile's own bbox, never a fixed pitch. Nothing ships from a sheet any more; see [[Animation Catalogue]]'s `sitting` section for why `working-alt`, the last clip that did, was retired |
 | `art/export_golden.py` | Re-frames the bundled GIFs into `Tests/Fixtures/`; run after any art change — see [[BLE Protocol]] |
 | `art/export_docs.py` | Regenerates the 6× images in [[Animation Catalogue]] from the bundled GIFs, so the page cannot drift from what ships |
 | `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |

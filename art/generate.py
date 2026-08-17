@@ -28,8 +28,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-import sheet_import
-
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 SOURCES = Path(__file__).resolve().parent / "sources"
@@ -880,6 +878,12 @@ WORKING_REPAIRS = [
     ((1, 2, 3, 4), ((5, 10),), WORKING_PAPER, WORKING_BODY),
     ((1, 2, 3, 4, 32, 33), ((4, 13), (6, 13), (7, 13), (9, 13)),
      WORKING_BODY, WORKING_PAPER),
+    # Frame 31 -- mid-rise out of the crouch -- carries a 2x2 body-coloured
+    # fragment two cells left of the shaded trailing edge, background on every
+    # other side: not attached to the silhouette, and sitting outboard of the
+    # shaded edge exactly the way the turned-head rule forbids. Erased rather
+    # than kept.
+    ((31,), ((2, 10), (3, 10), (2, 11), (3, 11)), WORKING_BODY, WORKING_PAPER),
 ]
 
 
@@ -927,158 +931,37 @@ def working_at(source, native):
     return (-WORKING_SCALE * left, 2)
 
 
-def sweep():
-    """Working: the mascot sweeps the floor with a broom while Claude works."""
-    return imported(WORKING_SRC, working_class, native=WORKING_NATIVE,
-                    scale=WORKING_SCALE, at=working_at, repair=working_repair)
+def sweeping():
+    """Idle variant: the mascot sweeps the floor with a broom while nothing else
+    is happening -- see the `sweeping` CLIP_METADATA entry for why it lives here
+    and not at `working`."""
+    frames = coalesce(imported(WORKING_SRC, working_class, native=WORKING_NATIVE,
+                                scale=WORKING_SCALE, at=working_at,
+                                repair=working_repair))
+    # Frames 11 and 30 are the worst two glitches in the source's held crouch:
+    # 11 drops the front leg entirely and grows a shoulder-shaped fragment
+    # detached from the torso's right edge; 30 collapses to a single eye and
+    # folds the torso in on itself. Neither reads as a pose, only as damage, so
+    # both are cut outright rather than repaired.
+    frames = [f for i, f in enumerate(frames) if i not in (11, 30)]
+    # Anchor bookends, exactly workout()'s reasoning: every frame of the sweep
+    # holds the crouch or the raised broom, so without these the clip neither
+    # opens nor closes on the standing anchor it now shares with idle/idle-alt/
+    # dancing/workout.
+    return [(_standing_anchor(), 200)] + frames + [(_standing_anchor(), 400)]
 
 
-# --------------------------------------------------------------------------
-# Imported sprite sheets -- hand-authored loop variants, sliced by sheet_import.py
-# rather than a GIF read frame by frame (see "Edge art is procedural, loop art is
-# imported" in Task.md). Two 36-frame contact-sheet screenshots: a standing
-# "thinking" set with speech/thought/question/exclamation beats, and a seated
-# "working" set at a grey laptop. Both are screenshots, not clean exports -- see
-# sheet_import.py's module docstring for the tile-detection and resampling this
-# rests on.
-# --------------------------------------------------------------------------
-
-# The thinking sheet is no longer a source: thinking_alt() is drawn now, and
-# idle-think, the only other clip cut from it, was dropped for the same reason --
-# the sheet's figure is 87% of the drawn silhouette. Only the working sheet below
-# is still imported. The file stays in art/sources as reference art.
-WORKING_SHEET = SOURCES / "186F7A97-0B62-4283-9DC4-65E953629BDC.png"
-
-# Anti-aliasing/JPEG noise in a screenshot means source pixels never land exactly on
-# a named constant, so classification here is by shape, not by exact match:
-#   - dark (background, eyes)            -> BG
-#   - achromatic but not dark (R=G=B-ish) -> PROP
-#   - everything else (the orange body)   -> MASCOT
-# The achromatic bucket is what makes this safe rather than fragile: it catches the
-# working sheet's grey laptop (~(134,134,134), brightest channel 134) and its white
-# speech/exclamation marks (~(255,255,255)) with the same rule, and it is why
-# neither sheet ever hits MASCOT_DARK/MASCOT_SHADE -- neither draws a second body
-# tone, so the classifier never has to choose between them.
-#
-# Plain nearest-neighbour against the full named palette (the way working_class()
-# above snaps sweep()'s already-clean colours) was tried first and rejected: in
-# Euclidean RGB distance, grey (134,134,134) is closer to MASCOT (255,68,4) -- ~190
-# -- than to PROP (255,255,255) -- ~210 -- so it would have painted the laptop
-# orange, exactly the panel-colour-rule violation this palette exists to prevent
-# (see the module docstring above: a colour whose brightest channel is under 255
-# renders blue-violet, and there is deliberately no grey constant to reach for
-# instead).
-SHEET_DARK = 40
-SHEET_ACHROMATIC_SPREAD = 40
-
-
-def sheet_classify(rgb):
-    if max(rgb) < SHEET_DARK:
-        return BG
-    if max(rgb) - min(rgb) < SHEET_ACHROMATIC_SPREAD:
-        return PROP
-    return MASCOT
-
-
-def _bg_components(px, left, top, right, bottom):
-    """4-connected BG-coloured blobs within [left,right]x[top,bottom], inclusive."""
-    seen = set()
-    comps = []
-    for y in range(top, bottom + 1):
-        for x in range(left, right + 1):
-            if (x, y) in seen or px[x, y] != BG:
-                continue
-            stack, comp = [(x, y)], []
-            seen.add((x, y))
-            while stack:
-                cx, cy = stack.pop()
-                comp.append((cx, cy))
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = cx + dx, cy + dy
-                    if (left <= nx <= right and top <= ny <= bottom
-                            and (nx, ny) not in seen and px[nx, ny] == BG):
-                        seen.add((nx, ny))
-                        stack.append((nx, ny))
-            comps.append(comp)
-    return comps
-
-
-def sheet_repair(index, im) -> None:
-    """
-    Erase whatever is drawn directly below the eyes, back to MASCOT.
-
-    Both sheets draw the eyes as a pair of small squares near the top of the head.
-    The working sheet's three-quarter view also draws a mouth immediately beneath
-    them -- confirmed by inspecting the source screenshot at native resolution, a
-    stepped ~3px dark mark, absent from the thinking sheet's flat front-on view. At
-    32x32 the mascot is ~16px tall, so that mark reads as noise rather than an
-    expression: the eyes already carry the face in every other clip (idle,
-    thinking, waiting, ...), so it comes off here rather than riding along as a
-    stray mark.
-
-    Unlike WORKING_REPAIRS above, there is no fixed coordinate table -- each
-    tile's own bounding box (and so the head's exact placement) differs slightly
-    frame to frame, by design; see sheet_import.py's module docstring on why tiles
-    are never assumed to share a pitch. Instead: find the two small BG blobs in
-    the top third of the body (the eyes), and clear any BG pixel in the two rows
-    directly beneath them, between their inner edges. Requiring exactly two small
-    blobs is what keeps this a safe no-op on frames where the pose (a raised arm,
-    a turned head) makes the eyes ambiguous, or on the thinking sheet, which has
-    no mouth to begin with, rather than mangling a frame it cannot read
-    confidently -- following `imported()`'s own `repair=` callback pattern, called
-    per-frame on the already-resampled image.
-    """
-    px = im.load()
-    body = [(x, y) for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT]
-    if not body:
-        return
-    left = min(x for x, _ in body)
-    right = max(x for x, _ in body)
-    top = min(y for _, y in body)
-    bottom = max(y for _, y in body)
-    band = top + max(1, (bottom - top) // 3)  # top third -- where the eyes live
-    holes = _bg_components(px, left, top, right, band)
-    eyes = [c for c in holes if len(c) <= 6]
-    if len(eyes) != 2:
-        return
-    eyes.sort(key=lambda c: min(x for x, _ in c))
-    eye_l, eye_r = eyes
-    inner_l = max(x for x, _ in eye_l) + 1
-    inner_r = min(x for x, _ in eye_r) - 1
-    if inner_r < inner_l:
-        return
-    eye_bottom = max(max(y for _, y in eye_l), max(y for _, y in eye_r))
-    for y in range(eye_bottom + 1, min(SIZE - 1, eye_bottom + 3) + 1):
-        for x in range(inner_l, inner_r + 1):
-            if px[x, y] == BG:
-                px[x, y] = MASCOT
+# Both hand-authored reference sheets -- art/sources/186F7A97-...png (seated at a
+# laptop) and the thinking sheet already noted below -- stay in art/sources as
+# reference art. Nothing here imports either any more: thinking_alt() replaced
+# the thinking sheet's clip, and working_alt(), the last clip cut from the
+# working sheet, is retired -- see [[Animation Catalogue]]'s `sitting` section.
 
 
 def _standing_anchor() -> Image.Image:
     """The exact `standing` anchor pixels -- idle.gif frame 0 -- for the loop
-    boundary contract the sheet variants below guarantee mechanically."""
+    boundary contract every standing loop variant guarantees mechanically."""
     return mascot_at()
-
-
-def _sheet_frames(sheet: Path) -> list:
-    """
-    Slice, recolour and repair one 36-frame sheet into panel-ready tiles.
-
-    Deliberately separate from this file's own `imported()`: that function reads
-    an already-32x32-native GIF frame by frame, while a sheet is a single
-    screenshot that first has to be cut into 36 tiles (sheet_import.slice_sheet)
-    before any per-frame processing is possible.
-    """
-    tiles = sheet_import.slice_sheet(sheet)
-    out = []
-    for index, tile in enumerate(tiles):
-        px = tile.load()
-        for y in range(SIZE):
-            for x in range(SIZE):
-                px[x, y] = sheet_classify(px[x, y])
-        sheet_repair(index, tile)
-        out.append(tile)
-    return out
 
 
 # The thought bubble, drawn rather than imported. Centred where the panel is empty
@@ -1165,38 +1048,6 @@ def thinking_alt():
         _thought_bubble(d, stage, dots, puffs)
         out.append((im, ms))
     return out
-
-
-def working_alt():
-    """
-    Working variant: a full pass through the seated-at-a-laptop sheet.
-
-    Unlike the thinking sheet, this one is not several beats stitched together --
-    36 frames of one continuous work session (a typing burst, a coffee, a glance
-    at the screen, code scrolling by, a satisfied checkmark) -- so the whole
-    thing ships as a single loop, in sheet order.
-
-    No anchor-frame prepend/append here, unlike thinking_alt()/idle_think()
-    above: those guarantee the `standing` anchor contract, but this clip is
-    `pose: "sitting"`, and there is no established sitting anchor to guarantee
-    against yet -- sweep()'s own imported art is what currently defines
-    "sitting", and stand<->sit transition edges are explicitly out of scope for
-    this chunk (see the chunk brief). Swapping straight to/from this clip at a
-    pose boundary is exactly the graceful-degradation path the choreographer
-    already covers when an edge is missing.
-    """
-    frames = _sheet_frames(WORKING_SHEET)
-    # Typing has a steady rhythm; the handful of named beats below get a longer
-    # dwell so each reads as a beat instead of blurring past mid-loop.
-    durations = [130] * 36
-    for i in (3, 17, 22):
-        durations[i] = 170  # "!" typing-burst reactions
-    for i in (9, 10):
-        durations[i] = 220  # the coffee-mug pause
-    durations[27] = 200      # a stray thought bubble
-    durations[30] = 260      # code scrolls up the screen -- let it be read
-    durations[32] = 260      # the checkmark -- the satisfying beat
-    return list(zip(frames, durations))
 
 
 def _sitting_anchor() -> Image.Image:
@@ -1558,8 +1409,8 @@ STATES = {
     "thinking-alt": thinking_alt,
     "thinking-pace": thinking_pace,
     "workout": workout,
+    "sweeping": sweeping,
     "working": working,
-    "working-alt": working_alt,
     "stand-to-sit": stand_to_sit,
     "sit-to-stand": sit_to_stand,
     "work-idea": work_idea,
@@ -1644,6 +1495,18 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 0.4,
     },
+    "sweeping": {
+        # The broom sweep, imported from the mascot's own loading animation -- see
+        # sweeping()'s docstring. Moved here from `working` for the same reason
+        # `workout` is here and not at `thinking`: sweeping the floor says nothing
+        # about working on a prompt, it is the mascot doing something while
+        # nothing is happening. Weighted the same as `workout`, the other "doing
+        # something" idle variant -- there is no reason for the two to differ.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 0.4,
+    },
     "thinking-alt": {
         # Same variantGroup as "thinking" -- imported from the sprite sheet's
         # "..." thought-bubble beat, see thinking_alt()'s docstring.
@@ -1685,22 +1548,16 @@ CLIP_METADATA = {
     },
     "working": {
         # The seated pose, drawn on the standard geometry against `_sitting_anchor()`
-        # -- see working()'s own docstring. Replaces the old broom sweep that used to
-        # live at this id; that art is now `sweep()`, left defined but unregistered
-        # until a later chunk re-registers it under its own id, "sweeping".
+        # -- see working()'s own docstring. Replaces the old broom sweep that used
+        # to live at this id; that art now ships as `sweeping`, an idle variant --
+        # see its own CLIP_METADATA entry above for why. `working-alt`, the other
+        # clip that used to share this variantGroup, is retired outright: it was
+        # imported from a reference sheet at ~87% of the drawn silhouette, the
+        # same problem that got idle-think cut -- see [[Animation Catalogue]].
         "loops": True,
         "pose": "sitting",
         "variantGroup": "working",
         "weight": 1.0,
-    },
-    "working-alt": {
-        # Same variantGroup as "working" -- imported from the seated-at-a-laptop
-        # sprite sheet, see working_alt()'s docstring for why it carries no
-        # anchor-frame prepend/append the way the standing-pose variants above do.
-        "loops": True,
-        "pose": "sitting",
-        "variantGroup": "working",
-        "weight": 0.5,
     },
     "stand-to-sit": {
         "loops": False,
