@@ -37,13 +37,20 @@ opened and closed mid-gesture, so a swap into it snapped the arm up four rows an
 the flag in one frame. It gains one half-raised frame at each end — the arm halfway, the
 flag just clearing the head — which is all the contract needs.
 
+**A turned head trims its far-side body edge.** Any pose that turns the mascot to face the
+viewer follows one rule, next to the floor line rule below: the eyes shift toward the
+facing side and the trailing column shades to `MASCOT_SHADE`, and no body pixel sits
+outboard of the far eye. A turn that leaves silhouette hanging past the eye reads as the
+figure widening rather than turning. Today's turn frames in `dancing` break this — it is
+why that turn reads wrong — and the seated fidgets below are drawn to it from the start.
+
 ---
 
 ## Loops
 
 ### standing
 
-**idle** — four variants, the richest set, because idle is on screen most.
+**idle** — the richest set, because idle is on screen most.
 
 | | | | |
 |---|---|---|---|
@@ -68,13 +75,20 @@ flag just clearing the head — which is all the contract needs.
   clip for as long as this project had four animations and four states to spread them
   over, but lifting weights says nothing about working on a prompt — it is the mascot
   doing something while nothing is happening, which is what idle means.
+- **`sweeping` joins `workout` as an idle variant, by the same reasoning** — see the
+  `sitting` section below for what it used to be and why it moved.
 - **The `thinking` group performs nothing.** `thinking` itself just stands and breathes,
   slower than idle does; `thinking-pace` walks off one side and back in the other, twice,
   which on a panel with no middle distance is what walking in circles looks like; only
   `thinking-alt` shows a thought at all. Thinking is mostly not visible from outside, and
   a mascot that always mimes it has nothing left to say when the thought is a hard one.
+  Now that a session with a tool call underway sits rather than stands (see
+  [[Menu Bar App]]), standing `thinking` is honest for a narrower stretch than before — the
+  moment before the first tool call, where nothing has started yet — which is exactly when
+  performing nothing is most correct.
 - A fourth idle variant, `idle-think`, was cut: sliced out of the thinking sheet, it
-  carried that sheet's ~87% silhouette (gap 2 below) and read as a smaller creature.
+  carried that sheet's ~87% silhouette (the same problem `working-alt` had, below) and
+  read as a smaller creature.
 - **The floor line is absolute at `standing`.** Every idle variant keeps all four feet on
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle`/`idle-alt` used to bob a pixel upward and read as a slow hop. Only a clip that
@@ -93,7 +107,9 @@ flag just clearing the head — which is all the contract needs.
   stay the most legible clip on the panel from across a room.
 - `done` is the *same jump* as the `done-enter` celebration, held as a loop with confetti
   fired on each landing instead of a checkmark. One celebration, told once and then
-  sustained — so the hand-off from entrance to loop has nothing to give away.
+  sustained — so the hand-off from entrance to loop has nothing to give away. The
+  checkmark itself belongs only to `done-enter`; see "The checkmark belongs to `done`"
+  under the sit edges below for why it does not also live on the way out of the chair.
 
 ### dozing
 
@@ -122,14 +138,73 @@ clip's cadence.
 
 ### sitting
 
-| | |
-|---|---|
+|                                     |                                             |
+| ----------------------------------- | ------------------------------------------- |
 | ![working](_animations/working.gif) | ![working-alt](_animations/working-alt.gif) |
-| **working** · 36f · 3.65s · w 1.0 | **working-alt** · 36f · 5.31s · w 0.5 |
+| **working** · 36f · 3.65s · w 1.0   | **working-alt** · 36f · 5.31s · w 0.5       |
 
-`working` is the broom sweep; `working-alt` is the imported laptop sheet. **Nothing
-connects to `sitting`** — see the gaps below — so both are only ever reached by a direct
-swap.
+The table above is still today's shipped pair — `working` the broom sweep, `working-alt`
+the imported laptop sheet — and stays as-is until the art in this section actually exists;
+regenerating it is a later pass, not this one. What follows is the intended shape once it
+does.
+
+`sitting` is where `working` lives, and `working` is on screen for most of a turn — see
+[[Menu Bar App]] for why sitting now covers the whole stretch between the first tool call
+and the turn ending, rather than flickering in and out between calls. The pose gains a
+drawn anchor (`_sitting_anchor()`, alongside `_standing_anchor()` and `_dozing_anchor()`);
+the `working` loop itself is redrawn against it as a seated pose, replacing today's
+standing broom sweep — the id survives, the art underneath it does not (the sweep is
+rehomed rather than discarded; see below). `sitting` also gains four fidget beats scoped
+to it, and the two edges that carry the mascot to and from `standing` — see the sit edges
+below.
+
+**The seated art is drawn on the standard geometry, not sliced from a sheet.** The
+previous seated clip, `working-alt`, was imported from a reference sprite sheet at ~87% of
+the drawn silhouette with a per-tile crop that wobbled a pixel or three — the same failure
+mode `idle-think` was cut for. A sheet import also has no anchor to speak of: the sit
+edges need an exact pixel target to arrive at and leave from, which only drawn art gives.
+
+**The laptop is a dark lid, not the reference's grey.** The reference art
+(`art/sources/186F7A97-…png`, tile 0) draws a 12×8 lid with a flat `(134,134,134)` fill and
+a 2×2 white logo dead centre, lid-back to the viewer. `(134,134,134)` is the exact case
+[[Panel Quirks]] documents the panel rendering as blue-violet, so that grey cannot ship as
+drawn — the lid becomes near-black instead, carried by a 1px white outline with the same
+2×2 white logo, which reads as a laptop lid on the panel the way the true grey never could.
+It is drawn lid-back to the viewer, in front of the figure, and drawn last so it occludes
+the figure's lower right side and arm — the same trick that lets a 24px figure and a 12px
+lid both fit inside 32 columns.
+
+**Four fidgets are scoped to `sitting`**, each a non-looping self-edge with
+`fidgetGroup: "working"` so none of them can fire anywhere else: `work-idea` (an eye
+lifts, a spark, a fast typing burst), `work-coffee` (a mug appears, he turns to the viewer,
+sips, sets it down, turns back), `work-look` (turns to the viewer, holds, blinks, turns
+back) and `work-think` — the desk-side thought bubble the seated pose needed, built by
+reusing `_thought_bubble()` rather than adding a new `PanelState`; thinking at the desk is
+a beat on top of `working`, not a state of its own. `work-coffee` and `work-look` turn the
+mascot to face the viewer, so both are drawn to the turned-head rule above.
+
+**Two edges connect `sitting` to `standing`**: `stand-to-sit` (he lowers himself, the lid
+comes in) and `sit-to-stand` (the lid closes and leaves, he stands), both pixel-exact on
+the anchor at each end, closing what was previously the one pose with no way in or out.
+
+**The checkmark belongs to `done`, not to `sit-to-stand`.** `sit-to-stand` fires on every
+departure from the desk — including into `waiting` and into a panel shutdown — so a
+checkmark on that edge would celebrate departures that completed nothing, exactly the
+false-completion problem the `done` debounce ([[Menu Bar App]]) exists to remove. The
+route to a genuine `done` instead plays `sit-to-stand` (close the lid, get up) and then
+`done-enter` (the checkmark, the jump): the checkmark still lands immediately after he
+stands, and only when the turn actually finished.
+
+**`working-alt` is retired.** The sprite sheet it was cut from stays in `art/sources` as
+reference art, the way the thinking sheet already does after `thinking-alt` was
+re-authored off it — a record of where the art came from, not a clip that ships.
+
+**The broom sweep moves to `standing`, renamed `sweeping`, and joins `idle`.** It was
+`working` in name only: `pose: sitting` on a figure that stands the whole time it sweeps.
+Once `working` means the drawn seated loop, the sweep has nowhere honest left to be, and
+`idle` is exactly where it belongs — the same move `workout` made, by the same reasoning:
+sweeping the floor says nothing about working on a prompt, it is the mascot doing
+something while nothing is happening. Its worst frames are dropped going in.
 
 ### offBottom
 
@@ -229,7 +304,8 @@ of `variantGroup`: both would read as "which group is this in", but one says whi
 *loop* rotates within and the other which state a *one-shot* may fire for, and a single
 field answering both could only be read by first checking `loops`. At weight 0.2 each they total 1.8 against `fidget-stretch` and
 `fidget-look`'s 2.0, so a fidget is still slightly more likely to be a small one than a
-whole trip offscreen.
+whole trip offscreen. The four `sitting` fidgets in the loops section above follow the
+same shape, scoped by `fidgetGroup: "working"` instead.
 
 Fidgets are motion with no cause — the thing that separates "animated" from "alive". They
 fire on a seeded roll during long holds and return the mascot exactly where it stood.
@@ -276,28 +352,18 @@ A ❌ is not a bug. Where no path exists the choreographer swaps directly at the
 boundary — the panel's swaps are seamless, so a missing edge costs a pose pop, never a
 stall.
 
+**The diagram and table above still show the shipped manifest, without `stand-to-sit` /
+`sit-to-stand`.** The sit edges are decided (see the `sitting` section) but not yet drawn;
+regenerating this diagram and table is part of the pass that adds them, once the art
+exists to draw a transition against.
+
 ## Known gaps — the work worth doing next
 
-1. **`sitting` is an island.** `stand-to-sit` and `sit-to-stand` would be the single
-   biggest improvement here: `working` is one of the most-shown states, and today the
-   mascot teleports into and out of it. They were deliberately deferred because the
-   sitting art was being replaced in the same run and a transition drawn against art that
-   is about to change is wasted work.
-2. **`working-alt` is ~87% the scale of the drawn art** (21×14 against 24×16 at rest),
-   the last clip still cut from a sprite sheet. `thinking-alt` and `idle-think` had the
-   same problem and were re-authored and dropped respectively, which leaves the thinking
-   sheet unused entirely; this one is harder, because there is no drawn `sitting` art to
-   re-author it against.
-3. **The laptop in `working-alt` is a featureless white slab.** The panel renders any
-   colour whose brightest channel is under 255 as blue-violet (see [[Panel Quirks]]), so
-   its grey had to become pure white and the screen detail flattened out. Black outlines
-   would give it shape back within the palette.
-4. **`waiting` has no variants**, despite being the state that most wants to catch your
+1. **`waiting` has no variants**, despite being the state that most wants to catch your
    eye.
-5. **No fidgets at `sitting` or `dozing`** — the mascot is perfectly still at the laptop
-   between loops, and `fidget-doze` was drawn against the retired floor blob and went with
-   it, so a doze fidget is a clean slot to fill.
-6. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
+2. **No fidgets at `dozing`.** `fidget-doze` was drawn against the retired floor blob and
+   went with it, so a doze fidget is a clean slot to fill.
+3. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
    diagonal stroke has zero height, so the smaller one degenerates into a square. It has
    always been that way — it reads as distance rather than as a letter, which is
    survivable, but a 2-wide Z drawn deliberately would be better than one that collapses.
