@@ -383,6 +383,56 @@
       274
     ]
   },
+  "work-coffee": {
+    "gif_bytes": 1737,
+    "crc32": 1780655847,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      226
+    ]
+  },
+  "work-idea": {
+    "gif_bytes": 1923,
+    "crc32": 1886105063,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      412
+    ]
+  },
+  "work-look": {
+    "gif_bytes": 1281,
+    "crc32": 3987611056,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      279
+    ]
+  },
+  "work-think": {
+    "gif_bytes": 3115,
+    "crc32": 124797629,
+    "outer_chunks": 1,
+    "ble_packets": 7,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      77
+    ]
+  },
   "working": {
     "gif_bytes": 1916,
     "crc32": 1412031570,

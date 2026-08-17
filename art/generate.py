@@ -1351,6 +1351,186 @@ def sit_to_stand():
     ]
 
 
+def work_idea():
+    """
+    Fidget: an idea strikes -- one eye lifts, a spark flashes above the head, then a
+    burst of faster typing as he acts on it.
+
+    Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
+    The eye lift is `thinking_alt()`'s own technique -- paint over the drawn eye and
+    redraw it a row higher, since `mascot()` has no per-eye offset -- reused here
+    rather than reinvented. The spark sits in the clear rows well above
+    `SIT_TORSO_Y`, in PROP, never touching the silhouette. The typing burst is
+    `working()`'s own arm jitter at a faster cadence: not a new gesture, just a
+    quicker one, which is what "got on with it" needs to read as.
+    """
+    def seated(*, lift=0, spark=False, jitter=0, squash=0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(jitter, None),
+               legs=(SIT_LEG_FOLD,) * 4, squash=squash)
+        if lift:
+            ex = EYE_XS[1] + SIT_DX
+            ey = SIT_TORSO_Y + squash + EYE_TOP
+            rect(d, ex, ey, EYE_W, EYE_H, MASCOT)      # erase the drawn eye
+            rect(d, ex, ey - lift, EYE_W, EYE_H, EYE)  # and lift it
+        if spark:
+            # A small three-stroke spark, centred above the (raised) eye, rows
+            # 10-12 -- six clear rows above SIT_TORSO_Y=18, nowhere near the figure.
+            cx, cy = EYE_XS[1] + SIT_DX, SIT_TORSO_Y - 6
+            rect(d, cx, cy - 2, 1, 2, PROP)
+            rect(d, cx - 2, cy, 2, 1, PROP)
+            rect(d, cx + 1, cy, 2, 1, PROP)
+        laptop(d)
+        return im
+
+    out = [(_sitting_anchor(), 300)]
+    out.append((seated(lift=1), 260))                        # an eye lifts
+    out.append((seated(lift=1, spark=True), 220))             # the spark
+    out.append((seated(lift=1, spark=True, squash=1), 260))   # held an instant
+    out.append((seated(lift=0, jitter=-1), 90))                # faster typing --
+    out.append((seated(lift=0, jitter=1), 90))                 # he got on with it
+    out.append((seated(lift=0, jitter=-1), 90))
+    out.append((seated(lift=0, jitter=1), 90))
+    out.append((seated(lift=0, jitter=0), 220))
+    out.append((_sitting_anchor(), APPEAR_TAIL_MS))
+    return out
+
+
+def work_coffee():
+    """
+    Fidget: a mug appears in the clear columns to his left, he lifts it to sip, sets
+    it down, and it goes.
+
+    Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
+    The mug lives at columns 0-3, the same columns the resting far arm already
+    occupies in the anchor (`arms=(0, None)`), so it reads as sitting right by his
+    hand rather than floating in space; it never shares a column with the torso
+    (`SIT_DX`-shifted to columns 4-19) or the laptop (columns 18-29), so nothing it
+    draws ever needs to occlude or be occluded by the figure. The far arm is the one
+    that lifts it -- the near arm is already hidden behind the laptop lid in every
+    seated frame, `_sitting_anchor()` included.
+    """
+    MUG_X, MUG_W, MUG_H = 0, 3, 3
+    MUG_REST_Y = 27  # just above the folded legs at rows 30-31
+
+    def seated(*, lift=0, mug=False, squash=0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(lift, None),
+               legs=(SIT_LEG_FOLD,) * 4, squash=squash)
+        if mug:
+            my = MUG_REST_Y + lift  # travels with the lifting arm
+            rect(d, MUG_X, my, MUG_W, MUG_H, PROP)
+            rect(d, MUG_X + MUG_W, my + 1, 1, 1, PROP)  # the handle notch
+        laptop(d)
+        return im
+
+    out = [(_sitting_anchor(), 300)]
+    out.append((seated(mug=True), 260))                       # the mug appears
+    out.append((seated(lift=-1, mug=True), 220))
+    out.append((seated(lift=-3, mug=True), 220))               # lifted toward the head
+    out.append((seated(lift=-3, mug=True, squash=1), 420))     # the sip
+    out.append((seated(lift=-1, mug=True), 220))
+    out.append((seated(lift=0, mug=True), 240))                # set back down
+    out.append((seated(lift=0, mug=False), 260))                # and it goes
+    out.append((_sitting_anchor(), APPEAR_TAIL_MS))
+    return out
+
+
+def work_look():
+    """
+    Fidget: he looks up from the screen, holds, blinks, and goes back to work.
+
+    Self-edge at `sitting`, the calmest of the four -- a pause, not an event. There is
+    no away-facing pose to turn *from* -- see the chunk brief -- so the attention
+    shift is drawn as the eyes rising within the head, `thinking_alt()`'s own
+    paint-over-and-redraw-a-row-higher technique, applied to both eyes at once rather
+    than one: a symmetric lift reads as looking up, where the single-eye version
+    elsewhere in the manifest reads as a quizzical brow. Nothing else about the
+    silhouette moves.
+    """
+    LOOK_LIFT = 1
+
+    def seated(*, look=False, blink=False, squash=0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(0, None),
+               legs=(SIT_LEG_FOLD,) * 4, squash=squash)
+        if look:
+            ey = SIT_TORSO_Y + squash + EYE_TOP
+            for ex in EYE_XS:
+                x = ex + SIT_DX
+                rect(d, x, ey, EYE_W, EYE_H, MASCOT)  # erase the drawn eye
+                if blink:
+                    rect(d, x, ey - LOOK_LIFT + EYE_H // 2, EYE_W, 1, EYE)
+                else:
+                    rect(d, x, ey - LOOK_LIFT, EYE_W, EYE_H, EYE)
+        laptop(d)
+        return im
+
+    out = [(_sitting_anchor(), 300)]
+    out.append((seated(look=True), 260))              # the head comes up
+    out.append((seated(look=True, squash=1), 900))    # the hold -- about a second
+    out.append((seated(look=True, blink=True), 130))  # the blink
+    out.append((seated(look=True), 220))
+    out.append((seated(look=False), 260))              # back down to the screen
+    out.append((_sitting_anchor(), APPEAR_TAIL_MS))
+    return out
+
+
+def work_think():
+    """
+    Fidget: a thought bubble grows over the desk, fills its "...", holds, and
+    retreats the way it came -- `thinking_alt()`'s own beat, moved to the seated
+    pose, reusing `_thought_bubble()` unchanged rather than adding a new one.
+
+    `_thought_bubble()`'s geometry (`BUBBLE_CX/CY`, `BUBBLE_PUFFS`) is authored
+    against the standing figure, which tops out at `HOME_Y` = row 16. The seated
+    figure tops out at `SIT_TORSO_Y` = row 18 -- two rows LOWER, not higher -- so the
+    seated head is further from the bubble than the standing figure ever was: the
+    full bubble and its puffs occupy rows 3-14, the seated torso starts at row 18,
+    four clear rows below the lowest puff. No offset is needed and none is applied.
+    """
+    def seated(*, lift=0, stage=-1, dots=0, puffs=0, squash=0):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(0, None),
+               legs=(SIT_LEG_FOLD,) * 4, squash=squash)
+        if lift:
+            ex = EYE_XS[1] + SIT_DX
+            ey = SIT_TORSO_Y + squash + EYE_TOP
+            rect(d, ex, ey, EYE_W, EYE_H, MASCOT)      # erase the drawn eye
+            rect(d, ex, ey - lift, EYE_W, EYE_H, EYE)  # and lift it
+        _thought_bubble(d, stage, dots, puffs)
+        laptop(d)
+        return im
+
+    # (eye lift, bubble stage, dots, puffs, breath, ms) -- same shape as
+    # thinking_alt()'s own `steps`, minus its leading/trailing anchor frames, which
+    # this clip gets from explicit `_sitting_anchor()` calls instead.
+    steps = [
+        (1, -1, 0, 0, 0, 380),   # an eye goes up: something occurred to it
+        (1, -1, 0, 1, 0, 340),
+        (1, 0, 0, 2, 1, 340),    # the bubble starts
+        (1, 1, 0, 2, 1, 320),
+        (1, 2, 0, 2, 0, 320),    # full size, still empty
+        (1, 2, 1, 2, 0, 300),
+        (1, 2, 2, 2, 1, 300),
+        (1, 2, 3, 2, 1, 650),    # "..." complete -- the beat to hold on
+        (1, 2, 3, 2, 0, 650),
+        (1, 1, 0, 2, 0, 300),    # and back down
+        (1, 0, 0, 1, 0, 300),
+        (1, -1, 0, 0, 0, 380),
+        (0, -1, 0, 0, 0, 320),
+    ]
+    out = [(_sitting_anchor(), 300)]
+    for lift, stage, dots, puffs, squash, ms in steps:
+        out.append((seated(lift=lift, stage=stage, dots=dots, puffs=puffs, squash=squash), ms))
+    out.append((_sitting_anchor(), APPEAR_TAIL_MS))
+    return out
+
+
 def off():
     """
     Fully dark frame.
@@ -1382,6 +1562,10 @@ STATES = {
     "working-alt": working_alt,
     "stand-to-sit": stand_to_sit,
     "sit-to-stand": sit_to_stand,
+    "work-idea": work_idea,
+    "work-coffee": work_coffee,
+    "work-look": work_look,
+    "work-think": work_think,
     "waiting": waiting,
     "done": done,
     "done-enter": done_enter,
@@ -1530,6 +1714,42 @@ CLIP_METADATA = {
         "loops": False,
         "fromPose": "sitting",
         "toPose": "standing",
+    },
+    # The four `sitting` fidgets -- self-edges like fidget-stretch/fidget-look, but
+    # each carries a fidgetGroup for the same reason the wander fidgets do: fidget
+    # selection is by POSE, so an untagged sitting fidget would fire in any sitting
+    # state. "working" keeps each of these to `sitting` alone. work-look is the
+    # calmest of the four -- a held look, then back down -- so it carries the
+    # highest weight; work-coffee is the most eventful (a prop enters and leaves),
+    # so it carries the lowest. All four stay well under fidget-stretch/fidget-look's
+    # implicit 1.0 default so a beat stays occasional rather than constant.
+    "work-idea": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.25,
+    },
+    "work-coffee": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.15,
+    },
+    "work-look": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.4,
+    },
+    "work-think": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.25,
     },
     "sleeping": {
         # At `dozing`, its own pose: the mascot sleeps standing but the slumped

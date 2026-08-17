@@ -317,6 +317,50 @@
       "fidgetGroup": "idle",
       "weight": 0.2
     },
+    "work-coffee": {
+      "file": "work-coffee.gif",
+      "frameCount": 8,
+      "durationMs": 4640,
+      "motionMs": 1880,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.15
+    },
+    "work-idea": {
+      "file": "work-idea.gif",
+      "frameCount": 9,
+      "durationMs": 4120,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.25
+    },
+    "work-look": {
+      "file": "work-look.gif",
+      "frameCount": 6,
+      "durationMs": 4570,
+      "motionMs": 1810,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.4
+    },
+    "work-think": {
+      "file": "work-think.gif",
+      "frameCount": 14,
+      "durationMs": 7700,
+      "motionMs": 4880,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.25
+    },
     "working": {
       "file": "working.gif",
       "frameCount": 9,
