@@ -155,10 +155,12 @@ final class SessionTracker {
   }
 
   /// Lower is more urgent: `waiting > working > thinking > done > idle`.
-  /// `.starting`, `.sleeping` and `.off` never come out of
-  /// `effectiveState` — no session is ever stored in those states — but the
-  /// switch stays exhaustive rather than defaulted so a future
-  /// `PanelState` case fails to compile here instead of failing silently.
+  /// `.starting`, `.sleeping`, `.away` and `.off` never come out of
+  /// `effectiveState` — no session is ever stored in those states; the first
+  /// two are journeys `PanelController` plays and the last two are panel-wide
+  /// power business — but the switch stays exhaustive rather than defaulted
+  /// so a future `PanelState` case fails to compile here instead of failing
+  /// silently.
   private func precedence(of state: PanelState) -> Int {
     switch state {
     case .waiting: return 0
@@ -166,7 +168,7 @@ final class SessionTracker {
     case .thinking: return 2
     case .done: return 3
     case .idle: return 4
-    case .starting, .sleeping, .off: return 5
+    case .starting, .sleeping, .away, .off: return 5
     }
   }
 }

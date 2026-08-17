@@ -160,6 +160,14 @@ Never uploaded. `PanelController` cuts power for `.off` instead. It exists only 
 `starting` is the original hand-drawn entrance and is far longer than the others (2.5s of
 motion against ~0.6s); it is the one transition the user is meant to notice.
 
+**These six edges are also the mascot's comings and goings, not just routes between
+poses.** `PanelState.away` picks `walk-off-left` or `walk-off-right` per epoch to leave by
+before the panel goes dark, and the arrival takes whichever entrance matches where it
+went — `starting` from `offBottom`, `walk-in-left`/`walk-in-right` from the sides. `sink`
+is deliberately not an exit: sinking through the floor is the entrance played backwards
+and reads as the mascot being swallowed rather than choosing to go. It keeps its place
+inside the wander fidgets, where the mascot comes back.
+
 **`art/sources/appear.gif` is not one animation but three**, and `art/generate.py` now
 cuts it into three clips rather than playing the whole 32-frame strip once a session:
 

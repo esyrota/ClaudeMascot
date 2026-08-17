@@ -106,10 +106,28 @@ private func testClip(_ state: PanelState, loops: Bool = true, duration: TimeInt
 @MainActor
 private let defaultTestClips: [PanelState: Clip] = {
   var clips: [PanelState: Clip] = [:]
-  for state in PanelState.allCases where state != .starting {
+  for state in PanelState.allCases where state != .starting && state != .away {
     clips[state] = testClip(state)
   }
   clips[.starting] = testClip(.starting, loops: false, duration: 6, motion: 0)
+  // The departure edge. Non-looping and ending off screen, which is what
+  // `PanelController` reads to know the mascot has left and the panel may go
+  // dark; `motion: 0` keeps it out of the boundary arithmetic in tests that
+  // are about power, not pacing.
+  clips[.away] = Clip(
+    id: PanelState.away.rawValue,
+    file: "away.gif",
+    frameCount: 1,
+    duration: 1,
+    motion: 0,
+    loops: false,
+    pose: nil,
+    variantGroup: nil,
+    fidgetGroup: nil,
+    weight: 1,
+    fromPose: .standing,
+    toPose: .offLeft
+  )
   return clips
 }()
 
@@ -191,8 +209,53 @@ func idleEscalatesToSleepingThenOff() async {
 
   clock.advance(300)  // total 600s == offAfter
   await controller.tick()
+  // The mascot walks off before the panel goes dark, rather than the panel
+  // blinking out from under it.
+  #expect(controller.displayed?.id == PanelState.away.rawValue)
+  #expect(controller.isPanelOff == false)
+
+  await controller.tick()  // it has left: nothing lit is left to keep
   #expect(controller.isPanelOff == true)
   #expect(panel.calls.last == .setPower(false))
+}
+
+@Test @MainActor
+func departureIsAbandonedIfTheMascotCannotLeave() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  // A resolver with no `.away` edge: the art for walking off does not exist
+  // (true of `sitting` in the shipped manifest today). The panel must still
+  // go dark rather than stay lit forever waiting to finish leaving.
+  let controller = makeController(
+    panel: panel, clock: clock,
+    resolve: { state, _ in state == .away ? nil : defaultTestClips[state] })
+
+  await controller.tick()
+  clock.advance(600)
+  await controller.tick()
+
+  #expect(controller.isPanelOff == true)
+  #expect(panel.calls.last == .setPower(false))
+}
+
+@Test @MainActor
+func aPromptDuringTheDepartureBringsTheMascotBack() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  await controller.tick()
+  clock.advance(600)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.away.rawValue)  // mid-departure
+
+  // Caught on the way out: the panel never went dark, so there is no wake and
+  // no entrance — just the walk back to what was asked for.
+  controller.handle(.thinking)
+  await controller.tick()
+  #expect(controller.isPanelOff == false)
+  #expect(controller.displayed?.id == PanelState.thinking.rawValue)
+  #expect(panel.calls.contains(.setPower(false)) == false)
 }
 
 @Test @MainActor
@@ -202,7 +265,8 @@ func nonIdleStateDuringEscalationResetsAndWakesInOrder() async {
   let controller = makeController(panel: panel, clock: clock)
 
   await controller.tick()
-  clock.advance(600)  // idle -> sleeping -> off
+  clock.advance(600)  // idle -> sleeping -> away -> off
+  await controller.tick()
   await controller.tick()
   #expect(controller.isPanelOff == true)
 
@@ -288,7 +352,7 @@ func startingHoldShowsBootAnimationThenHandsOffToDesiredState() async {
 }
 
 @Test @MainActor
-func sessionStartReplaysEntranceThenSettlesIntoIdle() async {
+func sessionStartOnAVisibleMascotDoesNotReplayTheEntrance() async {
   let clock = FakeClock()
   let panel = MockPanel()
   let controller = makeController(
@@ -297,21 +361,52 @@ func sessionStartReplaysEntranceThenSettlesIntoIdle() async {
     clock: clock
   )
 
-  // Get past the launch entrance so this test is only about the second one.
+  // Get past the launch entrance: the mascot is now standing on the panel.
   clock.advance(5)
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.idle.rawValue)
 
+  // A second session starts. The entrance is the mascot arriving from
+  // nothing, so replaying it here would mean *removing* a mascot that is
+  // standing right there in order to bring it back — which is what this
+  // looked like on the panel: the mascot vanished and rose out of the floor
+  // every time a session began.
   controller.handle(.starting)
-  clock.advance(1)  // let `.idle`'s loop finish -- swaps land on a boundary
+  clock.advance(1)  // a boundary, so a swap could land if one were wanted
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.idle.rawValue)
+
+  clock.advance(5)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.idle.rawValue)
+  #expect(panel.calls.contains(.upload(testClip(.starting, loops: false, duration: 6, motion: 0))) == false)
+}
+
+@Test @MainActor
+func sessionStartAfterTheMascotHasLeftReplaysTheEntrance() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600, startingHold: 5),
+    clock: clock
+  )
+
+  // Walk the mascot off the panel, but stop short of the power-off, so the
+  // entrance is being judged on where the mascot *is* rather than on whether
+  // the panel is lit.
+  clock.advance(5)
+  await controller.tick()
+  clock.advance(600)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.away.rawValue)
+
+  // Off screen: now there really is an arrival to play.
+  controller.handle(.starting)
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.starting.rawValue)
 
-  clock.advance(3)  // 4s into the 5s entrance -- still arriving
-  await controller.tick()
-  #expect(controller.displayed?.id == PanelState.starting.rawValue)
-
-  clock.advance(1)  // entrance over: `.starting` is never sat in
+  clock.advance(5)  // entrance over: `.starting` is never sat in
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.idle.rawValue)
 }
@@ -328,7 +423,8 @@ func wakingADarkPanelReplaysEntranceBeforeTheDesiredState() async {
 
   clock.advance(5)
   await controller.tick()
-  clock.advance(600)  // idle -> sleeping -> off
+  clock.advance(600)  // idle -> sleeping -> away -> off
+  await controller.tick()
   await controller.tick()
   #expect(controller.isPanelOff == true)
 
@@ -348,7 +444,7 @@ func wakingADarkPanelReplaysEntranceBeforeTheDesiredState() async {
 }
 
 @Test @MainActor
-func offPowersDownImmediatelyWithoutWaitingForIdleEscalation() async {
+func offWalksTheMascotOffWithoutWaitingForIdleEscalation() async {
   let clock = FakeClock()
   let panel = MockPanel()
   let controller = makeController(panel: panel, clock: clock)
@@ -359,12 +455,16 @@ func offPowersDownImmediatelyWithoutWaitingForIdleEscalation() async {
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.working.rawValue)
 
-  // SessionEnd, mid-session -- must not wait out the 600s offAfter, and must
-  // not wait for `.working`'s own loop boundary either: power transitions
-  // bypass boundary gating entirely.
+  // SessionEnd, mid-session -- must not wait out the 600s offAfter. It does
+  // still walk off first: skipping the idle *timers* is what makes `.off`
+  // immediate, and that is a separate thing from skipping the departure.
   controller.handle(.off)
+  clock.advance(1)  // `.working`'s loop finishes -- the walk off lands on a seam
   await controller.tick()
+  #expect(controller.displayed?.id == PanelState.away.rawValue)
+  #expect(controller.isPanelOff == false)
 
+  await controller.tick()
   #expect(controller.isPanelOff == true)
   #expect(panel.calls.last == .setPower(false))
   // Never resolves or uploads an asset for `.off`.
@@ -476,7 +576,7 @@ func nonLoopingClipHandsOffAtMotionNotDuration() async {
 }
 
 @Test @MainActor
-func powerOffAndWakeAreNotBoundaryGated() async {
+func theDepartureIsBoundaryGatedButPowerAndWakeAreNot() async {
   let clock = FakeClock()
   let panel = MockPanel()
   let controller = makeController(panel: panel, clock: clock)
@@ -488,7 +588,20 @@ func powerOffAndWakeAreNotBoundaryGated() async {
   clock.advance(0.3)  // well inside `.working`'s loop -- no boundary crossed
   controller.handle(.off)
   await controller.tick()
-  #expect(controller.isPanelOff == true)  // off happens anyway; it never waits on a boundary
+  // The walk off is an animation like any other, so it waits for the seam:
+  // cutting into it mid-loop would break the anchor contract every clip is
+  // authored to, and jump the mascot before it starts walking.
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+  #expect(controller.isPanelOff == false)
+
+  clock.advance(0.7)  // `.working`'s loop completes
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.away.rawValue)
+
+  // The power cut itself is not gated: once the mascot is gone, the panel
+  // goes dark on the same tick that notices.
+  await controller.tick()
+  #expect(controller.isPanelOff == true)
 
   controller.handle(.thinking)
   await controller.tick()
