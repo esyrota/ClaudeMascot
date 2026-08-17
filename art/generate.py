@@ -9,8 +9,7 @@ Shape: ONE silhouette -- a torso block with arms protruding from either side, an
 hanging off the bottom edge. The geometry is taken from art/sources/appear.gif (see
 `GEOMETRY SOURCE` below), which is hand-drawn art, not generated here -- every drawn
 state matches its silhouette exactly so any state can cut to any other without the
-figure changing size or shape. The second hand-drawn state, working.gif, is the one
-exception: its mascot is drawn smaller, to clear floor space for the broom.
+figure changing size or shape.
 
 Style: the mascot is one flat colour with pure black eyes, plus a deeper orange used
 only for shading a turn. No highlight band, no floor.
@@ -103,6 +102,25 @@ MAX_ARM_LIFT = -ARM_TOP
 # the floor with a hump for a head, which was legible as a blob and not as this
 # creature -- see `Docs/Specs/Animation Catalogue.md`. It now sleeps standing, from
 # art/sources/sleep.gif, on exactly the silhouette above.
+
+# Seated geometry, `sitting`'s own anchor -- see _sitting_anchor()'s docstring for how
+# it is derived from the standing geometry above rather than inventing a new shape.
+SIT_DX = -4        # figure shifted left, clearing room for the laptop on the right
+SIT_TORSO_Y = 18    # torso top 2px below HOME_Y -- seated is shorter, not lower
+SIT_LEG_FOLD = 2    # shortens LEG_H's 4px legs to 2px stubs on rows 30-31
+
+# The laptop lid drawn in front of the seated figure -- see laptop()'s docstring for
+# why its fill is near-black rather than the reference art's true grey.
+LAPTOP_X, LAPTOP_Y = 18, 24
+LAPTOP_W, LAPTOP_H = 12, 8
+LAPTOP_LOGO_W, LAPTOP_LOGO_H = 2, 2
+# The reference art's lid is a flat (134,134,134) -- exactly the mid-value case
+# [[Panel Quirks]] documents the panel rendering as blue-violet (brightest channel
+# 134, under 255), so that grey cannot ship as drawn. (24,14,10) is the dark fill
+# Panel Quirks names as rendering fine ("very dark colours render fine as dark"),
+# so the lid goes near-black instead, carried by the white outline and logo below
+# for shape.
+LAPTOP_FILL = (24, 14, 10)
 
 
 def frame() -> Image.Image:
@@ -569,11 +587,12 @@ def done_enter():
 # holds, so the dwell is what makes a hand-off during it look like a still mascot
 # rather than a restarted clip.
 #
-# stand<->sit is deliberately not here -- see the chunk brief's scope note. The
-# sitting anchor comes from imported, hand-drawn art (`sweep()`) that a later chunk
-# replaces; matching it procedurally now would be building against art about to
-# change. The choreographer's graceful degradation (direct swap when no edge
-# exists) covers stand<->sit until then.
+# stand<->sit is deliberately not here -- see the chunk brief's scope note. Chunk 3
+# drew the `sitting` anchor (`_sitting_anchor()`), but the edges onto and off it are
+# a later chunk's own scope; matching them procedurally now would be building ahead
+# of the fidgets and beats those edges have to line up with. The choreographer's
+# graceful degradation (direct swap when no edge exists) covers stand<->sit until
+# then.
 # --------------------------------------------------------------------------
 
 def walk_off_left():
@@ -1182,6 +1201,108 @@ def working_alt():
     return list(zip(frames, durations))
 
 
+def _sitting_anchor() -> Image.Image:
+    """
+    The `sitting` anchor: seated at the laptop, in the shape of `_standing_anchor()`
+    and `_dozing_anchor()` above -- the pixel-identical frame every seated clip opens
+    and closes on.
+
+    Built from `mascot()` on the standard geometry, not sliced from a sheet, so it is
+    provably the same creature as every standing clip: `dx=SIT_DX` shifts the whole
+    figure left to clear room for the laptop on the right; `legs=(SIT_LEG_FOLD,)*4`
+    folds the standard 4px legs to 2px stubs on rows 30-31 using `mascot()`'s own
+    per-leg shortening rather than a new parameter, which is what lets the torso top
+    drop from `HOME_Y` to `SIT_TORSO_Y` -- seated is 2px shorter, not lower; the feet
+    are already on row 31 and cannot go further. The head keeps its standing geometry
+    exactly, just shifted with the body -- same torso width, same eye size, same eye
+    spacing.
+
+    The near (right) arm is hidden outright with `arms=(0, None)` rather than drawn
+    and then painted over: `laptop()` (called last, below) covers its lower half
+    anyway, and `mascot()` already supports hiding an arm rather than drawing over
+    one. The far (left) arm rests at its normal position, reading as the mascot's
+    other hand resting beside the laptop.
+    """
+    im = frame()
+    d = ImageDraw.Draw(im)
+    mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(0, None), legs=(SIT_LEG_FOLD,) * 4)
+    laptop(d)
+    return im
+
+
+def laptop(d, ox: int = 0, oy: int = 0) -> None:
+    """
+    Draw the laptop lid, lid-back to the viewer, at LAPTOP_X/LAPTOP_Y (+ox, +oy).
+
+    MUST be called after `mascot()` -- see `_sitting_anchor()` -- so its outline and
+    fill paint over the figure's lower right torso edge and near arm. That is what
+    lets a 24px figure at `dx=SIT_DX` and a 12px lid both live inside 32 columns: the
+    lid is drawn in front of him, not beside him.
+
+    `ox`/`oy` default to 0 so every current caller draws the lid at its fixed seated
+    position; the offset exists because a later chunk's sit edges need to slide the
+    lid in and out rather than pop it, and that is a plausible enough need to take
+    the parameter now rather than bolt one on later.
+    """
+    x, y = LAPTOP_X + ox, LAPTOP_Y + oy
+    # 1px white outline: top row, bottom row, left column, right column.
+    rect(d, x, y, LAPTOP_W, 1, PROP)
+    rect(d, x, y + LAPTOP_H - 1, LAPTOP_W, 1, PROP)
+    rect(d, x, y, 1, LAPTOP_H, PROP)
+    rect(d, x + LAPTOP_W - 1, y, 1, LAPTOP_H, PROP)
+    # Near-black fill inside the outline -- see LAPTOP_FILL's own comment for why
+    # this cannot be the reference art's true grey.
+    rect(d, x + 1, y + 1, LAPTOP_W - 2, LAPTOP_H - 2, LAPTOP_FILL)
+    # A 2x2 white logo, centred on the lid.
+    logo_x = x + (LAPTOP_W - LAPTOP_LOGO_W) // 2
+    logo_y = y + (LAPTOP_H - LAPTOP_LOGO_H) // 2
+    rect(d, logo_x, logo_y, LAPTOP_LOGO_W, LAPTOP_LOGO_H, PROP)
+
+
+def working():
+    """
+    Default seated loop: breathing at the laptop, a small typing jitter, a rare
+    blink. `sitting` is on screen for most of a turn, so this stays calm rather
+    than busy -- see the chunk brief's own framing.
+
+    Opens and closes on `_sitting_anchor()` pixel-identically, the same anchor
+    contract idle()'s frame 0 satisfies for `standing`. The breath is idle()'s own
+    torso `squash`, feet planted -- never a lift of the whole figure, for the floor-
+    line reason idle()'s docstring gives. Typing is a 1px jitter of the far arm, the
+    only part of him still visible above the lid (the near arm is already hidden by
+    the anchor); it is deliberately small so it reads as work at a glance without
+    pulling the eye. The blink fires once per loop -- this clip runs for minutes at
+    a time, so a busier face would fight the calm it is meant to read as.
+    """
+    def seated(*, squash=0, jitter=0, blink=False):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(jitter, None),
+               legs=(SIT_LEG_FOLD,) * 4, blink=blink, squash=squash)
+        laptop(d)
+        return im
+
+    # (squash, jitter, blink, ms) -- breath and typing overlap, the way a person
+    # really does keep breathing while they type, rather than taking turns; the
+    # blink sits alone on an otherwise-still frame so it reads clearly instead of
+    # blurring into the jitter.
+    beats = [
+        (0, -1, False, 260),
+        (1, 0, False, 300),
+        (1, 1, False, 260),
+        (0, 0, False, 300),
+        (0, -1, False, 260),
+        (0, 0, True, 320),   # the rare blink
+        (1, 1, False, 260),
+        (0, 0, False, 300),
+    ]
+    out = [(_sitting_anchor(), 320)]
+    for squash, jitter, blink, ms in beats:
+        out.append((seated(squash=squash, jitter=jitter, blink=blink), ms))
+    out.append((_sitting_anchor(), 320))
+    return out
+
+
 def off():
     """
     Fully dark frame.
@@ -1209,7 +1330,7 @@ STATES = {
     "thinking-alt": thinking_alt,
     "thinking-pace": thinking_pace,
     "workout": workout,
-    "working": sweep,
+    "working": working,
     "working-alt": working_alt,
     "waiting": waiting,
     "done": done,
@@ -1329,6 +1450,10 @@ CLIP_METADATA = {
         "toPose": "standing",
     },
     "working": {
+        # The seated pose, drawn on the standard geometry against `_sitting_anchor()`
+        # -- see working()'s own docstring. Replaces the old broom sweep that used to
+        # live at this id; that art is now `sweep()`, left defined but unregistered
+        # until a later chunk re-registers it under its own id, "sweeping".
         "loops": True,
         "pose": "sitting",
         "variantGroup": "working",

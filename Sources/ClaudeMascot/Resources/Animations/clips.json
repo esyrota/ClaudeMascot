@@ -301,9 +301,9 @@
     },
     "working": {
       "file": "working.gif",
-      "frameCount": 36,
-      "durationMs": 3650,
-      "motionMs": 3650,
+      "frameCount": 9,
+      "durationMs": 2900,
+      "motionMs": 2900,
       "loops": true,
       "pose": "sitting",
       "variantGroup": "working",

@@ -364,27 +364,15 @@
     ]
   },
   "working": {
-    "gif_bytes": 7322,
-    "crc32": 1777027318,
-    "outer_chunks": 2,
-    "ble_packets": 16,
+    "gif_bytes": 1916,
+    "crc32": 1412031570,
+    "outer_chunks": 1,
+    "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      509,
-      509,
-      509,
-      509,
-      509,
-      40,
-      509,
-      509,
-      509,
-      509,
-      509,
-      509,
-      188
+      405
     ]
   },
   "working-alt": {
