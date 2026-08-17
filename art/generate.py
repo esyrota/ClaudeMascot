@@ -716,7 +716,7 @@ def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 
     `at` places the result, so imported art can be landed exactly on the geometry the
     drawn states use. Anything falling outside the panel is cropped. `at` is either a
     fixed (dx, dy) or a callable taking the resampled frame, which lets the crop
-    follow the figure instead of standing still -- see `working_at()`.
+    follow content that moves within the frame instead of standing still.
 
     There is no frame subsampling: the source durations are the animation.
     (`art/import_gif.py` subsamples, crops to a power-of-two window and flattens to a
@@ -850,111 +850,9 @@ def dancing():
     return out
 
 
-# The sweep comes from the mascot's own loading animation, exported at 200x200. Its
-# art is 19x19 -- one native pixel every 10.53 file pixels -- and at that resolution
-# it is EXACTLY the geometry above at half scale: an 8x6 torso, 2-tall arms, 1x1 eyes
-# and four 1x2 legs. Doubling it therefore lands on the same 16x12 torso, 4x4 arms and
-# 2x4 legs every drawn state uses, with the feet flush on the bottom row, which is
-# what WORKING_AT places. Importing it at 1:1 instead would put a half-size mascot on
-# the panel, and cutting to it from any other state would visibly shrink the figure.
-#
-# The one cost of 2x is horizontal: at that size the sweep wants 38 columns and the
-# panel has 32. No fixed offset fits both the figure and its broom, so `working_at()`
-# tracks the figure instead -- see there.
-WORKING_SRC = SOURCES / "claude-claude-code-1.gif"
-WORKING_NATIVE, WORKING_SCALE = 19, 2
-WORKING_BODY, WORKING_SHADE_SRC, WORKING_PAPER = (216, 112, 80), (184, 104, 72), (0, 0, 0)
-WORKING_PALETTE = {
-    WORKING_PAPER: BG,              # background, and the eyes
-    WORKING_BODY: MASCOT,
-    WORKING_SHADE_SRC: MASCOT_SHADE,  # the drawn shading down one side
-    (136, 136, 136): PROP,          # the broom
-}
-
-# The source's standing frames are redrawn rather than held, and two of those wobbles
-# stop reading as life and start reading as damage once they are doubled onto a 32px
-# panel: frames 1-4 widen the mascot's LEFT eye to two cells while the right stays at
-# one, and frames 1-4 and 32-33 draw the legs a cell short, filling the row where the
-# four gaps belong. Both are repaired against frame 0 -- the same pose, drawn right.
-#
-# Each entry names the cells on the 19x19 grid, the colour they must currently hold,
-# and the colour to paint. Checking the current colour means a changed source fails
-# the build loudly instead of being silently mispainted somewhere else.
-WORKING_REPAIRS = [
-    ((1, 2, 3, 4), ((5, 10),), WORKING_PAPER, WORKING_BODY),
-    ((1, 2, 3, 4, 32, 33), ((4, 13), (6, 13), (7, 13), (9, 13)),
-     WORKING_BODY, WORKING_PAPER),
-    # Frame 31 -- mid-rise out of the crouch -- carries a 2x2 body-coloured
-    # fragment two cells left of the shaded trailing edge, background on every
-    # other side: not attached to the silhouette, and sitting outboard of the
-    # shaded edge exactly the way the turned-head rule forbids. Erased rather
-    # than kept.
-    ((31,), ((2, 10), (3, 10), (2, 11), (3, 11)), WORKING_BODY, WORKING_PAPER),
-]
-
-
-def working_class(rgb):
-    """Snap a source pixel to the panel palette, nearest colour wins.
-
-    A handful of anti-aliased pixels from the 200x200 export survive on cell
-    boundaries; this puts each back on the side it came from.
-    """
-    return min(WORKING_PALETTE.items(),
-               key=lambda kv: sum((a - b) ** 2 for a, b in zip(rgb, kv[0])))[1]
-
-
-def working_repair(index, im) -> None:
-    """Fix the source's two standing-frame wobbles -- see WORKING_REPAIRS."""
-    px = im.load()
-    for frames, cells, expect, paint in WORKING_REPAIRS:
-        if index not in frames:
-            continue
-        for x, y in cells:
-            if working_class(px[x, y]) != working_class(expect):
-                raise SystemExit(
-                    f"{WORKING_SRC.name} frame {index}: cell ({x},{y}) holds "
-                    f"{px[x, y]}, expected {expect} -- the art changed, recheck "
-                    f"WORKING_REPAIRS")
-            px[x, y] = paint
-
-
-def working_at(source, native):
-    """
-    Pin the mascot's left edge to the panel's, frame by frame.
-
-    Doubled, the sweep spans 38 columns against the panel's 32, so a single fixed
-    offset always gives something up: centring the figure clips the broom down to a
-    smudge, and pushing the broom on clips the figure's own left arm while it stands.
-    Tracking the figure costs neither. Its left edge only ever takes two values -- it
-    steps right as it crouches -- so this is one 4px pan twice a loop, both times
-    inside a pose change big enough to hide it. In exchange every silhouette is whole
-    and the broom is fully on the panel through the entire sweep; the only thing still
-    cropped is the tip of the handle in the three frames where it is in mid-air.
-    """
-    body = {MASCOT, MASCOT_SHADE}
-    left = min(x for y in range(native) for x in range(native)
-               if working_class(source[x, y]) in body)
-    return (-WORKING_SCALE * left, 2)
-
-
-def sweeping():
-    """Idle variant: the mascot sweeps the floor with a broom while nothing else
-    is happening -- see the `sweeping` CLIP_METADATA entry for why it lives here
-    and not at `working`."""
-    frames = coalesce(imported(WORKING_SRC, working_class, native=WORKING_NATIVE,
-                                scale=WORKING_SCALE, at=working_at,
-                                repair=working_repair))
-    # Frames 11 and 30 are the worst two glitches in the source's held crouch:
-    # 11 drops the front leg entirely and grows a shoulder-shaped fragment
-    # detached from the torso's right edge; 30 collapses to a single eye and
-    # folds the torso in on itself. Neither reads as a pose, only as damage, so
-    # both are cut outright rather than repaired.
-    frames = [f for i, f in enumerate(frames) if i not in (11, 30)]
-    # Anchor bookends, exactly workout()'s reasoning: every frame of the sweep
-    # holds the crouch or the raised broom, so without these the clip neither
-    # opens nor closes on the standing anchor it now shares with idle/idle-alt/
-    # dancing/workout.
-    return [(_standing_anchor(), 200)] + frames + [(_standing_anchor(), 400)]
+# art/sources/claude-claude-code-1.gif -- the mascot's own loading-animation broom
+# sweep, once imported here as the retired `sweeping` clip -- stays in art/sources as
+# reference art. Nothing here imports it any more.
 
 
 # Both hand-authored reference sheets -- art/sources/186F7A97-...png (seated at a
@@ -1444,7 +1342,6 @@ STATES = {
     "thinking-alt": thinking_alt,
     "thinking-pace": thinking_pace,
     "workout": workout,
-    "sweeping": sweeping,
     "working": working,
     "stand-to-sit": stand_to_sit,
     "sit-to-stand": sit_to_stand,
@@ -1530,18 +1427,6 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 0.4,
     },
-    "sweeping": {
-        # The broom sweep, imported from the mascot's own loading animation -- see
-        # sweeping()'s docstring. Moved here from `working` for the same reason
-        # `workout` is here and not at `thinking`: sweeping the floor says nothing
-        # about working on a prompt, it is the mascot doing something while
-        # nothing is happening. Weighted the same as `workout`, the other "doing
-        # something" idle variant -- there is no reason for the two to differ.
-        "loops": True,
-        "pose": "standing",
-        "variantGroup": "idle",
-        "weight": 0.4,
-    },
     "thinking-alt": {
         # Same variantGroup as "thinking" -- imported from the sprite sheet's
         # "..." thought-bubble beat, see thinking_alt()'s docstring.
@@ -1584,9 +1469,9 @@ CLIP_METADATA = {
     "working": {
         # The seated pose, drawn on the standard geometry against `_sitting_anchor()`
         # -- see working()'s own docstring. Replaces the old broom sweep that used
-        # to live at this id; that art now ships as `sweeping`, an idle variant --
-        # see its own CLIP_METADATA entry above for why. `working-alt`, the other
-        # clip that used to share this variantGroup, is retired outright: it was
+        # to live at this id; that art is retired outright, not rehomed -- see
+        # [[Animation Catalogue]]'s `sitting` section. `working-alt`, the other
+        # clip that used to share this variantGroup, is also retired: it was
         # imported from a reference sheet at ~87% of the drawn silhouette, the
         # same problem that got idle-think cut -- see [[Animation Catalogue]].
         "loops": True,

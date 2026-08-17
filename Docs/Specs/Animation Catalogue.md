@@ -42,9 +42,9 @@ shipped clips satisfy.** Any pose that turns the mascot to face the viewer shoul
 eyes toward the facing side, shade the trailing column to `MASCOT_SHADE`, and leave no body
 pixel outboard of the far eye, next to the floor line rule below: a turn that leaves
 silhouette hanging past the eye reads as the figure widening rather than turning. No shipped
-clip turns this way today. `dancing`'s sway and the `sweeping` broom both turn and both
-violate it — the deep turns present a single eye with the full body still behind it, and the
-shallow ones leave a stray column past the far eye — see the known gap below for the frame
+clip turns this way today. `dancing`'s sway turns and violates it — the deep turn presents a
+single eye with the full body still behind it, and the shallow turn leaves a stray column past
+the far eye — see the known gap below for the frame
 numbers and why trimming would make the art worse, not better. The seated fidgets
 (`work-coffee`, `work-look`) sidestep the question rather than satisfying it: this mascot is
 drawn front-on in every clip, so neither actually turns — see the `sitting` section.
@@ -55,19 +55,19 @@ drawn front-on in every clip, so neither actually turns — see the `sitting` se
 
 ### standing
 
-**idle** — five variants, the richest set because idle is on screen most.
+**idle** — four variants, the richest set because idle is on screen most.
 
-| | | | | |
-|---|---|---|---|---|
-| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) | ![sweeping](_animations/sweeping.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **dancing** · 18f · 3.71s · w 0.5 | **workout** · 7f · 1.72s · w 0.4 | **sweeping** · 36f · 4.09s · w 0.4 |
+|                               |                                       |                                     |                                     |
+| ----------------------------- | ------------------------------------- | ----------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4     | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — three variants, and none of them mimes thinking.
 
-| | | |
-|---|---|---|
+|                                       |                                               |                                                 |
+| ------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
 | ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![thinking-pace](_animations/thinking-pace.gif) |
-| **thinking** · 3f · 3.6s · w 1.0 | **thinking-alt** · 14f · 6.06s · w 0.5 | **thinking-pace** · 17f · 4.72s · w 0.5 |
+| **thinking** · 3f · 3.6s · w 1.0      | **thinking-alt** · 14f · 6.06s · w 0.5        | **thinking-pace** · 17f · 4.72s · w 0.5         |
 
 **waiting** and **done** — one each.
 
@@ -80,8 +80,6 @@ drawn front-on in every clip, so neither actually turns — see the `sitting` se
   clip for as long as this project had four animations and four states to spread them
   over, but lifting weights says nothing about working on a prompt — it is the mascot
   doing something while nothing is happening, which is what idle means.
-- **`sweeping` joins `workout` as an idle variant, by the same reasoning** — see the
-  `sitting` section below for what it used to be and why it moved.
 - **The `thinking` group performs nothing.** `thinking` itself just stands and breathes,
   slower than idle does; `thinking-pace` walks off one side and back in the other, twice,
   which on a panel with no middle distance is what walking in circles looks like; only
@@ -157,8 +155,8 @@ out reads better next to the pose than filed separately by clip kind.
 and the turn ending, rather than flickering in and out between calls. The pose has a drawn
 anchor (`_sitting_anchor()`, alongside `_standing_anchor()` and `_dozing_anchor()`); the
 `working` loop is drawn against it as a seated pose, replacing the old standing broom
-sweep — the id survives, the art underneath it does not (the sweep is rehomed rather than
-discarded; see below). `sitting` also has four fidget beats scoped to it, and the two edges
+sweep — the id survives, the art underneath it does not; the sweep itself is retired, not
+rehomed (see below). `sitting` also has four fidget beats scoped to it, and the two edges
 that carry the mascot to and from `standing`.
 
 **The seated art is drawn on the standard geometry, not sliced from a sheet.** The retired
@@ -188,10 +186,10 @@ one, rather than hiding it outright.
 `fidgetGroup: "working"` so none of them can fire anywhere else — the same scoping the
 wander fidgets use for `idle`, below.
 
-|                                          |                                            |                                        |                                          |
-| ----------------------------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
-| ![work-idea](_animations/work-idea.gif)   | ![work-coffee](_animations/work-coffee.gif)  | ![work-look](_animations/work-look.gif)  | ![work-think](_animations/work-think.gif)    |
-| **work-idea**<br>sitting, 9f · 1.4s        | **work-coffee**<br>sitting, 8f · 1.88s        | **work-look**<br>sitting, 6f · 1.81s      | **work-think**<br>sitting, 14f · 4.88s        |
+|                                         |                                             |                                         |                                           |
+| --------------------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------------------------- |
+| ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif) | ![work-look](_animations/work-look.gif) | ![work-think](_animations/work-think.gif) |
+| **work-idea**<br>sitting, 9f · 1.4s     | **work-coffee**<br>sitting, 8f · 1.88s      | **work-look**<br>sitting, 6f · 1.81s    | **work-think**<br>sitting, 14f · 4.88s    |
 
 `work-idea` lifts an eye, sparks, and runs a fast typing burst. `work-coffee` brings a
 cup up in front of him, held in both hands for a sip, then sets it back down and lets it
@@ -225,12 +223,13 @@ stands, and only when the turn actually finished.
 reference art, the way the thinking sheet already does after `thinking-alt` was
 re-authored off it — a record of where the art came from, not a clip that ships.
 
-**The broom sweep moves to `standing`, renamed `sweeping`, and joins `idle`.** It was
-`working` in name only: `pose: sitting` on a figure that stands the whole time it sweeps.
-Once `working` means the drawn seated loop, the sweep has nowhere honest left to be, and
-`idle` is exactly where it belongs — the same move `workout` made, by the same reasoning:
-sweeping the floor says nothing about working on a prompt, it is the mascot doing
-something while nothing is happening. Its worst frames are dropped going in.
+**The broom sweep is retired outright.** It was `working` in name only: `pose: sitting` on
+a figure that stands the whole time it sweeps, drawn on the mascot's own loading-animation
+silhouette rather than the current figure. An earlier pass rehomed it to `standing` as an
+idle variant named `sweeping`, on the same reasoning that moved `workout` off `thinking` —
+but the user's verdict on the result was blunt: *"it has the old posture"*. Rehoming did not
+fix that; only retiring it does. `art/sources/claude-claude-code-1.gif` stays in `art/sources`
+as reference art, unused by any clip.
 
 ### offBottom
 
@@ -390,21 +389,20 @@ stall.
    diagonal stroke has zero height, so the smaller one degenerates into a square. It has
    always been that way — it reads as distance rather than as a letter, which is
    survivable, but a 2-wide Z drawn deliberately would be better than one that collapses.
-4. **`dancing` and the sweep both violate the turned-head rule, and a trim makes it worse,
-   not better.** On the deep turns — `dancing`'s coalesced frames 6 and 15, and the sweep's
-   own coalesced frames 12 and 21 — the shading (43 pixels against 46–47 on the shallow
-   turns) shows a single eye with the full 16-wide torso still behind it; "no body outboard
-   of the far eye" there would mean trimming eight of sixteen columns, halving the head
-   rather than turning it. On the shallow turns the rule cannot be applied either: in
-   `dancing` frame 1 the eyes sit at x13–14 and x21–22 with exactly one body column at x23,
-   and erasing that column opens the far eye into the background — it stops reading as an
-   eye and becomes a notch in the outline — while narrowing the head from 16 columns to 13
-   across most of the sway, the same shrinking silhouette this page already records as the
-   reason `idle-think` was cut and `working-alt` was retired. This was investigated and a
-   trim was attempted and reverted for exactly that reason. The honest fix is re-authoring
-   the sway's turned frames so the eyes shift and the head narrows together, keeping the
-   silhouette one width throughout — not a repair pass on the existing frames — and that is
-   a separate task.
+4. **`dancing` violates the turned-head rule, and a trim makes it worse, not better.** On
+   the deep turns — `dancing`'s coalesced frames 6 and 15 — the shading (43 pixels against
+   46–47 on the shallow turns) shows a single eye with the full 16-wide torso still behind
+   it; "no body outboard of the far eye" there would mean trimming eight of sixteen columns,
+   halving the head rather than turning it. On the shallow turns the rule cannot be applied
+   either: in `dancing` frame 1 the eyes sit at x13–14 and x21–22 with exactly one body
+   column at x23, and erasing that column opens the far eye into the background — it stops
+   reading as an eye and becomes a notch in the outline — while narrowing the head from 16
+   columns to 13 across most of the sway, the same shrinking silhouette this page already
+   records as the reason `idle-think` was cut and `working-alt` was retired. This was
+   investigated and a trim was attempted and reverted for exactly that reason. The honest fix
+   is re-authoring the sway's turned frames so the eyes shift and the head narrows together,
+   keeping the silhouette one width throughout — not a repair pass on the existing frames —
+   and that is a separate task.
 5. **`work-idea`'s spark sits ~6 rows above the seated head with nothing bridging the
    gap**, where `thinking-alt`'s bubble has a puff tail; it may read as floating rather than
    as his.

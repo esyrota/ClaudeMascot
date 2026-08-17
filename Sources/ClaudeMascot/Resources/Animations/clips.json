@@ -142,16 +142,6 @@
       "fromPose": "offBottom",
       "toPose": "standing"
     },
-    "sweeping": {
-      "file": "sweeping.gif",
-      "frameCount": 36,
-      "durationMs": 4090,
-      "motionMs": 4090,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "idle",
-      "weight": 0.4
-    },
     "thinking": {
       "file": "thinking.gif",
       "frameCount": 3,

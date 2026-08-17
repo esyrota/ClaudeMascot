@@ -8,10 +8,9 @@ poses are joined by transition clips. **[[Animation Catalogue]] is the inventory
 clip, its numbers and the pose graph, with a playable image of each. This page covers how
 they are *made*.
 
-Most are drawn programmatically; `starting`, `working` and the sprite-sheet variants are
-imported from hand-drawn art. **`starting`'s silhouette is the reference the drawn clips
-are built to match** — see the one deliberate exception under
-[[#The sweep (`working.gif`)]].
+Most are drawn programmatically; `starting` and the sprite-sheet variants are imported
+from hand-drawn art. **`starting`'s silhouette is the reference the drawn clips are built
+to match.**
 
 ## Tools
 
@@ -116,54 +115,15 @@ The last frame is given a long dwell (`APPEAR_TAIL_MS`) so the panel, which loop
 whatever GIF it holds, shows a mascot standing still rather than a restarted entrance
 if the hand-off runs late. The motion length (duration minus tail) is read from `clips.json` at runtime, so no hand-sync is needed.
 
-## The sweep (`working.gif`)
+## Retired: the broom sweep
 
-Imported from `art/sources/claude-claude-code-1.gif` — the mascot's own loading
-animation, exported at 200×200: it flings a broom up, catches it, bends over and
-sweeps the floor, then straightens up. 36 frames, 3.7s, on the source's own irregular
-timings, which carry the animation and must not be re-evened.
-
-Its palette maps by nearest colour rather than by threshold, because the export left a
-handful of anti-aliased pixels on cell boundaries. The broom's mid-grey becomes `PROP`
-white: a mid-grey would render blue-violet, see [[Panel Quirks]].
-
-**The art is 19×19, not 200×200** — one native pixel every 10.53 file pixels — and at
-that resolution it is exactly [[#Mascot geometry]] at *half* scale: an 8×6 torso,
-2-tall arms, 1×1 eyes, four 1×2 legs. So it is resampled to 19×19 and doubled, which
-lands the figure on the same silhouette every drawn state uses. Importing at 1:1
-instead would put a half-size mascot on the panel and cutting to it from any other
-state would visibly shrink the figure.
-
-### The crop tracks the figure
-
-Doubled, the sweep spans 38 columns against the panel's 32, and no *fixed* offset
-fits both the figure and its prop: centring the mascot clips the broom to a smudge,
-and pushing the broom on clips the mascot's own left arm while it stands. So
-`working_at()` pins the figure's left edge to the panel's, frame by frame. Its left
-edge only ever takes two values — it steps right as it crouches — so this is one 4px
-pan twice a loop, both times inside a pose change big enough to hide it. Every
-silhouette then survives whole and the broom is fully on-panel through the sweep; the
-only thing still cropped is the tip of the handle in the three frames where it is in
-mid-air.
-
-### Two repairs to the source
-
-The source's standing frames are redrawn rather than held, and two of those wobbles
-stop reading as life and start reading as damage once doubled onto 32px. `frame 0` is
-the same pose drawn correctly, so `WORKING_REPAIRS` fixes both against it:
-
-| Frames | Wobble |
-|---|---|
-| 1–4 | the **left eye** is two cells wide while the right stays at one |
-| 1–4, 32–33 | the **legs** are a cell short, filling the row where the four gaps belong |
-
-Each repair names the cells, the colour they must currently hold, and the colour to
-paint. The check on the current colour is the point: if the source art is ever
-replaced, the build fails loudly instead of silently painting over something else.
-
-Still unrepaired, and visible in the same frames: the mascot's **arms sit at different
-heights** there (left at eye level, right two cells lower). Fixing it means moving a
-limb rather than patching four cells, so it is left alone.
+`art/sources/claude-claude-code-1.gif` — the mascot's own loading-animation broom sweep,
+exported at 200×200 — was imported here as a clip through several renames (`working`,
+then, once `working` came to mean the drawn seated pose, `sweeping`). It is retired
+outright now, not re-authored: the user's verdict was that it "has the old posture",
+drawn on a silhouette that predates the current figure — see [[Animation Catalogue]]'s
+`sitting` section. The source file stays in `art/sources` as reference art; nothing in
+`generate.py` imports it any more.
 
 ## The app icon
 
