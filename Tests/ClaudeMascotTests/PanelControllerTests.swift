@@ -223,9 +223,9 @@ func idleEscalatesToSleepingThenOff() async {
 func departureIsAbandonedIfTheMascotCannotLeave() async {
   let clock = FakeClock()
   let panel = MockPanel()
-  // A resolver with no `.away` edge: the art for walking off does not exist
-  // (true of `sitting` in the shipped manifest today). The panel must still
-  // go dark rather than stay lit forever waiting to finish leaving.
+  // A resolver with no `.away` edge: proves graceful degradation for any pose
+  // that might ship without one, not a claim about today's manifest. The
+  // panel must still go dark rather than stay lit forever waiting to leave.
   let controller = makeController(
     panel: panel, clock: clock,
     resolve: { state, _ in state == .away ? nil : defaultTestClips[state] })

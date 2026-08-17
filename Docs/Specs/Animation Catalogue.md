@@ -37,12 +37,17 @@ opened and closed mid-gesture, so a swap into it snapped the arm up four rows an
 the flag in one frame. It gains one half-raised frame at each end — the arm halfway, the
 flag just clearing the head — which is all the contract needs.
 
-**A turned head trims its far-side body edge.** Any pose that turns the mascot to face the
-viewer follows one rule, next to the floor line rule below: the eyes shift toward the
-facing side and the trailing column shades to `MASCOT_SHADE`, and no body pixel sits
-outboard of the far eye. A turn that leaves silhouette hanging past the eye reads as the
-figure widening rather than turning. Today's turn frames in `dancing` break this — it is
-why that turn reads wrong — and the seated fidgets below are drawn to it from the start.
+**A turned head must trim its far-side body edge — a constraint on new art, not a rule the
+shipped clips satisfy.** Any pose that turns the mascot to face the viewer should shift the
+eyes toward the facing side, shade the trailing column to `MASCOT_SHADE`, and leave no body
+pixel outboard of the far eye, next to the floor line rule below: a turn that leaves
+silhouette hanging past the eye reads as the figure widening rather than turning. No shipped
+clip turns this way today. `dancing`'s sway and the `sweeping` broom both turn and both
+violate it — the deep turns present a single eye with the full body still behind it, and the
+shallow ones leave a stray column past the far eye — see the known gap below for the frame
+numbers and why trimming would make the art worse, not better. The seated fidgets
+(`work-coffee`, `work-look`) sidestep the question rather than satisfying it: this mascot is
+drawn front-on in every clip, so neither actually turns — see the `sitting` section.
 
 ---
 
@@ -50,12 +55,12 @@ why that turn reads wrong — and the seated fidgets below are drawn to it from 
 
 ### standing
 
-**idle** — the richest set, because idle is on screen most.
+**idle** — five variants, the richest set because idle is on screen most.
 
-| | | | |
-|---|---|---|---|
-| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **dancing** · 18f · 3.71s · w 0.5 | **workout** · 7f · 1.72s · w 0.4 |
+| | | | | |
+|---|---|---|---|---|
+| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) | ![sweeping](_animations/sweeping.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4 | **dancing** · 18f · 3.71s · w 0.5 | **workout** · 7f · 1.72s · w 0.4 | **sweeping** · 36f · 4.09s · w 0.4 |
 
 **thinking** — three variants, and none of them mimes thinking.
 
@@ -138,31 +143,29 @@ clip's cadence.
 
 ### sitting
 
-|                                     |                                             |
-| ----------------------------------- | ------------------------------------------- |
-| ![working](_animations/working.gif) | ![working-alt](_animations/working-alt.gif) |
-| **working** · 36f · 3.65s · w 1.0   | **working-alt** · 36f · 5.31s · w 0.5       |
+|                                      |                                                          |                                                        |
+| ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------ |
+| ![working](_animations/working.gif) | ![stand-to-sit](_animations/stand-to-sit.gif)             | ![sit-to-stand](_animations/sit-to-stand.gif)           |
+| **working** · 9f · 2.9s · w 1.0     | **stand-to-sit**<br>standing → sitting<br>3f · motion 1.4s | **sit-to-stand**<br>sitting → standing<br>3f · motion 1.4s |
 
-The table above is still today's shipped pair — `working` the broom sweep, `working-alt`
-the imported laptop sheet — and stays as-is until the art in this section actually exists;
-regenerating it is a later pass, not this one. What follows is the intended shape once it
-does.
+The sit edges sit inside this loop table rather than in the Transitions section, the same
+place `stand-to-doze`/`doze-to-stand` sit inside `dozing` above — a pose's own way in and
+out reads better next to the pose than filed separately by clip kind.
 
 `sitting` is where `working` lives, and `working` is on screen for most of a turn — see
 [[Menu Bar App]] for why sitting now covers the whole stretch between the first tool call
-and the turn ending, rather than flickering in and out between calls. The pose gains a
-drawn anchor (`_sitting_anchor()`, alongside `_standing_anchor()` and `_dozing_anchor()`);
-the `working` loop itself is redrawn against it as a seated pose, replacing today's
-standing broom sweep — the id survives, the art underneath it does not (the sweep is
-rehomed rather than discarded; see below). `sitting` also gains four fidget beats scoped
-to it, and the two edges that carry the mascot to and from `standing` — see the sit edges
-below.
+and the turn ending, rather than flickering in and out between calls. The pose has a drawn
+anchor (`_sitting_anchor()`, alongside `_standing_anchor()` and `_dozing_anchor()`); the
+`working` loop is drawn against it as a seated pose, replacing the old standing broom
+sweep — the id survives, the art underneath it does not (the sweep is rehomed rather than
+discarded; see below). `sitting` also has four fidget beats scoped to it, and the two edges
+that carry the mascot to and from `standing`.
 
-**The seated art is drawn on the standard geometry, not sliced from a sheet.** The
-previous seated clip, `working-alt`, was imported from a reference sprite sheet at ~87% of
-the drawn silhouette with a per-tile crop that wobbled a pixel or three — the same failure
-mode `idle-think` was cut for. A sheet import also has no anchor to speak of: the sit
-edges need an exact pixel target to arrive at and leave from, which only drawn art gives.
+**The seated art is drawn on the standard geometry, not sliced from a sheet.** The retired
+seated clip, `working-alt`, was imported from a reference sprite sheet at ~87% of the drawn
+silhouette with a per-tile crop that wobbled a pixel or three — the same failure mode
+`idle-think` was cut for. A sheet import also has no anchor to speak of: the sit edges need
+an exact pixel target to arrive at and leave from, which only drawn art gives.
 
 **The laptop is a dark lid, not the reference's grey.** The reference art
 (`art/sources/186F7A97-…png`, tile 0) draws a 12×8 lid with a flat `(134,134,134)` fill and
@@ -175,13 +178,26 @@ the figure's lower right side and arm — the same trick that lets a 24px figure
 lid both fit inside 32 columns.
 
 **Four fidgets are scoped to `sitting`**, each a non-looping self-edge with
-`fidgetGroup: "working"` so none of them can fire anywhere else: `work-idea` (an eye
-lifts, a spark, a fast typing burst), `work-coffee` (a mug appears, he turns to the viewer,
-sips, sets it down, turns back), `work-look` (turns to the viewer, holds, blinks, turns
-back) and `work-think` — the desk-side thought bubble the seated pose needed, built by
-reusing `_thought_bubble()` rather than adding a new `PanelState`; thinking at the desk is
-a beat on top of `working`, not a state of its own. `work-coffee` and `work-look` turn the
-mascot to face the viewer, so both are drawn to the turned-head rule above.
+`fidgetGroup: "working"` so none of them can fire anywhere else — the same scoping the
+wander fidgets use for `idle`, below.
+
+|                                          |                                            |                                        |                                          |
+| ----------------------------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
+| ![work-idea](_animations/work-idea.gif)   | ![work-coffee](_animations/work-coffee.gif)  | ![work-look](_animations/work-look.gif)  | ![work-think](_animations/work-think.gif)    |
+| **work-idea**<br>sitting, 9f · 1.4s        | **work-coffee**<br>sitting, 8f · 1.88s        | **work-look**<br>sitting, 6f · 1.81s      | **work-think**<br>sitting, 14f · 4.88s        |
+
+`work-idea` lifts an eye, sparks, and runs a fast typing burst. `work-coffee` brings a mug
+into frame, sips, and sets it back down. `work-look` holds a beat and blinks. `work-think`
+is the desk-side thought bubble the seated pose needed, built by reusing
+`_thought_bubble()` rather than adding a new `PanelState` — thinking at the desk is a beat
+on top of `working`, not a state of its own.
+
+**Neither `work-coffee` nor `work-look` turns the mascot to face the viewer.** This mascot
+is drawn front-on in every clip, so there is no away-facing pose to turn from — the
+turned-head rule above does not apply to either. The attention shift in both is drawn the
+way `thinking-alt` draws its own eye lift: paint over and redraw with the eyes higher in
+the head. `work-look` lifts both eyes, symmetric, to keep it visually distinct from the
+single-eye quizzical lift `work-idea` and `thinking-alt` use.
 
 **Two edges connect `sitting` to `standing`**: `stand-to-sit` (he lowers himself, the lid
 comes in) and `sit-to-stand` (the lid closes and leaves, he stands), both pixel-exact on
@@ -279,7 +295,7 @@ same numbers.
 |                                                                     |                                                                       |                                                                 |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------- |
 | ![wander-off-left-in-right](_animations/wander-off-left-in-right.gif) | ![wander-off-right-in-left](_animations/wander-off-right-in-left.gif) | ![wander-sink-rise](_animations/wander-sink-rise.gif)           |
-| **wander-off-left-in-right**<br>9f · motion 3.9s                      | **wander-off-right-in-left**<br>9f · motion 3.9s                      | **wander-sink-rise**<br>24f · motion 6.56s                      |
+| **wander-off-left-in-right**<br>9f · motion 3.9s                      | **wander-off-right-in-left**<br>9f · motion 3.9s                      | **wander-sink-rise**<br>21f · motion 5.72s                      |
 
 Nine clips, every pairing of an exit (`sink`, `walk-off-left`, `walk-off-right`) with an
 entrance (`walk-in-left`, `walk-in-right`, `starting`) — the mascot steps out and comes
@@ -324,21 +340,22 @@ self-edge that is *not* an entrance. Declare one wrong and it silently never fir
 
 ```
         offLeft ──walk-in-left──►  standing  ◄──walk-in-right── offRight
-              ◄──walk-off-left──   ▲ │ ▲ │           ──walk-off-right──►
-                                   │ │ │ │
-              starting ────────────┘ │ │ └──────────── doze-to-stand
-            (from offBottom)         │ │                  (from dozing)
-                                     │ │
-                            sink ────┘ └────► stand-to-doze
-                       (to offBottom)              (to dozing)
-
-                              sitting   ← no edges at all
+              ◄──walk-off-left──   ▲ │ ▲ │ ▲ │         ──walk-off-right──►
+                                   │ │ │ │ │ │
+              starting ────────────┘ │ │ │ │ └──────────── doze-to-stand
+            (from offBottom)         │ │ │ │                  (from dozing)
+                                     │ │ │ │
+                            sink ────┘ │ │ └────► stand-to-doze
+                       (to offBottom)  │ │              (to dozing)
+                                       │ │
+                    sit-to-stand ──────┘ └──────► stand-to-sit
+                     (from sitting)                  (to sitting)
 ```
 
 | From ↓ To → | standing | sitting | dozing | offLeft | offRight | offBottom |
 |---|---|---|---|---|---|---|
-| **standing** | — | ❌ | `stand-to-doze` | `walk-off-left` | `walk-off-right` | `sink` |
-| **sitting** | ❌ | — | ❌ | ❌ | ❌ | ❌ |
+| **standing** | — | `stand-to-sit` | `stand-to-doze` | `walk-off-left` | `walk-off-right` | `sink` |
+| **sitting** | `sit-to-stand` | — | ❌ | ❌ | ❌ | ❌ |
 | **dozing** | `doze-to-stand` | ❌ | — | ❌ | ❌ | ❌ |
 | **offLeft** | `walk-in-left` | ❌ | ❌ | — | ❌ | ❌ |
 | **offRight** | `walk-in-right` | ❌ | ❌ | ❌ | — | ❌ |
@@ -346,16 +363,12 @@ self-edge that is *not* an entrance. Declare one wrong and it silently never fir
 
 `standing` is the hub: every route runs through it, and the choreographer's breadth-first
 search finds multi-hop paths for free (`dozing → offLeft` walks `doze-to-stand` then
-`walk-off-left`, one edge per boundary).
+`walk-off-left`, one edge per boundary). `sitting` now hangs off the hub the same way
+`dozing` does — one edge in, one edge out, both through `standing`.
 
 A ❌ is not a bug. Where no path exists the choreographer swaps directly at the next
 boundary — the panel's swaps are seamless, so a missing edge costs a pose pop, never a
 stall.
-
-**The diagram and table above still show the shipped manifest, without `stand-to-sit` /
-`sit-to-stand`.** The sit edges are decided (see the `sitting` section) but not yet drawn;
-regenerating this diagram and table is part of the pass that adds them, once the art
-exists to draw a transition against.
 
 ## Known gaps — the work worth doing next
 
@@ -367,3 +380,23 @@ exists to draw a transition against.
    diagonal stroke has zero height, so the smaller one degenerates into a square. It has
    always been that way — it reads as distance rather than as a letter, which is
    survivable, but a 2-wide Z drawn deliberately would be better than one that collapses.
+4. **`dancing` and the sweep both violate the turned-head rule, and a trim makes it worse,
+   not better.** On the deep turns — `dancing`'s coalesced frames 6 and 15, and the sweep's
+   own coalesced frames 12 and 21 — the shading (43 pixels against 46–47 on the shallow
+   turns) shows a single eye with the full 16-wide torso still behind it; "no body outboard
+   of the far eye" there would mean trimming eight of sixteen columns, halving the head
+   rather than turning it. On the shallow turns the rule cannot be applied either: in
+   `dancing` frame 1 the eyes sit at x13–14 and x21–22 with exactly one body column at x23,
+   and erasing that column opens the far eye into the background — it stops reading as an
+   eye and becomes a notch in the outline — while narrowing the head from 16 columns to 13
+   across most of the sway, the same shrinking silhouette this page already records as the
+   reason `idle-think` was cut and `working-alt` was retired. This was investigated and a
+   trim was attempted and reverted for exactly that reason. The honest fix is re-authoring
+   the sway's turned frames so the eyes shift and the head narrows together, keeping the
+   silhouette one width throughout — not a repair pass on the existing frames — and that is
+   a separate task.
+5. **`work-idea`'s spark sits ~6 rows above the seated head with nothing bridging the
+   gap**, where `thinking-alt`'s bubble has a puff tail; it may read as floating rather than
+   as his.
+6. **`work-coffee`'s mug occupies the far arm's position rather than being held at the end
+   of it**, so "holding" is implied by adjacency rather than drawn.

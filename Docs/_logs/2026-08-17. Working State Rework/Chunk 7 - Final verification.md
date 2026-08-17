@@ -92,6 +92,30 @@ Also: **`sweeping` needs its line in the `standing`/**idle** variant table** —
 variant now, so it belongs in that table with the other four, and the idle intro sentence
 saying how many variants there are must match reality.
 
+### 3b. The turned-head rule is wrong as written — correct it
+
+Chunk 6 attempted the trim and it was **deliberately reverted** after investigation. The
+rule near the top of the catalogue currently reads as if it applies to any turn and is
+mechanically satisfiable. Neither is true, and the file must say what was actually found:
+
+- **It only means anything for a turn that still shows both eyes.** `dancing`'s two deep
+  turns (its frames 6 and 15, the ones carrying 43 shaded pixels against 46–47 for the
+  shallow ones) and the sweep's own deep turns (coalesced frames 12 and 21) present a single
+  eye with the full 16-wide torso behind it. There, "no body outboard of the far eye" would
+  mean trimming eight of sixteen columns — halving the head rather than turning it.
+- **Even on the shallow turns it cannot be applied to this art.** In `dancing` frame 1 the
+  eyes sit at x13–14 and x21–22 with exactly one body column at x23. Erasing that column
+  leaves the far eye opening into the background — it stops reading as an eye and becomes a
+  notch in the outline — and narrows the head from 16 columns to 13 across most of the sway.
+  That is the shrinking silhouette this page already records as the reason `idle-think` was
+  cut and `working-alt` retired.
+
+So rewrite the rule as a **constraint on newly drawn art** — which is how the seated set was
+built and why it has no such defect — and record the existing violation as a known gap
+rather than a rule the shipped clips satisfy. The honest fix is re-authoring the sway's
+turned frames (shifting the eyes and narrowing the head together, so the silhouette stays
+one width), not a repair pass, and that is a separate task.
+
 ### 4. Known gaps
 
 Re-check the list against the finished tree. `sitting` now has fidgets and edges, `working`
@@ -99,8 +123,14 @@ is drawn at full scale, and the laptop has shape — so if any surviving gap ent
 false or partly false, fix it. Do not invent new gaps; if the art review turns up something,
 that is the user's call, not a gap you add unilaterally.
 
-Two items you MAY record, because they are known and real, if you judge the gap list the
-right home for them (say either way in your report):
+**One gap you MUST add**: the turned-head violation in `dancing` and the sweep, with the
+diagnosis from section 3b — one stray column past the far eye on the shallow turns, a
+single-eye head on the deep ones, and why a trim makes both worse. This is the defect the
+user originally reported, so the page must carry it as known and unfixed rather than let the
+rule imply it is solved.
+
+Two further items you MAY record, because they are known and real, if you judge the gap list
+the right home for them (say either way in your report):
 
 - `work-idea`'s spark sits ~6 rows above the seated head with nothing bridging the gap,
   where `thinking-alt`'s bubble has a puff tail — it may read as floating rather than as his.
