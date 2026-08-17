@@ -118,13 +118,13 @@
     ]
   },
   "sit-to-stand": {
-    "gif_bytes": 641,
-    "crc32": 3703179780,
+    "gif_bytes": 630,
+    "crc32": 3800988397,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
       509,
-      148
+      137
     ]
   },
   "sleeping": {
@@ -154,13 +154,13 @@
     ]
   },
   "stand-to-sit": {
-    "gif_bytes": 641,
-    "crc32": 1542973963,
+    "gif_bytes": 630,
+    "crc32": 3624494098,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
       509,
-      148
+      137
     ]
   },
   "starting": {
@@ -408,43 +408,43 @@
     ]
   },
   "work-coffee": {
-    "gif_bytes": 1737,
-    "crc32": 1780655847,
+    "gif_bytes": 1738,
+    "crc32": 3573343878,
     "outer_chunks": 1,
     "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      226
+      227
     ]
   },
   "work-idea": {
-    "gif_bytes": 1923,
-    "crc32": 1886105063,
+    "gif_bytes": 1870,
+    "crc32": 3332451172,
     "outer_chunks": 1,
     "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      412
+      359
     ]
   },
   "work-look": {
-    "gif_bytes": 1281,
-    "crc32": 3987611056,
+    "gif_bytes": 1248,
+    "crc32": 1379696122,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
       509,
       509,
-      279
+      246
     ]
   },
   "work-think": {
-    "gif_bytes": 3115,
-    "crc32": 124797629,
+    "gif_bytes": 3066,
+    "crc32": 639852607,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -454,19 +454,19 @@
       509,
       509,
       509,
-      77
+      28
     ]
   },
   "working": {
-    "gif_bytes": 1916,
-    "crc32": 1412031570,
+    "gif_bytes": 1848,
+    "crc32": 222606757,
     "outer_chunks": 1,
     "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      405
+      337
     ]
   },
   "workout": {

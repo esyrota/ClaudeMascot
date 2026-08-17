@@ -187,3 +187,22 @@ and does not celebrate until a turn genuinely ends.
 - BLE, packetizer, plugin — the plugin stays frozen at 2.0.0.
 - Retuning fidget weights from logged data.
 - Catalogue gap 6 (the collapsing second Z).
+
+---
+
+## Feedback round (chunk 8)
+
+From the user's panel review of the first delivery. "Overall it's much cleaner now… it's a
+step forward" — with three specific art corrections and one hardware finding.
+
+| Item | Fix | File | Chunk |
+|---|---|---|---|
+| The white lid outline reads as a box, not a laptop | Drop the outline; the lid is grey and carries its own silhouette | `art/generate.py` | 8 |
+| The lid is a flat slab facing the viewer | Redraw in three-quarter: lid leaning away with a skew, a hinge seam, and the keyboard deck coming toward the viewer | `art/generate.py` | 8 |
+| `work-coffee`'s mug is small and stands in where the arm should be | Larger cup, drawn in front of the mascot, both hands to it — the reference sheet's own grab | `art/generate.py` | 8 |
+| The near-black lid fill renders bright blue on the panel | Record against [[Panel Quirks]], whose "very dark colours render fine as dark" claim names this exact value | `Docs/Reference/Panel Quirks.md` | 8 |
+
+**Grey ships against the reference doc's advice, at the user's explicit direction** ("grey is
+read fine, so no worry about it"). If it comes back blue-violet, that is the second data
+point and the rule stands; if it renders correctly, [[Panel Quirks]]' colour rule needs
+rewriting, since the near-black fill it vouches for demonstrably does not work.

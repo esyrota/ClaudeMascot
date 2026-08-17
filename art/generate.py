@@ -107,18 +107,24 @@ SIT_DX = -4        # figure shifted left, clearing room for the laptop on the ri
 SIT_TORSO_Y = 18    # torso top 2px below HOME_Y -- seated is shorter, not lower
 SIT_LEG_FOLD = 2    # shortens LEG_H's 4px legs to 2px stubs on rows 30-31
 
-# The laptop lid drawn in front of the seated figure -- see laptop()'s docstring for
-# why its fill is near-black rather than the reference art's true grey.
-LAPTOP_X, LAPTOP_Y = 18, 24
-LAPTOP_W, LAPTOP_H = 12, 8
-LAPTOP_LOGO_W, LAPTOP_LOGO_H = 2, 2
-# The reference art's lid is a flat (134,134,134) -- exactly the mid-value case
-# [[Panel Quirks]] documents the panel rendering as blue-violet (brightest channel
-# 134, under 255), so that grey cannot ship as drawn. (24,14,10) is the dark fill
-# Panel Quirks names as rendering fine ("very dark colours render fine as dark"),
-# so the lid goes near-black instead, carried by the white outline and logo below
-# for shape.
-LAPTOP_FILL = (24, 14, 10)
+# The laptop drawn in front of the seated figure -- see laptop()'s docstring.
+#
+# Chunk 8: redrawn in three-quarter view (lid leaning away, a hinge seam, the deck
+# coming toward the viewer) at flat grey, prototyped directly against the real
+# seated figure -- transcribed here rather than re-derived. Grey is the reference
+# art's own (134,134,134); [[Panel Quirks]] documents that value rendering
+# blue-violet on the panel, and it ships anyway at the user's explicit direction --
+# see Panel Quirks' colour table for the single-photo data point this chunk adds.
+LAPTOP_GREY = (134, 134, 134)
+# Each tuple is (row, x_first, x_last), inclusive. Row 28 is deliberately absent --
+# left as background, it is the hinge seam that separates lid from deck and is the
+# whole reason the three-quarter view reads.
+LAPTOP_LID = [(22, 20, 28), (23, 20, 28), (24, 19, 27),
+              (25, 19, 27), (26, 18, 26), (27, 18, 26)]
+LAPTOP_DECK = [(29, 17, 26), (30, 16, 25), (31, 15, 24)]
+LAPTOP_LOGO = (24, 22)   # (row, x) of a 2x2 white logo, centred on the lid's middle
+                          # row pair (rows 24-25, spanning x19-27 there)
+LAPTOP_KEYS = [(19, 30, 2), (22, 30, 2)]   # (x, row, width) notches knocked to BG
 
 
 def frame() -> Image.Image:
@@ -1066,46 +1072,51 @@ def _sitting_anchor() -> Image.Image:
     exactly, just shifted with the body -- same torso width, same eye size, same eye
     spacing.
 
-    The near (right) arm is hidden outright with `arms=(0, None)` rather than drawn
-    and then painted over: `laptop()` (called last, below) covers its lower half
-    anyway, and `mascot()` already supports hiding an arm rather than drawing over
-    one. The far (left) arm rests at its normal position, reading as the mascot's
-    other hand resting beside the laptop.
+    Chunk 8: both arms are drawn (`arms=(0, 0)`) rather than hiding the near one
+    outright -- `laptop()` (called last, below) now occludes it directly, since the
+    redrawn three-quarter lid covers exactly the near arm's columns and rows. That
+    occlusion is what puts his hands at the keyboard for free. The far (left) arm
+    rests at its normal position, reading as the mascot's other hand resting beside
+    the laptop, same as before.
     """
     im = frame()
     d = ImageDraw.Draw(im)
-    mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(0, None), legs=(SIT_LEG_FOLD,) * 4)
+    mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(0, 0), legs=(SIT_LEG_FOLD,) * 4)
     laptop(d)
     return im
 
 
 def laptop(d, ox: int = 0, oy: int = 0) -> None:
     """
-    Draw the laptop lid, lid-back to the viewer, at LAPTOP_X/LAPTOP_Y (+ox, +oy).
+    Draw the laptop, lid-back to the viewer, in three-quarter view, at (ox, oy).
 
-    MUST be called after `mascot()` -- see `_sitting_anchor()` -- so its outline and
-    fill paint over the figure's lower right torso edge and near arm. That is what
-    lets a 24px figure at `dx=SIT_DX` and a 12px lid both live inside 32 columns: the
-    lid is drawn in front of him, not beside him.
+    MUST be called after `mascot()` -- see `_sitting_anchor()` -- so it paints over
+    the figure's lower right torso edge and near arm. That is what lets a 24px
+    figure at `dx=SIT_DX` and this laptop both live inside 32 columns: it is drawn
+    in front of him, not beside him.
 
-    `ox`/`oy` default to 0 so every current caller draws the lid at its fixed seated
-    position; the offset exists because a later chunk's sit edges need to slide the
-    lid in and out rather than pop it, and that is a plausible enough need to take
-    the parameter now rather than bolt one on later.
+    Flat `LAPTOP_GREY`, no outline: the silhouette comes from the LID/DECK shape
+    itself, not a drawn edge. `LAPTOP_LID` steps a column right each row as it rises
+    (the lid leaning away); `LAPTOP_DECK` steps a column left each row as it
+    descends (the keyboard deck coming toward the viewer); the gap at row 28 between
+    them is the hinge seam -- without it the two blocks read as one slab, not a
+    laptop opened toward the viewer. `LAPTOP_KEYS` knocks two BG notches into the
+    deck's middle row -- sparse on purpose, a full row of them reads as a stripe,
+    not keys.
+
+    `ox`/`oy` default to 0 so every current caller draws the laptop at its fixed
+    seated position; the offset is what lets the sit edges slide it in and out
+    rather than pop it. The shape spans columns 15-28, so a slide offset pushes part
+    of it off-panel -- `rect()` clips, which is fine and is what the old lid did too.
     """
-    x, y = LAPTOP_X + ox, LAPTOP_Y + oy
-    # 1px white outline: top row, bottom row, left column, right column.
-    rect(d, x, y, LAPTOP_W, 1, PROP)
-    rect(d, x, y + LAPTOP_H - 1, LAPTOP_W, 1, PROP)
-    rect(d, x, y, 1, LAPTOP_H, PROP)
-    rect(d, x + LAPTOP_W - 1, y, 1, LAPTOP_H, PROP)
-    # Near-black fill inside the outline -- see LAPTOP_FILL's own comment for why
-    # this cannot be the reference art's true grey.
-    rect(d, x + 1, y + 1, LAPTOP_W - 2, LAPTOP_H - 2, LAPTOP_FILL)
-    # A 2x2 white logo, centred on the lid.
-    logo_x = x + (LAPTOP_W - LAPTOP_LOGO_W) // 2
-    logo_y = y + (LAPTOP_H - LAPTOP_LOGO_H) // 2
-    rect(d, logo_x, logo_y, LAPTOP_LOGO_W, LAPTOP_LOGO_H, PROP)
+    for row, x0, x1 in LAPTOP_LID:
+        rect(d, x0 + ox, row + oy, x1 - x0 + 1, 1, LAPTOP_GREY)
+    for row, x0, x1 in LAPTOP_DECK:
+        rect(d, x0 + ox, row + oy, x1 - x0 + 1, 1, LAPTOP_GREY)
+    logo_row, logo_x = LAPTOP_LOGO
+    rect(d, logo_x + ox, logo_row + oy, 2, 2, PROP)
+    for x, row, w in LAPTOP_KEYS:
+        rect(d, x + ox, row + oy, w, 1, BG)
 
 
 def working():
@@ -1156,7 +1167,8 @@ def working():
 # the desk as the lid slides in, `sit_to_stand()` is the reverse. Same three-frame
 # register as `stand_to_doze()`/`doze_to_stand()` above: an anchor, one drawn halfway
 # frame, the anchor at the other end held as a long dwell.
-SIT_MID_LID_OX = 6  # the lid mid-slide: LAPTOP_X+ox=24, clipped to columns 24-31
+SIT_MID_LID_OX = 6  # the lid mid-slide, in from off-panel right; the shape spans
+                     # columns 15-28, so ox=6 pushes it to 21-34, clipped at 31
 
 
 def _sit_mid() -> Image.Image:
@@ -1250,41 +1262,64 @@ def work_idea():
 
 def work_coffee():
     """
-    Fidget: a mug appears in the clear columns to his left, he lifts it to sip, sets
-    it down, and it goes.
+    Fidget: a cup comes up in front of him, he grips it with both hands, lifts it
+    for a sip, sets it down, and it goes.
 
     Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
-    The mug lives at columns 0-3, the same columns the resting far arm already
-    occupies in the anchor (`arms=(0, None)`), so it reads as sitting right by his
-    hand rather than floating in space; it never shares a column with the torso
-    (`SIT_DX`-shifted to columns 4-19) or the laptop (columns 18-29), so nothing it
-    draws ever needs to occlude or be occluded by the figure. The far arm is the one
-    that lifts it -- the near arm is already hidden behind the laptop lid in every
-    seated frame, `_sitting_anchor()` included.
-    """
-    MUG_X, MUG_W, MUG_H = 0, 3, 3
-    MUG_REST_Y = 27  # just above the folded legs at rows 30-31
+    Chunk 8 moved this from a small mug at the far arm's resting columns to a bigger
+    cup held with both hands in front of the torso, at the user's explicit
+    direction -- the reference (`art/sources/186F7A97-...png`, tiles 9-10) draws it
+    that way, and stealing that grab deliberately reverses the "props stay in clear
+    space" rule the other fidgets follow. `mascot()` has no per-arm x-offset, so
+    both hands are drawn the way `thinking_alt()` moves an eye: the ordinary arms
+    are hidden (`arms=(None, None)`) once he takes hold, and two hand blocks are
+    drawn beside the cup instead.
 
-    def seated(*, lift=0, mug=False, squash=0):
+    The cup never rises above row `CUP_TOP - CUP_LIFT` = 23, which stays clear of
+    the lowest eye row this beat reaches (22, at `squash=1`) -- see the chunk 8
+    report for the arithmetic. Its columns (5-13 including the hands) stay clear of
+    the laptop's (>=15) too, so nothing here needs to occlude or be occluded by it.
+
+    The handle is a C, not a bulge: two columns to the right of the body, with the
+    middle pixel of the near column left unpainted so the torso shows through the
+    gap -- at this size a handle only reads as a loop if there is a hole in it.
+    """
+    CUP_W, CUP_H = 5, 5   # the cup body; the handle adds 2 more columns to the right
+    CUP_X = 7                  # centred under the torso (SIT_DX-shifted to x4-19)
+    CUP_TOP = 25                # rest row
+    CUP_LIFT = 2                 # raised toward the chest for the sip
+    HAND_W, HAND_H = 2, 2
+
+    def seated(*, cup=False, hands=False, lift=0, squash=0):
         im = frame()
         d = ImageDraw.Draw(im)
-        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=(lift, None),
+        arms = (None, None) if hands else (0, None)
+        mascot(d, SIT_TORSO_Y, dx=SIT_DX, arms=arms,
                legs=(SIT_LEG_FOLD,) * 4, squash=squash)
-        if mug:
-            my = MUG_REST_Y + lift  # travels with the lifting arm
-            rect(d, MUG_X, my, MUG_W, MUG_H, PROP)
-            rect(d, MUG_X + MUG_W, my + 1, 1, 1, PROP)  # the handle notch
+        if cup:
+            cy = CUP_TOP - lift
+            rect(d, CUP_X, cy, CUP_W, CUP_H, PROP)  # the 5x5 body
+            hx0, hx1 = CUP_X + CUP_W, CUP_X + CUP_W + 1  # the handle's two columns
+            rect(d, hx0, cy + 1, 1, 1, PROP)
+            rect(d, hx1, cy + 1, 1, 1, PROP)
+            rect(d, hx1, cy + 2, 1, 1, PROP)
+            # (hx0, cy + 2) is deliberately left unpainted -- the gap in the loop.
+            rect(d, hx0, cy + 3, 1, 1, PROP)
+            rect(d, hx1, cy + 3, 1, 1, PROP)
+            if hands:
+                rect(d, CUP_X - HAND_W, cy + 1, HAND_W, HAND_H, MASCOT)
+                rect(d, CUP_X + CUP_W - 1, cy + 1, HAND_W, HAND_H, MASCOT)
         laptop(d)
         return im
 
     out = [(_sitting_anchor(), 300)]
-    out.append((seated(mug=True), 260))                       # the mug appears
-    out.append((seated(lift=-1, mug=True), 220))
-    out.append((seated(lift=-3, mug=True), 220))               # lifted toward the head
-    out.append((seated(lift=-3, mug=True, squash=1), 420))     # the sip
-    out.append((seated(lift=-1, mug=True), 220))
-    out.append((seated(lift=0, mug=True), 240))                # set back down
-    out.append((seated(lift=0, mug=False), 260))                # and it goes
+    out.append((seated(cup=True), 260))                                   # the cup comes in
+    out.append((seated(cup=True, hands=True), 220))                       # both hands come to it
+    out.append((seated(cup=True, hands=True, lift=CUP_LIFT), 220))        # lifted toward the chest
+    out.append((seated(cup=True, hands=True, lift=CUP_LIFT, squash=1), 420))  # the sip
+    out.append((seated(cup=True, hands=True), 220))                       # back down
+    out.append((seated(cup=True), 240))                                    # hands release
+    out.append((seated(cup=False), 260))                                    # and it goes
     out.append((_sitting_anchor(), APPEAR_TAIL_MS))
     return out
 

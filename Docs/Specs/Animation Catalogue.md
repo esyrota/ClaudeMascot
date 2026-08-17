@@ -167,15 +167,22 @@ silhouette with a per-tile crop that wobbled a pixel or three — the same failu
 `idle-think` was cut for. A sheet import also has no anchor to speak of: the sit edges need
 an exact pixel target to arrive at and leave from, which only drawn art gives.
 
-**The laptop is a dark lid, not the reference's grey.** The reference art
-(`art/sources/186F7A97-…png`, tile 0) draws a 12×8 lid with a flat `(134,134,134)` fill and
-a 2×2 white logo dead centre, lid-back to the viewer. `(134,134,134)` is the exact case
-[[Panel Quirks]] documents the panel rendering as blue-violet, so that grey cannot ship as
-drawn — the lid becomes near-black instead, carried by a 1px white outline with the same
-2×2 white logo, which reads as a laptop lid on the panel the way the true grey never could.
-It is drawn lid-back to the viewer, in front of the figure, and drawn last so it occludes
-the figure's lower right side and arm — the same trick that lets a 24px figure and a 12px
-lid both fit inside 32 columns.
+**The laptop is drawn in three-quarter view, flat grey, at the reference art's own
+value.** Chunk 8 replaced the earlier outlined near-black lid with the reference's true
+`(134,134,134)` — a flat fill, no outline — at the user's explicit direction: that value
+is the exact mid-tone [[Panel Quirks]] documents the panel rendering as blue-violet, and
+it ships anyway as the deliberate next test of that rule (see Panel Quirks' own note on
+the single photo that now complicates it). The silhouette carries the whole read: a
+lid (`LAPTOP_LID`) that leans away from the viewer, stepping a column right with each
+row as it rises, and a keyboard deck (`LAPTOP_DECK`) that comes toward the viewer,
+stepping a column left with each row as it descends, with a one-row gap left as
+background between them — the hinge seam a solid slab would not have. A 2×2 white logo
+sits on the lid back, and two small background notches in the deck's middle row read as
+keys. It is drawn lid-back to the viewer, in front of the figure, and drawn last so it
+occludes the figure's lower right side and near arm — the same trick that lets a 24px
+figure and the laptop both fit inside 32 columns, and (since chunk 8) what puts his hands
+at the keyboard: `_sitting_anchor()` now draws both arms and lets the lid cover the near
+one, rather than hiding it outright.
 
 **Four fidgets are scoped to `sitting`**, each a non-looping self-edge with
 `fidgetGroup: "working"` so none of them can fire anywhere else — the same scoping the
@@ -186,8 +193,11 @@ wander fidgets use for `idle`, below.
 | ![work-idea](_animations/work-idea.gif)   | ![work-coffee](_animations/work-coffee.gif)  | ![work-look](_animations/work-look.gif)  | ![work-think](_animations/work-think.gif)    |
 | **work-idea**<br>sitting, 9f · 1.4s        | **work-coffee**<br>sitting, 8f · 1.88s        | **work-look**<br>sitting, 6f · 1.81s      | **work-think**<br>sitting, 14f · 4.88s        |
 
-`work-idea` lifts an eye, sparks, and runs a fast typing burst. `work-coffee` brings a mug
-into frame, sips, and sets it back down. `work-look` holds a beat and blinks. `work-think`
+`work-idea` lifts an eye, sparks, and runs a fast typing burst. `work-coffee` brings a
+cup up in front of him, held in both hands for a sip, then sets it back down and lets it
+go — chunk 8 moved it from a small mug at his side to this bigger, two-handed hold in
+front of the torso, at the user's direction; it stays clear of the eyes at every frame.
+`work-look` holds a beat and blinks. `work-think`
 is the desk-side thought bubble the seated pose needed, built by reusing
 `_thought_bubble()` rather than adding a new `PanelState` — thinking at the desk is a beat
 on top of `working`, not a state of its own.

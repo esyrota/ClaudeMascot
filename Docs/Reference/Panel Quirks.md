@@ -15,9 +15,24 @@ mid-tones shift hard toward blue-violet.
 | `(255,68,4)` (current `MASCOT`) | 1.00 | correct deep orange |
 | `#DD775B` = `(221,119,91)` (the brand terracotta) | 0.87 | **blue-violet** |
 | `(216,112,80)` (source gif body) | 0.85 | **blue-violet** |
+| `(24,14,10)` | 0.09 | dark in the model below, but **one photo showed saturated blue** — see the note under the table |
 
-Very dark colours (`(24,14,10)`, value 0.09) render fine as dark — the effect bites
-mid-to-high values that fall short of 255.
+Very dark colours were believed to render fine as dark, the effect biting only
+mid-to-high values that fall short of 255 — **that belief is now in question.** A
+photo of the panel showed a lid drawn in exactly `(24,14,10)` (value 0.09) rendering
+as saturated blue, not dark. That is a single photo, on the same photo-of-the-panel-
+alone method the lesson below already warns off, so it is recorded here as an
+observation that contradicts the old claim, not as its replacement — a saturated
+test card of very-dark values would settle it either way. The core rule (brightest
+channel must be 255) still holds everywhere else it has been tested, including
+every non-grey colour in this table.
+
+At the user's explicit direction, the chunk 8 laptop lid now ships at the reference
+art's true `(134,134,134)` grey — the mid-value case this page already documents as
+rendering blue-violet — instead of working around it with a near-black substitute.
+That is the next deliberate data point: whichever way it comes back on the real
+panel narrows down whether the dark-colours line above is right, wrong, or (given the
+`(24,14,10)` case just above) simply unreliable at this end of the range too.
 
 **Consequence:** you cannot make the art darker by dimming channels. Deepen the hue
 instead (pull green/blue down, keep red pinned) and use **panel brightness** for
