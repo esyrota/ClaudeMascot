@@ -5,7 +5,27 @@ struct SessionSnapshot: Sendable, Equatable {
   var state: PanelState
   var subagentDepth: Int
   var lastEventAt: TimeInterval
-  var doneAt: TimeInterval?  // when this session most recently finished
+  /// Whether this session has made a tool call since its last `UserPromptSubmit`.
+  /// `Stop` only earns `.done` when this is true — see `effectiveState(of:now:)` —
+  /// because a `Stop` fires on every turn regardless of whether anything happened:
+  /// 18 turns in one log window each produced a `done` celebration and a 30s hold
+  /// reverting to `idle`, making `done` and `idle` mean the same thing.
+  var didWorkThisTurn: Bool
+  /// When `Stop` arrived, if it has and nothing has contradicted it yet. A `Stop`
+  /// no longer stores `.done` outright: one arrived at 12:12:33 for a session that
+  /// was mid-tool (`PreToolUse` at 12:12:31, `PostToolUse` at 12:12:33, eleven more
+  /// tool events in the following two minutes) because a nested `claude` run's
+  /// lifecycle events landed attributed to the outer session. Recording a pending
+  /// timestamp instead lets `effectiveState(of:now:)` require a quiet grace window
+  /// before the turn is allowed to read as finished.
+  var pendingDoneAt: TimeInterval?
+  /// When `SessionEnd` arrived, if it has and nothing has contradicted it yet. A
+  /// `SessionEnd` at 12:13:23 once powered the panel down while that same session
+  /// kept working for another ten minutes with no intervening `SessionStart` — the
+  /// same class of misattributed-nested-run failure as `pendingDoneAt`, so the fix
+  /// is the same shape: record the intent, let a settle window and any
+  /// contradicting event decide whether it sticks.
+  var pendingEndAt: TimeInterval?
 }
 
 /// The world model: every live session, reduced to the one state the panel
@@ -26,6 +46,13 @@ final class SessionTracker {
   private let clock: () -> TimeInterval
   private let staleAfter: TimeInterval
   private let doneCountsFor: TimeInterval
+  /// Grace window a pending `Stop` or `SessionEnd` must sit quiet for before
+  /// it is allowed to resolve into `.done` / a settled end. Sized to cover
+  /// the nested-`claude` misattribution window that motivated both
+  /// debounces (see `SessionSnapshot.pendingDoneAt` / `pendingEndAt`) — long
+  /// enough for a stray inner-session event to land and cancel the pending
+  /// state, short enough that a genuinely finished turn still reads promptly.
+  private let settleAfter: TimeInterval
 
   private var sessions: [String: SessionSnapshot] = [:]
 
@@ -42,11 +69,13 @@ final class SessionTracker {
   init(
     clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
     staleAfter: TimeInterval = 30 * 60,
-    doneCountsFor: TimeInterval = 30
+    doneCountsFor: TimeInterval = 30,
+    settleAfter: TimeInterval = 5
   ) {
     self.clock = clock
     self.staleAfter = staleAfter
     self.doneCountsFor = doneCountsFor
+    self.settleAfter = settleAfter
   }
 
   /// Applies one hook event. Returns true when the event was meaningful.
@@ -57,7 +86,8 @@ final class SessionTracker {
 
     if EventPolicy.isSessionStart(event) {
       sessions[key] = SessionSnapshot(
-        state: .idle, subagentDepth: 0, lastEventAt: now, doneAt: nil)
+        state: .idle, subagentDepth: 0, lastEventAt: now,
+        didWorkThisTurn: false, pendingDoneAt: nil, pendingEndAt: nil)
       // A session just showed up, so whatever "all sessions ended" meant a
       // moment ago no longer applies.
       allSessionsEndedExplicitly = false
@@ -66,10 +96,13 @@ final class SessionTracker {
     }
 
     if EventPolicy.isSessionEnd(event) {
-      guard sessions.removeValue(forKey: key) != nil else { return false }
-      if sessions.isEmpty {
-        allSessionsEndedExplicitly = true
-      }
+      // Not removed here — recorded as pending. Housekeeping (the physical
+      // removal) lives in `reap()`; see `pendingEndAt`'s doc comment for why
+      // an immediate removal is the bug this replaces.
+      guard var snapshot = sessions[key] else { return false }
+      snapshot.pendingEndAt = now
+      snapshot.lastEventAt = now
+      sessions[key] = snapshot
       return true
     }
 
@@ -85,15 +118,42 @@ final class SessionTracker {
       return true
     }
 
+    // `Stop` needs its own branch: `EventPolicy.state(for:)` maps it to
+    // `.done`, but storing that outright is exactly the bug `pendingDoneAt`
+    // exists to fix (see its doc comment). Everything else — including
+    // leaving `state` untouched, so the mascot keeps doing what it was
+    // doing through the grace window — is handled below by treating it as
+    // an event with no `PanelState` of its own.
+    if EventPolicy.isTurnEnd(event) {
+      guard var snapshot = sessions[key] else { return false }
+      snapshot.pendingDoneAt = now
+      snapshot.lastEventAt = now
+      sessions[key] = snapshot
+      return true
+    }
+
     guard let state = EventPolicy.state(for: event) else { return false }
 
     var snapshot =
       sessions[key]
-      ?? SessionSnapshot(state: .idle, subagentDepth: 0, lastEventAt: now, doneAt: nil)
+      ?? SessionSnapshot(
+        state: .idle, subagentDepth: 0, lastEventAt: now,
+        didWorkThisTurn: false, pendingDoneAt: nil, pendingEndAt: nil)
     snapshot.state = state
     snapshot.lastEventAt = now
-    if state == .done {
-      snapshot.doneAt = now
+    // Every event that reaches this point (everything but `Stop` and
+    // `SessionEnd`, handled above, and `SessionStart`/`SubagentStop`,
+    // handled earlier) clears both pendings, `PostToolUse` included: any
+    // real activity for this session contradicts a `Stop` or `SessionEnd`
+    // that arrived for it, which is precisely how the nested-run
+    // misattributions in `pendingDoneAt`/`pendingEndAt` self-heal once the
+    // outer session's own events resume.
+    snapshot.pendingDoneAt = nil
+    snapshot.pendingEndAt = nil
+    if EventPolicy.isTurnStart(event) {
+      snapshot.didWorkThisTurn = false
+    } else if EventPolicy.isToolCall(event) {
+      snapshot.didWorkThisTurn = true
     }
     if EventPolicy.isSubagentSpawn(event) {
       snapshot.subagentDepth += 1
@@ -102,29 +162,50 @@ final class SessionTracker {
     return true
   }
 
-  /// Drops sessions that have gone quiet past `staleAfter`. A crashed
-  /// `claude` never sends `SessionEnd`, so without this one stuck session
-  /// would pin the panel in whatever it last reported forever. This is
-  /// silent housekeeping, not a `SessionEnd` — it never sets the all-ended
-  /// condition, so a fully-reaped tracker falls back to `.idle` rather than
-  /// blanking to `.off`.
+  /// Drops sessions that have gone quiet past `staleAfter`, and physically
+  /// removes any session whose `SessionEnd` has settled — i.e. whose
+  /// `pendingEndAt` is at least `settleAfter` old (see
+  /// `SessionSnapshot.pendingEndAt`). `derived` treats a settled-ended
+  /// session as gone already; this is the housekeeping step that catches up
+  /// the storage to match, and is the only place `allSessionsEndedExplicitly`
+  /// gets set, so it stays in step with what was actually removed. A crashed
+  /// `claude` never sends `SessionEnd` at all, so `staleAfter` remains the
+  /// backstop for that case — without it one stuck session would pin the
+  /// panel in whatever it last reported forever.
   func reap() {
     let now = clock()
     sessions = sessions.filter { now - $0.value.lastEventAt <= staleAfter }
+    let settledEnded = sessions.filter { isSettledEnded($0.value, now: now) }
+    guard !settledEnded.isEmpty else { return }
+    for key in settledEnded.keys {
+      sessions.removeValue(forKey: key)
+    }
+    if sessions.isEmpty {
+      allSessionsEndedExplicitly = true
+    }
   }
 
-  /// The single state the panel should show, reduced across all live
-  /// sessions by precedence: `waiting > working > thinking > done > idle`.
-  /// `.starting` never appears here — it is a transition `PanelController`
-  /// plays on the way to a derived state, not somewhere a session can sit
-  /// (see `PanelState`'s doc comment).
+  /// The single state the panel should show, reduced across live (not
+  /// settled-ended) sessions by precedence:
+  /// `waiting > working > thinking > done > idle`. `.starting` never
+  /// appears here — it is a transition `PanelController` plays on the way
+  /// to a derived state, not somewhere a session can sit (see
+  /// `PanelState`'s doc comment).
+  ///
+  /// Read-only: a settled-ended session is *skipped* here, never removed —
+  /// removal is `reap()`'s job (see its doc comment). `derived` runs every
+  /// tick, including ticks where `reap()` has not yet run, so it must be
+  /// correct on its own rather than relying on mutating storage to get
+  /// there.
   var derived: PanelState {
-    guard !sessions.isEmpty else {
-      return allSessionsEndedExplicitly ? .off : .idle
-    }
     let now = clock()
+    let live = sessions.values.filter { !isSettledEnded($0, now: now) }
+    guard !live.isEmpty else {
+      let anySettledEnded = sessions.values.contains { isSettledEnded($0, now: now) }
+      return (anySettledEnded || allSessionsEndedExplicitly) ? .off : .idle
+    }
     return
-      sessions.values
+      live
       .map { effectiveState(of: $0, now: now) }
       .min { precedence(of: $0) < precedence(of: $1) }
       ?? .idle
@@ -145,13 +226,49 @@ final class SessionTracker {
     return entrancePending
   }
 
-  /// A session's `.done` only outranks `.idle` for `doneCountsFor` seconds
-  /// after it fired; past that it reads as `.idle`. Otherwise a session
-  /// that finished long ago would permanently outrank one that is
-  /// genuinely idle right now.
+  /// Whether `snapshot`'s `SessionEnd` has settled: `pendingEndAt` is set
+  /// and at least `settleAfter` old. A `PreToolUse` (or any other real
+  /// event) for the same session clears `pendingEndAt` before this can ever
+  /// become true — see `apply(_:)` — which is how the 12:13:23 failure (a
+  /// `SessionEnd` powering the panel down under a session that kept working
+  /// another ten minutes) is prevented rather than merely delayed.
+  private func isSettledEnded(_ snapshot: SessionSnapshot, now: TimeInterval) -> Bool {
+    guard let pendingEndAt = snapshot.pendingEndAt else { return false }
+    return now - pendingEndAt >= settleAfter
+  }
+
+  /// Resolves the state one session should be read as *right now*, folding
+  /// in both debounces on top of the raw stored `state`:
+  ///
+  /// 1. A pending `Stop` (`pendingDoneAt`) is resolved first. Inside
+  ///    `settleAfter` of it, nothing has been claimed yet — the mascot is
+  ///    still doing whatever `state` says, so this falls through to rule 2.
+  ///    Past `settleAfter`: `.done` if the turn did real work
+  ///    (`didWorkThisTurn`), for `doneCountsFor` seconds — this replaces
+  ///    the old unconditional `doneAt` window. Either past that window, or
+  ///    the turn never did any work, resolves to `.idle`: a `Stop` with no
+  ///    work behind it has nothing to celebrate (see
+  ///    `SessionSnapshot.didWorkThisTurn`).
+  /// 2. The seating rule: a stored `.thinking` reads as `.working` while
+  ///    `didWorkThisTurn` holds. `PostToolUse` maps to `.thinking`, a
+  ///    standing state, so reading every event literally made the mascot
+  ///    stand up and sit back down between tool calls — 56 sit↔stand swaps
+  ///    in one 96-minute window across ~7 turns. Sitting for the whole
+  ///    turn instead of once per tool call fixes it at the source.
+  /// 3. Otherwise, the raw stored state.
   private func effectiveState(of snapshot: SessionSnapshot, now: TimeInterval) -> PanelState {
-    guard snapshot.state == .done, let doneAt = snapshot.doneAt else { return snapshot.state }
-    return now - doneAt < doneCountsFor ? .done : .idle
+    if let pendingDoneAt = snapshot.pendingDoneAt {
+      let since = now - pendingDoneAt
+      if since >= settleAfter {
+        guard snapshot.didWorkThisTurn else { return .idle }
+        return since < settleAfter + doneCountsFor ? .done : .idle
+      }
+      // Still in the grace window: fall through to rules 2-3 below.
+    }
+    if snapshot.state == .thinking && snapshot.didWorkThisTurn {
+      return .working
+    }
+    return snapshot.state
   }
 
   /// Lower is more urgent: `waiting > working > thinking > done > idle`.

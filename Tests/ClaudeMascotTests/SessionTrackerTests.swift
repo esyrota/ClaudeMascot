@@ -4,8 +4,9 @@ import Testing
 @testable import ClaudeMascot
 
 /// Fake clock the tracker reads instead of `Date()`. Every test advances it
-/// explicitly, so tests involving `staleAfter`/`doneCountsFor` (minutes of
-/// wall time) finish instantly. Mirrors `PanelControllerTests`' `FakeClock`.
+/// explicitly, so tests involving `staleAfter`/`doneCountsFor`/`settleAfter`
+/// (minutes of wall time) finish instantly. Mirrors `PanelControllerTests`'
+/// `FakeClock`.
 @MainActor
 private final class FakeClock {
   private(set) var now: TimeInterval = 1_000
@@ -41,7 +42,7 @@ func stopFromOneSessionDoesNotCancelAnothersThinking() {
 @Test("derived reduces across concurrent sessions by full precedence order")
 func fullPrecedenceOrdering() {
   let clock = FakeClock()
-  let tracker = SessionTracker(clock: clock.callAsFunction)
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
 
   tracker.apply(hook("SessionStart", session: "A"))
   tracker.apply(hook("SessionStart", session: "B"))
@@ -52,7 +53,11 @@ func fullPrecedenceOrdering() {
   // idle, idle, idle, idle, idle -> idle
   #expect(tracker.derived == .idle)
 
+  // A did real work before Stop, and enough time has passed to settle to done.
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
   tracker.apply(hook("Stop", session: "A"))
+  clock.advance(6)  // past settleAfter
   // done, idle, idle, idle, idle -> done
   #expect(tracker.derived == .done)
 
@@ -74,19 +79,28 @@ func fullPrecedenceOrdering() {
 }
 
 @MainActor
-@Test("a done session decays to idle after doneCountsFor")
+@Test("a done session decays to idle after settleAfter + doneCountsFor")
 func doneDecaysToIdle() {
   let clock = FakeClock()
-  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30)
+  let tracker = SessionTracker(
+    clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
 
   tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
   tracker.apply(hook("Stop", session: "A"))
+
+  // Still within the settle window: reads as whatever it was doing
+  // (working, from the seating rule), not done yet.
+  #expect(tracker.derived == .working)
+
+  clock.advance(5)  // now exactly at settleAfter
   #expect(tracker.derived == .done)
 
-  clock.advance(29)
+  clock.advance(29)  // 34s since pendingDoneAt, still < settleAfter + doneCountsFor (35)
   #expect(tracker.derived == .done)
 
-  clock.advance(2)  // now 31s since doneAt
+  clock.advance(2)  // now 36s since pendingDoneAt
   #expect(tracker.derived == .idle)
 }
 
@@ -144,15 +158,19 @@ func subagentStopDoesNotChangeState() {
 }
 
 @MainActor
-@Test("SessionEnd of the last session yields off; a fresh SessionStart clears it")
+@Test("SessionEnd of the last session yields off once settled; a fresh SessionStart clears it")
 func sessionEndYieldsOffUntilNewSessionStart() {
   let clock = FakeClock()
-  let tracker = SessionTracker(clock: clock.callAsFunction)
+  let tracker = SessionTracker(clock: clock.callAsFunction, settleAfter: 5)
 
   tracker.apply(hook("SessionStart", session: "A"))
   tracker.apply(hook("SessionEnd", session: "A"))
+  clock.advance(5)  // past settleAfter
 
   #expect(tracker.derived == .off)
+
+  tracker.reap()
+  #expect(tracker.sessionCount == 0)
 
   tracker.apply(hook("SessionStart", session: "A"))
   #expect(tracker.derived == .idle)
@@ -172,14 +190,16 @@ func neverHadASessionReadsIdle() {
 @Test("nil session ids collapse to one implicit session")
 func nilSessionIdsCollapseToOneImplicitSession() {
   let clock = FakeClock()
-  let tracker = SessionTracker(clock: clock.callAsFunction)
+  let tracker = SessionTracker(clock: clock.callAsFunction, settleAfter: 5)
 
   tracker.apply(hook("SessionStart", session: nil))
   tracker.apply(hook("UserPromptSubmit", session: nil))
   #expect(tracker.sessionCount == 1)
   #expect(tracker.derived == .thinking)
 
+  tracker.apply(hook("PreToolUse", session: nil))
   tracker.apply(hook("Stop", session: nil))
+  clock.advance(5)
   #expect(tracker.sessionCount == 1)
   #expect(tracker.derived == .done)
 }
@@ -208,4 +228,195 @@ func unknownEventIsNotMeaningful() {
   #expect(meaningful == false)
   #expect(tracker.sessionCount == 0)
   #expect(tracker.derived == .idle)
+}
+
+// MARK: - Chunk 2: seating, done-debounce, and end-debounce
+
+@MainActor
+@Test("a prompt with no tool call yet derives thinking")
+func promptWithNoToolCallDerivesThinking() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+
+  #expect(tracker.derived == .thinking)
+}
+
+@MainActor
+@Test("after one PreToolUse, PostToolUse still derives working — the seating case")
+func postToolUseAfterWorkStaysWorking() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
+  #expect(tracker.derived == .working)
+
+  tracker.apply(hook("PostToolUse", session: "A"))
+  #expect(tracker.derived == .working)
+}
+
+@MainActor
+@Test("a new UserPromptSubmit returns to thinking — the per-turn flag resets")
+func newPromptResetsSeatingFlag() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
+  tracker.apply(hook("PostToolUse", session: "A"))
+  #expect(tracker.derived == .working)
+
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  #expect(tracker.derived == .thinking)
+}
+
+@MainActor
+@Test("the 12:12:33 case: Stop mid-tool never resolves to done, even well past settleAfter")
+func stopMidToolNeverBecomesDone() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "1e27"))
+  tracker.apply(hook("UserPromptSubmit", session: "1e27"))
+  tracker.apply(hook("PreToolUse", session: "1e27"))
+  tracker.apply(hook("Stop", session: "1e27"))
+  tracker.apply(hook("PostToolUse", session: "1e27"))  // 0s later, contradicts the pending Stop
+
+  clock.advance(120)  // well past settleAfter + doneCountsFor
+  #expect(tracker.derived == .working)
+  #expect(tracker.derived != .done)
+}
+
+@MainActor
+@Test("a Stop after real work derives done past settleAfter, and idle past settleAfter + doneCountsFor")
+func stopAfterRealWorkEarnsDoneThenExpires() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
+  tracker.apply(hook("Stop", session: "A"))
+
+  clock.advance(4)  // still inside settleAfter
+  #expect(tracker.derived != .done)
+
+  clock.advance(1)  // now exactly at settleAfter (5s total)
+  #expect(tracker.derived == .done)
+
+  clock.advance(30)  // 35s since pendingDoneAt == settleAfter + doneCountsFor
+  #expect(tracker.derived == .idle)
+}
+
+@MainActor
+@Test("a work-free turn derives idle on Stop, never done")
+func workFreeTurnNeverEarnsDone() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("Stop", session: "A"))
+
+  clock.advance(5)
+  #expect(tracker.derived == .idle)
+
+  clock.advance(30)
+  #expect(tracker.derived == .idle)
+}
+
+@MainActor
+@Test("during the grace window the session still derives what it was doing")
+func duringGraceWindowStateIsUnchanged() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
+  #expect(tracker.derived == .working)
+
+  tracker.apply(hook("Stop", session: "A"))
+  // Immediately after Stop, still inside the grace window: the seating
+  // rule still applies because didWorkThisTurn holds and state is
+  // unchanged by Stop.
+  #expect(tracker.derived == .working)
+
+  clock.advance(4)
+  #expect(tracker.derived == .working)
+}
+
+@MainActor
+@Test("the 12:13:23 case: SessionEnd followed by PreToolUse never derives off")
+func sessionEndFollowedByToolUseNeverGoesOff() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "1e27"))
+  tracker.apply(hook("SessionEnd", session: "1e27"))
+  tracker.apply(hook("PreToolUse", session: "1e27"))  // contradicts the pending end
+
+  clock.advance(600)  // ten minutes, well past settleAfter
+  #expect(tracker.derived == .working)
+  #expect(tracker.derived != .off)
+}
+
+@MainActor
+@Test("a SessionEnd with nothing following derives off once past settleAfter, and reap empties the tracker")
+func sessionEndAloneSettlesToOffAndReaps() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("SessionEnd", session: "A"))
+
+  clock.advance(4)
+  #expect(tracker.derived != .off)
+
+  clock.advance(1)  // now at settleAfter
+  #expect(tracker.derived == .off)
+
+  tracker.reap()
+  #expect(tracker.sessionCount == 0)
+  #expect(tracker.derived == .off)
+}
+
+@MainActor
+@Test("a session sitting in a pending state is still reaped by staleAfter")
+func pendingSessionIsStillReapedByStaleness() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, staleAfter: 60, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", session: "A"))
+  tracker.apply(hook("Stop", session: "A"))  // pendingDoneAt set, never settles or contradicts
+
+  clock.advance(61)  // past staleAfter
+  tracker.reap()
+
+  #expect(tracker.sessionCount == 0)
+  #expect(tracker.derived == .idle)
+}
+
+@MainActor
+@Test("multi-session priority reduction still holds with pending states in play")
+func multiSessionPriorityReductionHoldsWithPendingStates() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("SessionStart", session: "B"))
+
+  tracker.apply(hook("PreToolUse", session: "A"))
+  #expect(tracker.derived == .working)
+
+  tracker.apply(hook("Notification", session: "B"))
+  // waiting outranks working.
+  #expect(tracker.derived == .waiting)
 }
