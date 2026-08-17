@@ -64,6 +64,34 @@ reconnect ever run. `BLEClient` wedges in `.connecting`, every upload fails
 connect and sets `skipRememberedPeripheral`, so the next attempt **scans** instead of
 reaching for the same stale identifier and stalling again.
 
+## System sleep ends the reconnect chain
+
+The other way the panel goes dark for good, and the one that actually happened: the Mac
+sleeps. Sleep drops the BLE link, so `didDisconnectPeripheral` fires and schedules a 1s
+reconnect — but sleep also takes the radio out of `.poweredOn`, so that retry arrives to
+a dead `CBCentralManager` and **the chain is only as long as its last link**. Any early
+return that does not reschedule is terminal.
+
+`BLEClient.beginConnecting` used to be exactly that: a `guard` that dropped the attempt
+when the radio was not ready, logging nothing and arming nothing. Recovery then rested
+entirely on `centralManagerDidUpdateState` firing `.poweredOn` again *and* finding
+`peripheral == nil` — a field sleep never cleared. One 12-second nap and the panel was
+black until the app was relaunched, with every `PanelController` tick logging
+`wake failed … BLEError error 0` (`.notConnected`) forever.
+
+Three things now hold it open, deliberately overlapping:
+
+1. `beginConnecting` reschedules instead of returning silently, so the chain never ends.
+2. Losing the radio clears `peripheral`, the characteristic and any pending write, so the
+   `.poweredOn` rescue starts clean; that rescue no longer gates on `peripheral == nil`.
+3. `AppModel` reconnects on `NSWorkspace.didWakeNotification`, and calls
+   `BLEClient.ensureConnecting()` on every tick — a backstop that restarts the chain if
+   the client is ever disconnected with no retry armed, whatever the reason.
+
+The third exists because the first two are correctness properties of every early return
+in a state machine that has already shipped this bug once. A dark panel that only a
+relaunch fixes is this app's worst failure; it is worth a redundant check per second.
+
 ## Symptom to check first
 
 A silent CoreBluetooth is diagnosable now: `BLEClient` logs every connection-state

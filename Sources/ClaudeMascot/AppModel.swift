@@ -184,6 +184,22 @@ final class AppModel: ObservableObject {
       hookServerError = error.localizedDescription
     }
 
+    // Reconnect on wake from system sleep. Sleep drops the BLE link and takes
+    // the radio down with it, so the reconnect that the disconnect schedules
+    // fires into a dead radio; this is the event that says the world is worth
+    // retrying. Without it the panel stayed dark until the app was relaunched.
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didWakeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        guard let self, self.enabled else { return }
+        Self.log.notice("woke from system sleep; reconnecting")
+        self.bleClient.reconnectNow()
+      }
+    }
+
     // Register for clean shutdown.
     NotificationCenter.default.addObserver(
       forName: NSApplication.willTerminateNotification,
@@ -231,6 +247,9 @@ final class AppModel: ObservableObject {
         try? await Task.sleep(for: self.tickInterval)
         if Task.isCancelled { break }
         await self.applyLiveSettings()
+        if self.enabled {
+          self.bleClient.ensureConnecting()
+        }
         // Reap stale sessions and propagate any state change to the panel.
         self.sessionTracker.reap()
         let derivedState = self.sessionTracker.derived

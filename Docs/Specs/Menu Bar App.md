@@ -102,6 +102,7 @@ Both are always on, size-capped, and rotated; tool input is never logged, matchi
 - `off` short-circuits straight to panel-off, without waiting out that escalation.
 - No 15-minute quit — a resident native app is cheap, and reconnecting is the slow part. It keeps the BLE connection.
 - Reconnect automatically if the panel drops off: exponential backoff to a 30s ceiling, plus a **connect timeout**, because CoreBluetooth's own `connect` has none and will pend forever — see [[macOS Bluetooth TCC]].
+- **The reconnect chain must never end.** Waking from system sleep reconnects immediately (backoff discarded — the panel is right there), and every tick calls `BLEClient.ensureConnecting()`, which restarts the chain if the client is disconnected with no retry armed. A sleeping Mac used to leave the panel dark until the app was relaunched; [[macOS Bluetooth TCC]] has the anatomy.
 - **Connection stability is a design constraint.** Only a new BLE connection flashes the panel's own icon; everything else stays visible. Dropping and reconnecting is the only visible artefact we cannot hide.
 
 ## Observability

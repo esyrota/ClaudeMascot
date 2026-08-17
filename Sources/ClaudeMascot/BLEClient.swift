@@ -141,6 +141,36 @@ final class BLEClient: NSObject, ObservableObject {
     updateState(.off)
   }
 
+  /// Reconnects at once, from the top, discarding any pending backoff.
+  ///
+  /// Called when something outside the client knows the world just changed
+  /// under it — waking from system sleep, above all. A wake invalidates the
+  /// link *and* the backoff: the panel is right there, so there is nothing to
+  /// back off from, and waiting out a 30s ceiling is a dark panel for no
+  /// reason.
+  func reconnectNow() {
+    guard isStarted, state != .connected else { return }
+    reconnectTask?.cancel()
+    reconnectTask = nil
+    reconnectDelaySeconds = 1
+    beginConnecting()
+  }
+
+  /// Restarts the reconnect chain if it has stalled. Cheap and idempotent —
+  /// `AppModel` calls it on every tick.
+  ///
+  /// The client should never be able to sit disconnected with no retry armed,
+  /// but that is a property of every early return in here staying correct
+  /// forever, and one that shipped broken (see `beginConnecting`). A panel
+  /// that stays dark until the app is relaunched is the worst failure this
+  /// app has, so it gets a backstop that does not depend on the state machine
+  /// being right.
+  func ensureConnecting() {
+    guard isStarted, state == .disconnected, reconnectTask == nil else { return }
+    Self.log.notice("reconnect chain had stalled; restarting it")
+    beginConnecting()
+  }
+
   /// Packetizes `gif` (see `GifPacketizer`) and writes every packet to the
   /// panel strictly in order, awaiting each write's delegate acknowledgment
   /// before sending the next.
@@ -181,7 +211,19 @@ final class BLEClient: NSObject, ObservableObject {
   }
 
   private func beginConnecting() {
-    guard isStarted, let centralManager, centralManager.state == .poweredOn else { return }
+    guard isStarted else { return }
+    guard let centralManager, centralManager.state == .poweredOn else {
+      // The radio is not ready — asleep, resetting, or switched off. Simply
+      // returning here *ends the reconnect chain*: nothing else reschedules,
+      // and recovery is left entirely to a `.poweredOn` callback. A system
+      // sleep lands in exactly this window (the disconnect schedules a 1s
+      // retry; the radio is down when it fires) and the panel then stays dark
+      // for the rest of the app's life. Always leave a retry armed.
+      let radio = centralManager.map { String(describing: $0.state) } ?? "no manager"
+      Self.log.notice("radio not ready (\(radio, privacy: .public)); retrying")
+      scheduleReconnect()
+      return
+    }
     lastError = nil
 
     if !skipRememberedPeripheral,
@@ -259,6 +301,10 @@ final class BLEClient: NSObject, ObservableObject {
     reconnectTask = Task { [weak self] in
       try? await Task.sleep(for: .seconds(delay))
       guard let self, !Task.isCancelled else { return }
+      // Cleared before the attempt, not after: `beginConnecting` may schedule
+      // the next one, and `ensureConnecting` reads this to tell "a retry is
+      // armed" from "the chain has stopped".
+      self.reconnectTask = nil
       self.retryConnect()
     }
   }
@@ -306,11 +352,26 @@ final class BLEClient: NSObject, ObservableObject {
     guard let centralManager else { return }
     switch centralManager.state {
     case .poweredOn:
-      if isStarted, peripheral == nil {
+      // Not `peripheral == nil`: a radio that comes back invalidates whatever
+      // we were holding, and gating the rescue on that field means a stale
+      // one wedges the client for good.
+      if isStarted, state != .connected, state != .connecting {
+        reconnectDelaySeconds = 1
         beginConnecting()
       }
     case .poweredOff, .unauthorized, .unsupported, .resetting, .unknown:
       if isStarted {
+        // The radio went away, so the peripheral, the characteristic and any
+        // in-flight write went with it. Dropping them here is what lets the
+        // `.poweredOn` branch above start clean, and stops a write from
+        // hanging on a continuation nothing will ever resume.
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = nil
+        connectTimeoutTask?.cancel()
+        connectTimeoutTask = nil
+        peripheral = nil
+        writeCharacteristic = nil
+        failPendingWrite(with: BLEError.notConnected)
         updateState(.disconnected)
       }
     @unknown default:
