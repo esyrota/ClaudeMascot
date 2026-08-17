@@ -3,6 +3,10 @@ model: 'Sonnet'
 estimated_time: 25
 estimated_tools: 32
 estimated_tokens: 85000
+actual_tokens: 'unreported'
+actual_tools: 'unreported'
+actual_time: 10
+outcome: 'killed by session limit; edits salvaged, verification completed by orchestrator'
 estimated_risk: 'medium'
 ---
 

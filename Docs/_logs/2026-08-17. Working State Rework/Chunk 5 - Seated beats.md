@@ -3,6 +3,10 @@ model: 'Sonnet'
 estimated_time: 25
 estimated_tools: 30
 estimated_tokens: 80000
+actual_tokens: 102000
+actual_tools: 23
+actual_time: 8
+outcome: 'success'
 estimated_risk: 'medium'
 ---
 
