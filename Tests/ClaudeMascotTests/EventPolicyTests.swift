@@ -21,6 +21,38 @@ func eventMapsToExpectedState(name: String, expected: PanelState) {
   #expect(EventPolicy.state(for: event) == expected)
 }
 
+@Test(
+  "a PreToolUse for a user-blocking tool is waiting, not working",
+  arguments: ["AskUserQuestion", "ExitPlanMode"]
+)
+func userBlockingToolMapsToWaiting(tool: String) {
+  let event = HookEvent(event: "PreToolUse", tool: tool, session: nil, mode: nil)
+  #expect(EventPolicy.state(for: event) == .waiting)
+}
+
+@Test(
+  "the matching PostToolUse is the user having answered, so it is not waiting",
+  arguments: ["AskUserQuestion", "ExitPlanMode"]
+)
+func userBlockingToolEndsOnPostToolUse(tool: String) {
+  let event = HookEvent(event: "PostToolUse", tool: tool, session: nil, mode: nil)
+  #expect(EventPolicy.state(for: event) == .thinking)
+  #expect(!EventPolicy.isUserBlocking(event))
+}
+
+@Test("an ordinary tool call is still working, not waiting")
+func ordinaryToolStillWorks() {
+  let event = HookEvent(event: "PreToolUse", tool: "Bash", session: nil, mode: nil)
+  #expect(EventPolicy.state(for: event) == .working)
+}
+
+@Test("Task keeps its subagent-spawn meaning and does not become waiting")
+func taskIsNotUserBlocking() {
+  let event = HookEvent(event: "PreToolUse", tool: "Task", session: nil, mode: nil)
+  #expect(EventPolicy.state(for: event) == .working)
+  #expect(EventPolicy.isSubagentSpawn(event))
+}
+
 @Test("SubagentStop is deliberately ignored, not a bug")
 func subagentStopMapsToNil() {
   let event = HookEvent(event: "SubagentStop", tool: nil, session: nil, mode: nil)

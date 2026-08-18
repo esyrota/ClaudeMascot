@@ -335,16 +335,26 @@ WAITING_RAISE_TIP = (24, 13)
 WAITING_RAISE_FLAG = 3  # a smaller flag than the wave's 4x4: it is still unfurling
 
 
-def _flag_frame(tip_x, tip_y, arm_lift, flag_size):
-    """The mascot with one arm up and a flag on a pole running out to (tip_x, tip_y)."""
+def _flag_frame(tip_x, tip_y, arm_lift, flag_size, *, squash=0, legs=(0, 0, 0, 0), hop=0):
+    """The mascot with one arm up and a flag on a pole running out to (tip_x, tip_y).
+
+    `hop` lifts the finished frame off the floor line, for `waiting_hop()`. It is a
+    paste rather than a smaller `HOME_Y` because the flag has to travel with the
+    figure: drawing the mascot higher would leave the pole anchored to a hand that
+    had moved and the flag where it was.
+    """
     im = frame()
     d = ImageDraw.Draw(im)
-    mascot(d, HOME_Y, arms=(0, arm_lift))
+    mascot(d, HOME_Y, arms=(0, arm_lift), squash=squash, legs=legs)
     hand_x = TORSO_X + TORSO_W + ARM_W // 2
-    hand_y = HOME_Y + ARM_TOP + arm_lift + ARM_H // 2
+    hand_y = HOME_Y + squash + ARM_TOP + arm_lift + ARM_H // 2
     d.line([hand_x, hand_y, tip_x, tip_y], fill=PROP)
     rect(d, tip_x - flag_size, tip_y, flag_size, flag_size, PROP)
-    return im
+    if not hop:
+        return im
+    lifted = frame()
+    lifted.paste(im, (0, -hop))
+    return lifted
 
 
 def waiting():
@@ -356,6 +366,143 @@ def waiting():
     out = [(_standing_anchor(), 200), (raise_frame, 120)]
     for tip_x, tip_y in arc:
         out.append((_flag_frame(tip_x, tip_y, MAX_ARM_LIFT, 4), 140))
+    out.append((raise_frame.copy(), 120))
+    out.append((_standing_anchor(), 300))
+    return out
+
+
+# --- waiting variants -------------------------------------------------------
+#
+# `waiting` means Claude is asking the *user* for something, so it is the one state
+# whose whole job is to be noticed from across a room. It shipped as a single clip for
+# a long time, which was gap 6 in [[Animation Catalogue]] -- and academic besides,
+# because the state was unreachable until `AskUserQuestion` became its trigger (see
+# `EventPolicy.userBlockingTools`). Now that the wave actually plays, two variants
+# join it, and both are built for peripheral vision rather than for detail:
+#
+#   waiting-hop        the same wave, off the floor -- the whole 24x16 silhouette
+#                      moves, and movement of the whole figure is what catches an
+#                      eye that is not pointed at the panel
+#   waiting-semaphore  two flags in counter-phase, sweeping the entire top half
+#
+# Both keep the base clip's flag, so the three read as one mascot doing one thing
+# three ways rather than as three unrelated states.
+
+# The hop's arc is lower than `waiting()`'s. At the apex the whole frame is pasted
+# HOP_PEAK rows up, and the wave's own tip at row 2 would take the flag's top row off
+# the panel; starting from row 6 keeps it on.
+HOP_PEAK = 4
+WAITING_HOP_CYCLE = [
+    # (hop, tip, squash, leg tuck)
+    (0, (21, 11), 1, 0),  # crouch
+    (2, (23, 8), 0, 1),
+    (HOP_PEAK, (25, 6), 0, 2),  # apex, legs tucked
+    (HOP_PEAK, (25, 6), 0, 2),
+    (2, (23, 8), 0, 1),
+    (0, (21, 11), 1, 0),  # land
+]
+WAITING_HOP_MS = 120
+WAITING_HOPS = 2
+
+
+def waiting_hop():
+    """Waiting variant: the flag wave with the mascot hopping on the spot."""
+    out = [(_standing_anchor(), 200)]
+    raise_frame = _flag_frame(*WAITING_RAISE_TIP, WAITING_RAISE_ARM, WAITING_RAISE_FLAG)
+    out.append((raise_frame, 120))
+    for _ in range(WAITING_HOPS):
+        for hop, tip, squash, tuck in WAITING_HOP_CYCLE:
+            out.append(
+                (
+                    _flag_frame(
+                        *tip,
+                        MAX_ARM_LIFT,
+                        4,
+                        squash=squash,
+                        legs=(tuck,) * 4,
+                        hop=hop,
+                    ),
+                    WAITING_HOP_MS,
+                )
+            )
+    out.append((raise_frame.copy(), 120))
+    out.append((_standing_anchor(), 300))
+    return out
+
+
+# The right flag's tip path, one full swing and back. The left flag mirrors it in
+# both axes -- `_mirror_tip()` below -- so the two are always in counter-phase, which
+# is what makes the pair read as semaphore rather than as arm-waving.
+SEMAPHORE_ARC = [(25, 2), (27, 5), (29, 8), (27, 5)]
+SEMAPHORE_SWINGS = 2
+SEMAPHORE_MS = 160
+SEMAPHORE_FLAG = 3  # smaller than the single wave's 4x4: two flags, same ink budget
+# The half-raised bookend, symmetric where `waiting()`'s is one-sided.
+SEMAPHORE_RAISE_ARM = -2
+SEMAPHORE_RAISE_TIP = (24, 13)
+SEMAPHORE_RAISE_FLAG = 2
+
+
+SEMAPHORE_ARC_TOP, SEMAPHORE_ARC_BOTTOM = 2, 8
+
+
+def _mirror_x(tip):
+    """The same tip on the other side of the panel, at the same height."""
+    x, y = tip
+    return (SIZE - 1 - x, y)
+
+
+def _counter_tip(tip):
+    """The opposite flag's tip during the sweep: mirrored *and* half a swing behind.
+
+    Inverting y within `SEMAPHORE_ARC`'s own top..bottom range is what puts the two
+    flags in counter-phase -- the left one is at the bottom of its sweep exactly when
+    the right one is at the top. It is only meaningful for tips that lie inside that
+    range, which is why the half-raised bookend uses `_mirror_x` instead: it sits
+    below the arc, and inverting it sent the left pole off the top of the panel.
+    """
+    x, y = tip
+    return (SIZE - 1 - x, SEMAPHORE_ARC_TOP + SEMAPHORE_ARC_BOTTOM - y)
+
+
+def _semaphore_frame(right_tip, left_tip, arm_lift, flag_size):
+    """The mascot with both arms up and a flag on a pole in each hand."""
+    im = frame()
+    d = ImageDraw.Draw(im)
+    mascot(d, HOME_Y, arms=(arm_lift, arm_lift))
+    hand_y = HOME_Y + ARM_TOP + arm_lift + ARM_H // 2
+    right_x = TORSO_X + TORSO_W + ARM_W // 2
+    left_x = TORSO_X - ARM_W + ARM_W // 2
+    # Each flag hangs inboard of its own tip, so neither runs off the panel edge the
+    # pole is reaching toward.
+    for hand_x, (tip_x, tip_y), flag_x in (
+        (right_x, right_tip, right_tip[0] - flag_size),
+        (left_x, left_tip, left_tip[0]),
+    ):
+        d.line([hand_x, hand_y, tip_x, tip_y], fill=PROP)
+        rect(d, flag_x, tip_y, flag_size, flag_size, PROP)
+    return im
+
+
+def waiting_semaphore():
+    """Waiting variant: two flags sweeping the top half in counter-phase."""
+    raise_frame = _semaphore_frame(
+        SEMAPHORE_RAISE_TIP,
+        _mirror_x(SEMAPHORE_RAISE_TIP),
+        SEMAPHORE_RAISE_ARM,
+        SEMAPHORE_RAISE_FLAG,
+    )
+    out = [(_standing_anchor(), 200), (raise_frame, 120)]
+    for _ in range(SEMAPHORE_SWINGS):
+        for tip in SEMAPHORE_ARC:
+            out.append(
+                (
+                    _semaphore_frame(
+                        tip, _counter_tip(tip), MAX_ARM_LIFT, SEMAPHORE_FLAG
+                    ),
+                    SEMAPHORE_MS,
+                )
+            )
     out.append((raise_frame.copy(), 120))
     out.append((_standing_anchor(), 300))
     return out
@@ -1564,6 +1711,8 @@ STATES = {
     "work-think": work_think,
     "work-look-down": work_look_down,
     "waiting": waiting,
+    "waiting-hop": waiting_hop,
+    "waiting-semaphore": waiting_semaphore,
     "done": done,
     "done-enter": done_enter,
     "fidget-stretch": fidget_stretch,
@@ -1650,6 +1799,23 @@ CLIP_METADATA = {
         "weight": 0.5,
     },
     "waiting": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "waiting",
+        "weight": 1.0,
+    },
+    "waiting-hop": {
+        # Same variantGroup as "waiting" -- see the block above waiting_hop().
+        # Weighted level with the base clip rather than below it, unlike the idle
+        # and thinking variants: those exist so a state on screen for hours does
+        # not become wallpaper, whereas every waiting clip is on screen for a
+        # minute at most and all three are trying equally hard to be seen.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "waiting",
+        "weight": 1.0,
+    },
+    "waiting-semaphore": {
         "loops": True,
         "pose": "standing",
         "variantGroup": "waiting",

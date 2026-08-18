@@ -70,12 +70,19 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 | ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![thinking-pace](_animations/thinking-pace.gif) |
 | **thinking** · 3f · 3.6s · w 1.0      | **thinking-alt** · 14f · 6.06s · w 0.5        | **thinking-pace** · 17f · 4.72s · w 0.5         |
 
-**waiting** and **done** — one each.
+**waiting** — three variants, all of them shouting.
 
-|                                     |                                |
-| ----------------------------------- | ------------------------------ |
-| ![waiting](_animations/waiting.gif) | ![done](_animations/done.gif)  |
-| **waiting** · 12f · 1.86s · w 1.0 | **done** · 17f · 3.29s · w 1.0 |
+|                                     |                                                     |                                                                 |
+| ----------------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| ![waiting](_animations/waiting.gif) | ![waiting-hop](_animations/waiting-hop.gif)         | ![waiting-semaphore](_animations/waiting-semaphore.gif)         |
+| **waiting** · 12f · 1.86s · w 1.0   | **waiting-hop** · 13f · 2.18s · w 1.0               | **waiting-semaphore** · 12f · 2.02s · w 1.0                     |
+
+**done** — one.
+
+|                                |
+| ------------------------------ |
+| ![done](_animations/done.gif)  |
+| **done** · 17f · 3.29s · w 1.0 |
 
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
@@ -108,7 +115,22 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   Only the last of those is a timing problem, so it was re-authored on the standard
   geometry instead. The body breathes underneath with idle's own torso squash.
 - `waiting` is the flag wave: it means Claude is asking *you* for something, so it should
-  stay the most legible clip on the panel from across a room.
+  stay the most legible clip on the panel from across a room. Its two variants are built
+  for the same job by different means — `waiting-hop` moves the *whole silhouette* off the
+  floor line, which is what peripheral vision picks up, and `waiting-semaphore` puts a
+  second flag in the other hand and sweeps both across the top half in counter-phase. All
+  three keep the same flag, so they read as one mascot doing one thing three ways.
+- **The waiting variants are weighted level at 1.0, not below the base clip** — the only
+  group where the variants do not taper. `idle` and `thinking` taper because they are on
+  screen for hours and the point of a variant there is to stop the panel becoming
+  wallpaper. `waiting` is on screen for a minute at most (the longest real wait in the
+  logs was four hours, the median under two minutes) and every clip in the group is
+  trying equally hard to be seen, so there is no "common sight" to protect.
+- **`waiting` had never once played before the variants were drawn.** Its only trigger was
+  the `Notification` hook, which fires zero times in this configuration; `AskUserQuestion`
+  is what reaches the state now. The art was fine — it was unreachable. See
+  [[Claude Code Plugin]], and do not add art to a state without checking that something
+  can still get to it.
 - `done` is the *same jump* as the `done-enter` celebration, held as a loop with confetti
   fired on each landing instead of a checkmark. One celebration, told once and then
   sustained — so the hand-off from entrance to loop has nothing to give away. The
@@ -442,8 +464,8 @@ stall.
 
 ## Known gaps — the work worth doing next
 
-1. **`waiting` has no variants**, despite being the state that most wants to catch your
-   eye.
+1. ~~**`waiting` has no variants**~~ — **closed.** `waiting-hop` and `waiting-semaphore`
+   join the wave, and the state is reachable at last (see the `standing` section above).
 2. **No fidgets at `dozing`.** `fidget-doze` was drawn against the retired floor blob and
    went with it, so a doze fidget is a clean slot to fill.
 3. ~~The second Z is a 2×2 dot~~ — **closed, and then moot.** `sleeping` drew two Zs at

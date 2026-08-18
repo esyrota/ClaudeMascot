@@ -233,6 +233,34 @@
       499
     ]
   },
+  "waiting-hop": {
+    "gif_bytes": 2670,
+    "crc32": 3184855327,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      141
+    ]
+  },
+  "waiting-semaphore": {
+    "gif_bytes": 2653,
+    "crc32": 2258940717,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      124
+    ]
+  },
   "walk-in-left": {
     "gif_bytes": 813,
     "crc32": 3612225958,
