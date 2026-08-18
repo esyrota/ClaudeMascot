@@ -45,13 +45,17 @@
     ]
   },
   "doze-to-stand": {
-    "gif_bytes": 591,
-    "crc32": 1623646362,
+    "gif_bytes": 2709,
+    "crc32": 792513192,
     "outer_chunks": 1,
-    "ble_packets": 2,
+    "ble_packets": 6,
     "packet_lengths": [
       509,
-      98
+      509,
+      509,
+      509,
+      509,
+      180
     ]
   },
   "fidget-look": {
@@ -128,8 +132,8 @@
     ]
   },
   "sleeping": {
-    "gif_bytes": 3805,
-    "crc32": 2511566570,
+    "gif_bytes": 3880,
+    "crc32": 445925748,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -140,17 +144,17 @@
       509,
       509,
       509,
-      258
+      333
     ]
   },
   "stand-to-doze": {
-    "gif_bytes": 591,
-    "crc32": 1071965512,
+    "gif_bytes": 969,
+    "crc32": 3965972910,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
       509,
-      98
+      476
     ]
   },
   "stand-to-sit": {

@@ -117,28 +117,51 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### dozing
 
-| | | |
-|---|---|---|
-| ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif) | ![doze-to-stand](_animations/doze-to-stand.gif) |
-| **sleeping** · 19f · 9.5s · w 1.0 | **stand-to-doze**<br>standing → dozing<br>3f · motion 1.4s | **doze-to-stand**<br>dozing → standing<br>3f · motion 1.4s |
+|                                       |                                                            |                                                            |
+| ------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
+| ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif)             | ![doze-to-stand](_animations/doze-to-stand.gif)             |
+| **sleeping** · 19f · 9.5s · w 1.0     | **stand-to-doze**<br>standing → dozing<br>5f · motion 1.32s | **doze-to-stand**<br>dozing → standing<br>14f · motion 4.06s |
 
 The mascot sleeps **on its feet**: same silhouette as every standing clip, arms slumped
 four rows down onto the legs, the face bowed so the eyes read as shut lids at row 24, two
-Zs drifting out of the top-right, and a one-eye peek twice a cycle. Frame 0 and the last
-frame are the bare pose with no Zs — that is the `dozing` anchor.
+bubbles drifting out of the top-right, and a one-eye peek twice a cycle. Frame 0 and the
+last frame are the bare pose with nothing over it — that is the `dozing` anchor.
+
+**All three clips are imported, and that is what makes this pose's edges exact.**
+`sleeping` comes from `art/sources/sleeping.gif`, `stand-to-doze` and `doze-to-stand` from
+sources of the same names, all three hand-authored on one silhouette — so
+`stand-to-doze`'s last frame *is* `sleeping` frame 0 and `doze-to-stand`'s last frame *is*
+`idle` frame 0, pixel for pixel, rather than a drawn approximation arriving near them.
+Both edges used to be three frames each: the two anchors with one drawn in-between that
+dropped the arms and shut the eyes halfway. `stand-to-doze` is now five authored frames of
+nodding off, and `doze-to-stand` fourteen — a startle awake with white sparks over the
+head, a full stretch with both arms up, then a settle back to standing, which is why it
+runs three times as long as the way in. **This is the shape the sit edges still want** and
+do not have; see their pop under Known gaps.
+
+The bubbles are drawn over the import rather than authored into it, in `sleeping()`: two
+of them drifting up and out of the top-right corner over four 500ms steps, swelling 2 → 3
+→ 4 px as they rise the way a real bubble does, half a cycle apart so there are always two
+on the panel. `_draw_bubble()` draws the perimeter of a square box minus its four corners,
+which is what a circle degenerates to at this scale — a four-pixel diamond at 3, an
+eight-pixel ring at 4 — and below that there is no inside to hollow out, so the freshly
+blown one is solid.
+
+**This used to be two Zs, and they were replaced at the user's request:** the letter is not
+a neutral shape to a Ukrainian reader. Bubbles say "asleep" just as plainly, and the change
+is confined to `sleeping()`'s overlay — the imported figure underneath is untouched.
 
 `dozing` is a pose and not just a `standing` clip because the slumped shape is a resting
-place the mascot has to be *carried* to. `stand-to-doze` is the three slow frames that do
-it: the anchor, one drawn in-between with the hands and eyes half down, then the sleeping
-pose. `doze-to-stand` is the same three in reverse.
+place the mascot has to be *carried* to.
 
 This pose was `lying` until the art changed. It slept as a 20×6 blob on the floor, which
 was legible as a blob and not as this creature — and the reason it stopped sleeping
 standing in the first place ("read as the mascot hovering") was the bob bug the idle
-variants above no longer have. The node was never the problem; the art was. Its source,
-`art/sources/sleep.gif`, is authored at a flat 1000ms a frame, so timing is overridden
-wholesale in `art/generate.py`: the Zs are the only thing moving, so their cadence is the
-clip's cadence.
+variants above no longer have. The node was never the problem; the art was. `sleeping.gif`
+is authored at a flat 1000ms a frame — the drawing tool's default, not an intention — so
+timing is overridden wholesale in `art/generate.py`: the bubbles are the only thing moving,
+so their cadence is the clip's cadence. The two edges are authored at deliberate rates (330ms
+and 140ms a frame) and keep their own.
 
 ### sitting
 
@@ -423,10 +446,10 @@ stall.
    eye.
 2. **No fidgets at `dozing`.** `fidget-doze` was drawn against the retired floor blob and
    went with it, so a doze fidget is a clean slot to fill.
-3. **The second Z is a 2×2 dot.** `sleeping` draws two Zs at sizes 3 and 2; at size 2 the
-   diagonal stroke has zero height, so the smaller one degenerates into a square. It has
-   always been that way — it reads as distance rather than as a letter, which is
-   survivable, but a 2-wide Z drawn deliberately would be better than one that collapses.
+3. ~~The second Z is a 2×2 dot~~ — **closed, and then moot.** `sleeping` drew two Zs at
+   sizes 3 and 2; at size 2 the diagonal stroke had zero height, so the smaller one
+   degenerated into a square. There are no Zs any more — see the bubbles in the `dozing`
+   section — and `_draw_bubble()` is legible at every size it is used at.
 4. **`dancing` violates the turned-head rule, and a trim makes it worse, not better.** On
    the deep turns — `dancing`'s coalesced frames 6 and 15 — the shading (43 pixels against
    46–47 on the shallow turns) shows a single eye with the full 16-wide torso still behind
