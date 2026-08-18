@@ -1,4 +1,4 @@
-# Animation Catalogue
+		# Animation Catalogue
 
 Every clip the panel can show, what it is for, and how the mascot gets between them.
 **This page is the single source of truth for the art.** If a clip is not here it does not
@@ -40,7 +40,7 @@ flag just clearing the head — which is all the contract needs.
 
 **A turned head must trim its far-side body edge — a constraint on new art, not a rule the
 shipped clips satisfy.** Any pose that turns the mascot to face the viewer should shift the
-eyes toward the facing side, shade the trailing column to `MASCOT_SHADE`, and leave no body
+eyes toward the facing side, shade the trailing column to `MASCOT_DARK`, and leave no body
 pixel outboard of the far eye, next to the floor line rule below: a turn that leaves
 silhouette hanging past the eye reads as the figure widening rather than turning. No shipped
 clip turns this way today. `dancing`'s sway turns and violates it — the deep turn presents a
@@ -190,11 +190,20 @@ checkerboard.
 
 **`laptop()` is deleted.** The desk — lid, deck, hinge — is baked into the imported pixels
 now rather than drawn by `mascot()`-style rectangles, and `_desk_sprite()` lifts every
-`LAPTOP_GREY` pixel back out of `_sitting_anchor()` into its own sprite, so the sit edges
+`LAPTOP_GREY` pixel — plus the `PROP` white logo on the lid, which has to travel with the
+lid it is painted on — back out of `_sitting_anchor()` into its own sprite, so the sit edges
 can still slide it in and out independent of the figure — the same job `laptop()` used to
 do. The colour is unchanged, `(134, 134, 134)`, the same mid-tone [[Panel Quirks]]
 documents the panel rendering as blue-violet, now snapped onto the source's own laptop
 pixels by `_typing_recolour()` instead of filled by a drawn rectangle.
+
+**The seated figure carries two body tones, and the lid's logo is white.** Both are the
+source's own authoring, and both were lost by the first `_typing_recolour()`: it split on
+max channel alone, which flattened the secondary colour on the back and the turned-away arm
+into one `MASCOT` slab and painted the white logo orange. The split is by chroma now, and
+the secondary tone maps to `MASCOT_DARK` — `dancing()`'s deep tone, chosen for legibility on
+the panel over faithfulness to the source's much subtler step. See [[Art Pipeline]] for the
+cutoffs.
 
 **Five fidgets are scoped to `sitting`**, each a non-looping self-edge with
 `fidgetGroup: "working"` so none of them can fire anywhere else — the same scoping the
@@ -203,17 +212,19 @@ wander fidgets use for `idle`, below. `work-look-down` belongs here, not with th
 `fromPose`/`toPose` both `sitting`, the identical shape as the other four fidgets, not the
 `variantGroup`/`pose` shape `working` itself has.
 
-|                                         |                                             |                                          |                                            |                                                     |
-| --------------------------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
-| ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif)  | ![work-look](_animations/work-look.gif)  | ![work-think](_animations/work-think.gif)    | ![work-look-down](_animations/work-look-down.gif)      |
-| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 7f · 1.88s       | **work-look**<br>sitting, 15f · 1.35s    | **work-think**<br>sitting, 13f · 4.88s       | **work-look-down**<br>sitting, 15f · 1.35s             |
+|                                         |                                             |                                         |                                           |                                                   |
+| --------------------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif) | ![work-look](_animations/work-look.gif) | ![work-think](_animations/work-think.gif) | ![work-look-down](_animations/work-look-down.gif) |
+| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 7f · 1.88s      | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
 
 `work-idea` lifts an eye, sparks, and runs a fast typing burst — the same imported frames
 `working` plays, just stepped through at a faster cadence. `work-coffee` brings a cup up
-in front of him, held in both hands for a sip, then sets it back down and lets it go; his
-far hand's fingers, baked onto the keyboard as three isolated pixels in the imported art,
-are cleared back to `LAPTOP_GREY` while the cup is held — the mechanical version of "a hand
-lifts off the keyboard." `work-look` lifts both eyes to look up from the screen while the
+in front of him, held in both hands for a sip, then sets it back down and lets it go. It
+used to also clear three pixels on the lid to `LAPTOP_GREY` while the cup was held, taken
+for the far hand's fingers baked onto the keyboard; they are the logo, and only looked like
+stray hand pixels while the recolour was painting them orange. There is no far hand in the
+source — both hands are the block at x17–20 that moves with the typing cycle — so the
+clearing is gone and the mark stays white through the sip. `work-look` lifts both eyes to look up from the screen while the
 hands keep typing, then lets them back down. `work-look-down` is its mirror, imported
 rather than drawn: the same beat with the eyes authored a row lower in the second source
 file instead of raised in code. `work-think`
@@ -437,9 +448,10 @@ stall.
 6. ~~`work-coffee`'s mug occupies the far arm's position rather than being held at the end
    of it, so "holding" is implied by adjacency rather than drawn~~ — **closed**, in the
    rebuilt clip. The cup is now drawn in front of the torso with a see-through C-shaped
-   handle, and both `MASCOT` hand blocks are drawn at its sides while the far hand's
-   baked-on keyboard fingers clear to `LAPTOP_GREY` for the duration — holding is drawn now,
-   not implied by where the prop sits.
+   handle, and both `MASCOT` hand blocks are drawn at its sides — holding is drawn now,
+   not implied by where the prop sits. (The clip also cleared three "keyboard finger"
+   pixels for the duration; those turned out to be the lid's logo, and the clearing is
+   gone — see the `work-coffee` note above.)
 7. **The sit edges pop.** Measured, not guessed: `_standing_anchor()` and
    `_sitting_anchor()` differ by **293 pixels** — a structural gap between a drawn
    rectangle figure and an imported photographic-silhouette one, not just a difference in

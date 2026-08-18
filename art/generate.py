@@ -14,11 +14,12 @@ figure changing size or shape.
 Style: the mascot is one flat colour with pure black eyes, plus a deeper orange used
 only for shading a turn. No highlight band, no floor.
 
-Note on colour: the panel renders a colour correctly when its brightest channel is 255,
-and shifts dimmer mid-tones toward blue-violet -- #DD775B (value 0.87) and (216,112,80)
-(value 0.85) both came out blue on the panel, while (255,108,40) and the pure primaries
-were fine. So MASCOT is a deep orange that still pegs red at 255. A literally dark
-orange like (200,80,0) would render blue.
+Note on colour: the panel lifts low channel values enormously, hardest of all on blue,
+so a warm colour must end in B = 0 -- MASCOT carried B = 4 for a while and rendered
+PINK on the panel because of it. Darkening by scaling all three channels is fine once
+blue is 0, which is how MASCOT_DARK is built. What is NOT fine is any real amount of
+blue: #DD775B and (216,112,80) both came out blue-violet. See [[Panel Quirks]], which
+also names the reference photo to check new colours against.
 
     python art/generate.py     # writes the app's bundled GIFs + art/preview.png
 """
@@ -35,25 +36,56 @@ SIZE = 32
 
 # The one mascot colour: a deep burnt orange.
 #
-# "Darker" has to be done by deepening the hue, NOT by dimming the channels. The
-# panel shifts colours toward blue-violet once the brightest channel drops below
-# 255, so something like (200,80,0) would render blue. Pulling green and blue down
-# while red stays pinned gets a much deeper orange safely. For overall dimness,
-# turn down the panel brightness in daemon.py instead -- that is the right knob.
-MASCOT = (255, 68, 4)
-# The shade used where the mascot turns away from the viewer, as authored in
-# appear.gif. That file's own shade is (120,50,16) -- a mid-tone, i.e. exactly the
-# case the panel renders blue-violet -- so it maps to this instead: the same hue,
-# deepened the only way the hardware allows, by pulling green and blue down with red
-# still pinned at 255. It reads as a deeper red-orange rather than a true shadow.
-MASCOT_DARK = (255, 24, 0)
-# A second, much softer shade, for art whose own shading is subtle. appear.gif's
-# shade is a genuine dark side -- its source drops from 246-255 down to 111-123, so
-# MASCOT_DARK's big step is faithful. The sweep's is a 15% step (216,112,80 ->
-# 184,104,72), and sending that to MASCOT_DARK turned a gentle roll of the body into
-# a hard two-tone band. This sits about a third of the way down instead. Same rule as
-# ever: red stays pinned at 255, or the panel renders it blue-violet.
-MASCOT_SHADE = (255, 50, 2)
+# The blue channel is 0 because a near-black channel value is never free on this
+# panel -- the same effect that makes near-black greys in empty space light up as a
+# visible streak. That is worth keeping. It is NOT, however, why the body photographs
+# pink: dropping B from 4 to 0 changed nothing visible. The pink is still unexplained
+# and needs the channel sweep in [[Recheck the Panel Colour Rule]]; see
+# [[Panel Quirks]] for what is actually established.
+MASCOT = (255, 68, 0)
+
+# The shade used where the mascot turns away from the viewer.
+#
+# It is `MASCOT` scaled uniformly, and uniform scaling is exactly the point: it
+# preserves hue and saturation and moves ONLY value, which is what a shadow is.
+# The reference art the user pointed at -- the sweep in
+# art/sources/claude-claude-code-1.gif, whose body (216,112,80) shades to
+# (184,104,72) -- confirms the SHAPE of the step: hue +3 degrees, saturation -0.02,
+# value x0.852. Hue and saturation hold; only value moves.
+#
+# Its SIZE does not transfer, though. Shipping the reference's own 0.852 made the
+# shade invisible on the panel -- see SHADE_SCALE below.
+#
+# The old (255,24,0) did the opposite. Pinned at 255 it could not change value at
+# all (V stayed 1.000), so the entire step landed on hue instead -- -10 degrees,
+# which on the panel read as a vivid, over-saturated red stripe next to the body
+# rather than a shadow on it. That pinning came from the "brightest channel must be
+# 255" rule on [[Panel Quirks]], which turned out to be a proxy rather than the real
+# constraint -- dropping below 255 is demonstrably fine here, and the shade this file
+# ships is the evidence. What the real constraint IS remains open; see the channel
+# sweep in [[Recheck the Panel Colour Rule]].
+#
+# THE PANEL COMPRESSES THE DARK END FAR HARDER THAN THE PREVIEW SUGGESTS, so this
+# is well below the reference's 0.852. Found by bisection against photographs of the
+# real panel, not by theory -- three of them:
+#
+#   x0.85   the reference art's own faithful step: INVISIBLE on the panel
+#   x0.35   green back at the old (255,24,0) shade's ratio: visible, but muddy --
+#           "it feels dirty", and it does: red falls to 89 and the shadow stops
+#           reading as the same material as the body
+#   x0.60   between the two, and where it sits now
+#
+# Red is what makes it dirty and green is what makes it visible, which is why the
+# usable window is narrow: red near saturation barely moves until it suddenly falls
+# off, and green moves the whole time. Scaling uniformly keeps hue at 16 degrees and
+# spends the step on value, which is what a shadow is -- the old (255,24,0) held red
+# at 255, could not change value at all, and so read as a vivid red stripe instead.
+#
+# Turn this one number if the step is still wrong. Lower is darker and dirtier,
+# higher is cleaner and fainter.
+SHADE_SCALE = 0.60
+MASCOT_DARK = tuple(round(c * SHADE_SCALE) for c in MASCOT)
+
 EYE = (0, 0, 0)
 BG = (0, 0, 0)
 # Props are kept at full value for the same reason.
@@ -968,14 +1000,36 @@ WORK_TYPING_LOOK_DOWN_SRC = SOURCES / "work-typing-look-down.gif"
 # lower cutoff that let the warm tile through as grey painted a visible
 # checkerboard into the background, exactly that mistake.
 #
-# From TYPING_DARK up to TYPING_BODY_MIN is the laptop -- already drawn
-# near-grey in the source (130-139, plus a (247,247,247) highlight and an
-# (82,82,82) shadow fleck) -- which snaps onto the exact LAPTOP_GREY the drawn
-# lid uses. TYPING_BODY_MIN and up is the body, (255,95,5) plus its antialiasing
-# halo, which snaps to MASCOT so the seated figure matches the standing one. The
-# gap between the two families (dither tops out at 32, the grey laptop starts at
-# 82) leaves TYPING_DARK room anywhere in [33, 81]; 40 sits comfortably inside it.
-TYPING_DARK, TYPING_BODY_MIN = 40, 180
+# Above TYPING_DARK the source splits by CHROMA, not by value -- value alone
+# cannot tell the laptop's white lid mark from the orange body, and the first
+# version of this function got exactly that wrong (see below). The laptop is
+# achromatic: near-grey 130-139 for lid, deck and hinge, an (82,82,82) shadow
+# fleck at the near corner, and a (247,247,247) mark on the lid. The body is
+# violently chromatic -- every one of its colours has a red-minus-blue spread of
+# 222 or more, and nothing in either source lands between the two families, so
+# TYPING_CHROMA_MIN has the whole span from 12 to 222 to sit in.
+#
+# Within the achromatic family, TYPING_LOGO_MIN separates the lid mark from the
+# lid it sits on. It is the Claude logo, hand-drawn white, and it stays PROP
+# white here. It used to fall through to MASCOT, which painted it orange -- and
+# `work_coffee()` then read those same three pixels as the far hand's fingers
+# resting on the keys and greyed them out for the sip, so the mark also went
+# black for part of that fidget. There is no far hand in the imported art; both
+# hands are the moving block at x17-20. See that clip's own comment.
+#
+# Within the chromatic family, TYPING_BODY_MIN separates the mascot's two tones.
+# The source authors a genuine secondary colour -- the back (columns x0-2, every
+# row) and whichever arm is turned away (x17-20, alternating with the typing
+# cycle) sit at red 222-248 against the front body's 252-255. Flattening both to
+# MASCOT lost the back and the far arm entirely, which is what made the seated
+# figure read as one orange slab. The source's own step is small (~8%) and it maps
+# to MASCOT_DARK's 15%, the same shade every other clip uses -- a little firmer
+# than authored, because this tone is carrying silhouette rather than shading here
+# (it is what tells you which arm is which) and because the panel compresses
+# differences at the dark end. See [[Panel Quirks]].
+TYPING_DARK, TYPING_BODY_MIN = 40, 252
+TYPING_CHROMA_MIN = 64
+TYPING_LOGO_MIN = 200
 
 # Eye columns in the imported art, measured off `_sitting_anchor()` the same way
 # TYPING_DARK/TYPING_BODY_MIN were: both eyes sit at rows 20-21 (SIT_TORSO_Y + 2, the
@@ -990,9 +1044,52 @@ def _typing_recolour(rgb):
     value = max(rgb)
     if value < TYPING_DARK:
         return BG
-    if value < TYPING_BODY_MIN:
-        return LAPTOP_GREY
-    return MASCOT
+    if value - min(rgb) < TYPING_CHROMA_MIN:
+        return PROP if value >= TYPING_LOGO_MIN else LAPTOP_GREY
+    return MASCOT if value >= TYPING_BODY_MIN else MASCOT_DARK
+
+
+def _typing_despeckle(im: Image.Image) -> Image.Image:
+    """
+    Flip any body pixel whose every body-coloured neighbour is the OTHER tone.
+
+    The source is hand-drawn and dithered, and it carries a handful of single
+    pixels that landed on the wrong side of the `MASCOT`/`MASCOT_DARK` split --
+    one primary pixel stranded inside the back stripe at (0,27), another at
+    (2,31), and one shade pixel stranded inside the torso at (18,22) on the last
+    frame of each cycle. All three are visible on the panel as a wrong-coloured
+    speck, and the user pointed at exactly these three in a panel photo.
+
+    They are fixed here rather than in the source GIFs so the sources stay the
+    user's to edit: re-exporting them will not undo this, and a redraw that moves
+    the specks (or removes them) needs no coordinate list updating. The rule is
+    deliberately narrow -- 4-neighbours, and only when they ALL disagree -- so it
+    cannot touch a one-pixel detail that the art actually means. Across all ten
+    frames of both sources it catches those three pixels and nothing else.
+    """
+    src = im.load()
+    out = im.copy()
+    dst = out.load()
+    tones = (MASCOT, MASCOT_DARK)
+    for y in range(SIZE):
+        for x in range(SIZE):
+            here = src[x, y]
+            if here not in tones:
+                continue
+            neighbours = [
+                src[x + dx, y + dy]
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                if 0 <= x + dx < SIZE and 0 <= y + dy < SIZE
+                and src[x + dx, y + dy] in tones
+            ]
+            if neighbours and all(n != here for n in neighbours):
+                dst[x, y] = neighbours[0]
+    return out
+
+
+def _typing_frames(src: Path):
+    """The recoloured, despeckled frames of one typing source, at its own timing."""
+    return [(_typing_despeckle(im), ms) for im, ms in imported(src, _typing_recolour)]
 
 
 def _paste_over(base: Image.Image, sprite: Image.Image, ox: int = 0, oy: int = 0,
@@ -1052,14 +1149,16 @@ def _sitting_anchor() -> Image.Image:
     every dependent (the sit edges, the four `work-*` fidgets) to composite onto
     copies of this frame instead of the old drawn shapes -- see the chunk 11 brief.
     """
-    return imported(WORK_TYPING_SRC, _typing_recolour)[0][0]
+    return _typing_frames(WORK_TYPING_SRC)[0][0]
 
 
 def _desk_sprite() -> Image.Image:
     """
     The desk (laptop lid, deck, hinge -- all of it) lifted out of the imported
-    `_sitting_anchor()` into its own sprite: every `LAPTOP_GREY` pixel kept at its
-    own coordinates, everything else `BG`.
+    `_sitting_anchor()` into its own sprite: every `LAPTOP_GREY` pixel, plus the
+    `PROP` white logo on the lid, kept at its own coordinates, everything else
+    `BG`. The logo has to travel with the lid it is painted on -- matching
+    `LAPTOP_GREY` alone slides a laptop in with three holes punched in it.
 
     Chunk 8's `laptop()` drew the desk with `mascot()`-style rectangles so the sit
     edges could slide a lid in independent of the figure. The desk is baked into the
@@ -1073,8 +1172,8 @@ def _desk_sprite() -> Image.Image:
     dst = out.load()
     for y in range(SIZE):
         for x in range(SIZE):
-            if src[x, y] == LAPTOP_GREY:
-                dst[x, y] = LAPTOP_GREY
+            if src[x, y] in (LAPTOP_GREY, PROP):
+                dst[x, y] = src[x, y]
     return out
 
 
@@ -1113,7 +1212,7 @@ def working():
     typing, then one alt. Adjacent identical frames coalesce at the seams, so the
     shipped frame count is lower than 5 x WORKING_CYCLES.
     """
-    frames = imported(WORK_TYPING_SRC, _typing_recolour) * WORKING_CYCLES
+    frames = _typing_frames(WORK_TYPING_SRC) * WORKING_CYCLES
     anchor_im, _ = frames[0]
     return frames + [(anchor_im, WORKING_CLOSE_MS)]
 
@@ -1132,7 +1231,7 @@ def work_look_down():
     seated state.
     """
     anchor = _sitting_anchor()
-    cycle = imported(WORK_TYPING_LOOK_DOWN_SRC, _typing_recolour)
+    cycle = _typing_frames(WORK_TYPING_LOOK_DOWN_SRC)
     out = [(anchor, 300)]
     for _ in range(3):
         out += cycle
@@ -1222,7 +1321,7 @@ def work_idea():
     which is what "got on with it" needs to read as.
     """
     anchor = _sitting_anchor()
-    typing = [im for im, _ in imported(WORK_TYPING_SRC, _typing_recolour)]
+    typing = [im for im, _ in _typing_frames(WORK_TYPING_SRC)]
     ex = TYPING_EYE_XS[1]  # the same eye the standing `thinking_alt()` raises
 
     def lifted(*, spark=False):
@@ -1255,13 +1354,18 @@ def work_coffee():
 
     Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
     Composited onto copies of the imported anchor, not drawn. Chunk 8's C-shaped
-    handle survives unchanged, gap and all -- see its own comment below. His hands
-    are baked onto the keyboard in the imported art now, one of them (the far hand's
-    fingers, resting on the keys) as three isolated pixels sitting inside the desk's
-    own `LAPTOP_GREY` -- `HAND_ON_KEYS` below, measured by diffing `MASCOT` pixels
-    against the desk's bounding box in `_sitting_anchor()`. Clearing them back to
-    `LAPTOP_GREY` on the frames where he holds the cup is what "a hand lifts off the
-    keyboard" means mechanically here, the way the old version hid a drawn arm.
+    handle survives unchanged, gap and all -- see its own comment below.
+
+    His hands are baked onto the keyboard in the imported art, so nothing here
+    hides them; `hands` just brings a pair of `MASCOT` hands to the cup. It used
+    to ALSO clear three pixels at (26,26), (27,26), (26,27) to `LAPTOP_GREY`,
+    named `HAND_ON_KEYS` and believed to be the far hand's fingers resting inside
+    the desk -- they had been found by diffing `MASCOT` pixels against the desk's
+    bounding box, back when `_typing_recolour()` was painting the lid's white logo
+    orange and so leaving three stray `MASCOT` pixels there. They are the logo.
+    There is no far hand in the source: both hands are the block at x17-20 that
+    moves with the typing cycle. Clearing them blacked the mark out for the length
+    of the sip, so the clearing is gone.
 
     The cup never rises above row `CUP_TOP - CUP_LIFT` = 23, four rows clear of the
     eyes at rows 20-21 -- checked mechanically in this chunk's verification, not just
@@ -1277,16 +1381,12 @@ def work_coffee():
     CUP_TOP = 25                # rest row
     CUP_LIFT = 2                 # raised toward the chest for the sip
     HAND_W, HAND_H = 2, 2
-    HAND_ON_KEYS = ((26, 26), (27, 26), (26, 27))  # the far hand's fingers on the keys
 
     anchor = _sitting_anchor()
 
     def seated(*, cup=False, hands=False, lift=0):
         im = anchor.copy()
         d = ImageDraw.Draw(im)
-        if hands:
-            for x, y in HAND_ON_KEYS:
-                rect(d, x, y, 1, 1, LAPTOP_GREY)  # the hand lifts clear of the keys
         if cup:
             cy = CUP_TOP - lift
             rect(d, CUP_X, cy, CUP_W, CUP_H, PROP)  # the 5x5 body
@@ -1334,7 +1434,7 @@ def work_look():
             im = _typing_eye_lift(im, ex)
         return im
 
-    cycle = [(lifted(im), ms) for im, ms in imported(WORK_TYPING_SRC, _typing_recolour)]
+    cycle = [(lifted(im), ms) for im, ms in _typing_frames(WORK_TYPING_SRC)]
     out = [(anchor, 300)]
     for _ in range(3):
         out += cycle
@@ -1717,9 +1817,16 @@ def pad_palette(im: Image.Image) -> Image.Image:
 
     The first version wrote near-black greys along the bottom-left edge. On a
     preview they look like nothing; on the panel those LEDs are genuinely lit and
-    read as a grey gradient streak. So instead, nudge the BLUE channel of a few
-    body pixels by 1-8. Those are distinct palette entries as far as the GIF
-    encoder is concerned, but indistinguishable from the body colour to the eye.
+    read as a grey gradient streak. So instead, nudge a few body pixels by 1-8 --
+    distinct palette entries as far as the GIF encoder is concerned, but
+    indistinguishable from the body colour to the eye.
+
+    The nudge is on RED, downward, and used to be on BLUE, upward. Same reason the
+    grey streak was a mistake and the same reason `MASCOT` now ends in 0: the panel
+    over-drives low channel values hardest of all on blue, so B=1..8 is not an
+    invisible nudge there -- it is the brightest relative change the panel can be
+    handed, sprinkled at random over the body. Red is already at 255, where the
+    panel's response is flat, so 247-254 genuinely is invisible.
     """
     im = im.copy()
     px = im.load()
@@ -1731,7 +1838,7 @@ def pad_palette(im: Image.Image) -> Image.Image:
     for x, y in body:
         if len(im.getcolors(maxcolors=1 << 20)) >= MIN_COLORS:
             break
-        px[x, y] = (MASCOT[0], MASCOT[1], min(255, MASCOT[2] + bump))
+        px[x, y] = (max(0, MASCOT[0] - bump), MASCOT[1], MASCOT[2])
         bump += 1
     return im
 
