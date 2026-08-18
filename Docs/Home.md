@@ -57,7 +57,7 @@ Each one cost a wrong diagnosis to find.
 | Art generator | `art/generate.py` | working, **23 clips** — 11 loops, 12 transitions. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
-| Sprite-sheet importer | `art/sheet_import.py` | working — slices screenshot contact sheets into 32×32 frames |
+| Sprite-sheet importer | `art/sheet_import.py` | standalone — nothing imports a sheet any more; kept for a future one |
 | Golden-fixture export | `art/export_golden.py` | working — pins the BLE protocol |
 | Catalogue images | `art/export_docs.py` | working — 6× previews for [[Animation Catalogue]] |
 | Python daemon | `legacy/` | **retired and non-functional** |
@@ -74,14 +74,25 @@ plugin on first launch, and the repo is no longer a marketplace.
 - `_logs/2026-08-16. Settings Window Cleanup/` — the Settings pane rebuild.
 - `_logs/2026-08-16. Stateful Mascot Choreography/` — the world model, pose graph and
   boundary scheduling. Its [[Analysis]] records the boundary bug that only hardware found.
+- `_logs/2026-08-17. Working State Rework/` — `sitting` rebuilt on hand-authored typing
+  art, its edges and five fidget beats; `done` debounced and earned. Its [[Analysis]]
+  records the check that passed while the art was broken.
 
 ## Deferred
 
-- **`stand-to-sit` / `sit-to-stand`** — `sitting` has no edges at all, so the mascot
-  teleports into and out of `working`. The largest remaining win; see
-  [[Animation Catalogue]] → Known gaps.
-- Rescaling the imported sheets to the drawn silhouette (~87% today), and giving the
-  laptop black outlines so it stops reading as a white slab.
+Written up in `_tasks/`, in the order they are worth doing:
+
+- [[Standing Art in the Typing Hand]] — the mascot is two different drawings today, and
+  the 166px sit-edge pop and `dancing`'s unfixable turn are both consequences. The
+  largest remaining win.
+- [[Waiting Never Fires]] — `Notification` fired zero times in 1102 events, so the flag
+  wave has never once been on the panel.
+- [[Recheck the Panel Colour Rule]] — [[Panel Quirks]] vouches for a value the panel
+  demonstrably renders blue, and the whole palette rests on that page.
+
+Still open, and small enough to live in [[Animation Catalogue]] → Known gaps rather than
+their own task: a `dozing` fidget, and the second Z that collapses to a 2×2 dot.
+
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.
 - Retuning the choreography constants against the accumulated `decision.jsonl`.

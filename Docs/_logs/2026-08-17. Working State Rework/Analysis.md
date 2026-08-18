@@ -100,3 +100,46 @@ Wall time spans 16:51–20:05 with a 1h18m user pause; ~2h of that was active.
 rather than compilable — but its real value here was procedural: the briefs' verification
 steps and one explicit licence to refuse are what kept a plausible-looking bad fix out of the
 tree.
+
+---
+
+## Feedback rounds (chunks 8–12)
+
+Three rounds after the first delivery, all on the same branch.
+
+| # | Chunk | Model | Tokens | Tools | Outcome |
+|---|---|---|---|---|---|
+| 8 | Laptop and cup revision | Sonnet | 294k | 57 | success (+1 fix-up: the cup handle read as a lump without a see-through gap) |
+| 9 | Remove sweeping | Sonnet | 111k | 61 | success |
+| 10 | Typing art as the seated base | Sonnet | 129k | 58 | success |
+| 11 | Rebuild the seated set | Sonnet | 203k | 77 | success, one target missed and reported (+1 fix-up: the bubble hung over the desk, not his head) |
+| 12 | Specs and final gates | Sonnet | 143k | 43 | success |
+
+### What these rounds taught
+
+- **A verification can pass while the thing it verifies is broken.** Redefining
+  `_sitting_anchor()` silently updated the *endpoints* of all six dependent clips, so the
+  byte-equality anchor-join check returned `True` for every one of them while every frame in
+  between still drew the old geometry. The measurement that actually worked was the **worst
+  consecutive-frame delta within a clip**: 154–203 px of pop against 21 px of legitimate
+  motion. Chunk 10 found this and said so; chunk 11 then had a numeric target instead of "make
+  it match", which is the single biggest improvement in brief quality across the whole run.
+- **The orchestrator's "measured facts" were wrong once, and the subagent was right to
+  ignore them.** Chunk 10 was told the source laptop was `(13,5,0)`; those pixels are the
+  background dither, and following the brief literally painted a grey checkerboard over the
+  panel — the exact artefact [[Panel Quirks]] warns about. It verified against the pixels
+  instead. Briefs should say where a fact came from so a subagent knows what it may doubt.
+- **A numeric target can drive a worse artistic choice.** Chunk 11's desk stopped sliding
+  partway in during the sit edges because a partial slide scored worse on the pop metric.
+  The metric was a proxy for "does it look right", and optimising the proxy cost the detail.
+- **Three of the orchestrator's own claims were wrong and had to be retracted**: the source
+  laptop colour, `fidgetChance` being per-loop (it is per 20-second epoch, which is why a
+  0.49s typing loop nearly shipped), and the test count (107, not 127 — the extra `Executed`
+  lines are rollups). A subagent was "corrected" on the last one while being right.
+- **Licence to refuse keeps working.** The turned-head trim was refused twice on evidence —
+  once by the orchestrator, once by the design — and both refusals are recorded as known gaps
+  rather than as silent omissions.
+
+**Round verdict:** the art improved most where the user supplied art and the run adapted to
+it, rather than where the run drew its own. The seated set is now hand-authored; the standing
+set is not, and that seam is the largest remaining defect.
