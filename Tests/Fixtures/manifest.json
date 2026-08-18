@@ -118,13 +118,13 @@
     ]
   },
   "sit-to-stand": {
-    "gif_bytes": 630,
-    "crc32": 3800988397,
+    "gif_bytes": 625,
+    "crc32": 4195107706,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
       509,
-      137
+      132
     ]
   },
   "sleeping": {
@@ -154,13 +154,13 @@
     ]
   },
   "stand-to-sit": {
-    "gif_bytes": 630,
-    "crc32": 3624494098,
+    "gif_bytes": 625,
+    "crc32": 3133682663,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
       509,
-      137
+      132
     ]
   },
   "starting": {
@@ -384,43 +384,31 @@
     ]
   },
   "work-coffee": {
-    "gif_bytes": 1738,
-    "crc32": 3573343878,
+    "gif_bytes": 1535,
+    "crc32": 1641327347,
     "outer_chunks": 1,
     "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      227
+      24
     ]
   },
   "work-idea": {
-    "gif_bytes": 1870,
-    "crc32": 3332451172,
-    "outer_chunks": 1,
-    "ble_packets": 4,
-    "packet_lengths": [
-      509,
-      509,
-      509,
-      359
-    ]
-  },
-  "work-look": {
-    "gif_bytes": 1248,
-    "crc32": 1379696122,
+    "gif_bytes": 1493,
+    "crc32": 2178420091,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
       509,
       509,
-      246
+      491
     ]
   },
-  "work-think": {
-    "gif_bytes": 3066,
-    "crc32": 639852607,
+  "work-look": {
+    "gif_bytes": 3142,
+    "crc32": 2789560726,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -430,19 +418,47 @@
       509,
       509,
       509,
-      28
+      104
     ]
   },
-  "working": {
-    "gif_bytes": 1848,
-    "crc32": 222606757,
+  "work-look-down": {
+    "gif_bytes": 3147,
+    "crc32": 3320892233,
     "outer_chunks": 1,
-    "ble_packets": 4,
+    "ble_packets": 7,
     "packet_lengths": [
       509,
       509,
       509,
-      337
+      509,
+      509,
+      509,
+      109
+    ]
+  },
+  "work-think": {
+    "gif_bytes": 2885,
+    "crc32": 3283400373,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      356
+    ]
+  },
+  "working": {
+    "gif_bytes": 1072,
+    "crc32": 2519451423,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      70
     ]
   },
   "workout": {

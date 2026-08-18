@@ -37,7 +37,9 @@ final class Choreographer {
     manifest: ClipManifest,
     clock: @escaping () -> TimeInterval,
     rotationPeriod: TimeInterval = 20,
-    fidgetChance: Double = 0.25
+    // 0.15 per rotation-period epoch is roughly one fidget every 7 loops --
+    // the sparser end of the "4-8 loops then an alt" the product wants.
+    fidgetChance: Double = 0.15
   ) {
     self.manifest = manifest
     self.clock = clock
