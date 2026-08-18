@@ -30,7 +30,8 @@ is why `motion` (the real movement) is much shorter than `duration`.
 **The anchor contract binds all of them:** every loop begins and ends on its pose's
 pixel-identical anchor frame, and every transition starts and ends on the anchor of the
 pose at each end. `idle` frame 0 defines `standing`, `sleeping` frame 0 defines `dozing`,
-and an offscreen anchor is an empty frame. Break this once and every swap visibly jumps.
+`working` frame 0 defines `sitting`, and an offscreen anchor is an empty frame. Break this
+once and every swap visibly jumps.
 
 **Every clip in the manifest now satisfies it.** `waiting` was the last holdout: its wave
 opened and closed mid-gesture, so a swap into it snapped the arm up four rows and conjured
@@ -47,7 +48,7 @@ single eye with the full body still behind it, and the shallow turn leaves a str
 the far eye — see the known gap below for the frame
 numbers and why trimming would make the art worse, not better. The seated fidgets
 (`work-coffee`, `work-look`) sidestep the question rather than satisfying it: this mascot is
-drawn front-on in every clip, so neither actually turns — see the `sitting` section.
+drawn or imported front-on in every clip, so neither actually turns — see the `sitting` section.
 
 ---
 
@@ -141,10 +142,10 @@ clip's cadence.
 
 ### sitting
 
-|                                      |                                                          |                                                        |
-| ------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------ |
-| ![working](_animations/working.gif) | ![stand-to-sit](_animations/stand-to-sit.gif)             | ![sit-to-stand](_animations/sit-to-stand.gif)           |
-| **working** · 9f · 2.9s · w 1.0     | **stand-to-sit**<br>standing → sitting<br>3f · motion 1.4s | **sit-to-stand**<br>sitting → standing<br>3f · motion 1.4s |
+|                                      |                                                            |                                                             |
+| ------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------ |
+| ![working](_animations/working.gif) | ![stand-to-sit](_animations/stand-to-sit.gif)                | ![sit-to-stand](_animations/sit-to-stand.gif)                 |
+| **working** · 25f · 2.24s · w 1.0    | **stand-to-sit**<br>standing → sitting<br>3f · motion 1.4s   | **sit-to-stand**<br>sitting → standing<br>3f · motion 1.4s    |
 
 The sit edges sit inside this loop table rather than in the Transitions section, the same
 place `stand-to-doze`/`doze-to-stand` sit inside `dozing` above — a pose's own way in and
@@ -152,64 +153,90 @@ out reads better next to the pose than filed separately by clip kind.
 
 `sitting` is where `working` lives, and `working` is on screen for most of a turn — see
 [[Menu Bar App]] for why sitting now covers the whole stretch between the first tool call
-and the turn ending, rather than flickering in and out between calls. The pose has a drawn
-anchor (`_sitting_anchor()`, alongside `_standing_anchor()` and `_dozing_anchor()`); the
-`working` loop is drawn against it as a seated pose, replacing the old standing broom
-sweep — the id survives, the art underneath it does not; the sweep itself is retired, not
-rehomed (see below). `sitting` also has four fidget beats scoped to it, and the two edges
-that carry the mascot to and from `standing`.
+and the turn ending, rather than flickering in and out between calls. `working` is
+`clips.json`'s `variantGroup: "working"` loop at `pose: "sitting"`; the id survives from an
+older clip, but the art underneath it does not — the old standing broom sweep is retired,
+not rehomed (see below).
 
-**The seated art is drawn on the standard geometry, not sliced from a sheet.** The retired
-seated clip, `working-alt`, was imported from a reference sprite sheet at ~87% of the drawn
-silhouette with a per-tile crop that wobbled a pixel or three — the same failure mode
-`idle-think` was cut for. A sheet import also has no anchor to speak of: the sit edges need
-an exact pixel target to arrive at and leave from, which only drawn art gives.
+**The seated art is imported, not drawn.** `working` comes from `art/sources/work-typing.gif`
+— 5 native 32×32 frames at 70ms each, the user's own hand-authored typing loop — and the
+pose's anchor, `_sitting_anchor()`, is frame 0 of that same import: the hands-at-rest pose,
+not a shape `mascot()` draws. Every other seated clip composites onto copies of this one
+frame; nothing calls `mascot()` at the seated pose except the sit edges' single bridging
+frame (below).
 
-**The laptop is drawn in three-quarter view, flat grey, at the reference art's own
-value.** Chunk 8 replaced the earlier outlined near-black lid with the reference's true
-`(134,134,134)` — a flat fill, no outline — at the user's explicit direction: that value
-is the exact mid-tone [[Panel Quirks]] documents the panel rendering as blue-violet, and
-it ships anyway as the deliberate next test of that rule (see Panel Quirks' own note on
-the single photo that now complicates it). The silhouette carries the whole read: a
-lid (`LAPTOP_LID`) that leans away from the viewer, stepping a column right with each
-row as it rises, and a keyboard deck (`LAPTOP_DECK`) that comes toward the viewer,
-stepping a column left with each row as it descends, with a one-row gap left as
-background between them — the hinge seam a solid slab would not have. A 2×2 white logo
-sits on the lid back, and two small background notches in the deck's middle row read as
-keys. It is drawn lid-back to the viewer, in front of the figure, and drawn last so it
-occludes the figure's lower right side and near arm — the same trick that lets a 24px
-figure and the laptop both fit inside 32 columns, and (since chunk 8) what puts his hands
-at the keyboard: `_sitting_anchor()` now draws both arms and lets the lid cover the near
-one, rather than hiding it outright.
+**This reverses what used to be true here.** `working-alt` (retired, below) and
+`idle-think` (cut, see the standing section above) both failed the same way: cropped
+per-tile out of a *screenshot* reference sheet at ~87% of the drawn silhouette, with the
+crop itself wobbling a pixel or three between tiles, so the figure both shrank and
+juddered — and a sheet import has no anchor to speak of, while the sit edges need an exact
+pixel target to arrive at and leave from. `work-typing.gif` doesn't share that failure: it
+is native 32×32 pixel art authored directly on the panel's own grid, not a screenshot
+rescaled down, so there is no shrink to inherit and no per-tile crop to wobble, and frame 0
+is a pixel-identical anchor the same way a drawn frame would be. It also already matched
+the established geometry (the figure sits at the same rows the drawn seated anchor used),
+confines all of its motion to the hands so the head stays perfectly still frame to frame,
+and puts his hands on the keyboard — eight columns of silhouette reaching onto the keys
+that the drawn version, whose arms could never rise past `MAX_ARM_LIFT` without detaching
+from the torso ([[Art Pipeline]]), had no way to show. That last detail is the one the
+drawn version could not express at any arm position.
 
-**Four fidgets are scoped to `sitting`**, each a non-looping self-edge with
+**The import flattens the source's near-black dither to pure background.** The source
+tiles an achromatic/warm-tinted checkerboard — `(0,0,0)`/`(1,1,1)`/`(3,3,3)` alternating
+with `(10,4,0)`/`(13,5,0)`/`(18,7,0)` — across the whole canvas, not only under the laptop.
+[[Panel Quirks]] is explicit that near-black left in empty space genuinely lights those
+LEDs, so both tones snap to `BG` on import rather than surviving as a visible grey
+checkerboard.
+
+**`laptop()` is deleted.** The desk — lid, deck, hinge — is baked into the imported pixels
+now rather than drawn by `mascot()`-style rectangles, and `_desk_sprite()` lifts every
+`LAPTOP_GREY` pixel back out of `_sitting_anchor()` into its own sprite, so the sit edges
+can still slide it in and out independent of the figure — the same job `laptop()` used to
+do. The colour is unchanged, `(134, 134, 134)`, the same mid-tone [[Panel Quirks]]
+documents the panel rendering as blue-violet, now snapped onto the source's own laptop
+pixels by `_typing_recolour()` instead of filled by a drawn rectangle.
+
+**Five fidgets are scoped to `sitting`**, each a non-looping self-edge with
 `fidgetGroup: "working"` so none of them can fire anywhere else — the same scoping the
-wander fidgets use for `idle`, below.
+wander fidgets use for `idle`, below. `work-look-down` belongs here, not with the
+`working` loop above: in `clips.json` it carries `fidgetGroup: "working"` with
+`fromPose`/`toPose` both `sitting`, the identical shape as the other four fidgets, not the
+`variantGroup`/`pose` shape `working` itself has.
 
-|                                         |                                             |                                         |                                           |
-| --------------------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------------------------- |
-| ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif) | ![work-look](_animations/work-look.gif) | ![work-think](_animations/work-think.gif) |
-| **work-idea**<br>sitting, 9f · 1.4s     | **work-coffee**<br>sitting, 8f · 1.88s      | **work-look**<br>sitting, 6f · 1.81s    | **work-think**<br>sitting, 14f · 4.88s    |
+|                                         |                                             |                                          |                                            |                                                     |
+| --------------------------------------- | -------------------------------------------- | ---------------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
+| ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif)  | ![work-look](_animations/work-look.gif)  | ![work-think](_animations/work-think.gif)    | ![work-look-down](_animations/work-look-down.gif)      |
+| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 7f · 1.88s       | **work-look**<br>sitting, 15f · 1.35s    | **work-think**<br>sitting, 13f · 4.88s       | **work-look-down**<br>sitting, 15f · 1.35s             |
 
-`work-idea` lifts an eye, sparks, and runs a fast typing burst. `work-coffee` brings a
-cup up in front of him, held in both hands for a sip, then sets it back down and lets it
-go — chunk 8 moved it from a small mug at his side to this bigger, two-handed hold in
-front of the torso, at the user's direction; it stays clear of the eyes at every frame.
-`work-look` holds a beat and blinks. `work-think`
-is the desk-side thought bubble the seated pose needed, built by reusing
-`_thought_bubble()` rather than adding a new `PanelState` — thinking at the desk is a beat
-on top of `working`, not a state of its own.
+`work-idea` lifts an eye, sparks, and runs a fast typing burst — the same imported frames
+`working` plays, just stepped through at a faster cadence. `work-coffee` brings a cup up
+in front of him, held in both hands for a sip, then sets it back down and lets it go; his
+far hand's fingers, baked onto the keyboard as three isolated pixels in the imported art,
+are cleared back to `LAPTOP_GREY` while the cup is held — the mechanical version of "a hand
+lifts off the keyboard." `work-look` lifts both eyes to look up from the screen while the
+hands keep typing, then lets them back down. `work-look-down` is its mirror, imported
+rather than drawn: the same beat with the eyes authored a row lower in the second source
+file instead of raised in code. `work-think`
+is the desk-side thought bubble the seated pose needed, `_thought_bubble()`'s own geometry
+recentred and composited over a copy of the imported anchor rather than drawn straight into
+a frame — thinking at the desk is a beat on top of `working`, not a state of its own.
 
 **Neither `work-coffee` nor `work-look` turns the mascot to face the viewer.** This mascot
-is drawn front-on in every clip, so there is no away-facing pose to turn from — the
-turned-head rule above does not apply to either. The attention shift in both is drawn the
-way `thinking-alt` draws its own eye lift: paint over and redraw with the eyes higher in
-the head. `work-look` lifts both eyes, symmetric, to keep it visually distinct from the
-single-eye quizzical lift `work-idea` and `thinking-alt` use.
+is drawn — and, for the seated pose, imported — front-on in every clip, so there is no
+away-facing pose to turn from — the turned-head rule above does not apply to either. The
+attention shift in both is the way `thinking-alt` draws its own eye lift, applied to the
+imported art instead of a `mascot()` draw: paint over and redraw with the eyes higher (or,
+for `work-look-down`, imported already lower) in the head. `work-look` lifts both eyes,
+symmetric, to keep it visually distinct from the single-eye quizzical lift `work-idea` and
+`thinking-alt` use.
 
-**Two edges connect `sitting` to `standing`**: `stand-to-sit` (he lowers himself, the lid
-comes in) and `sit-to-stand` (the lid closes and leaves, he stands), both pixel-exact on
-the anchor at each end, closing what was previously the one pose with no way in or out.
+**Two edges connect `sitting` to `standing`**: `stand-to-sit` (he lowers himself, the desk
+comes in) and `sit-to-stand` (the desk recedes, he stands), both pixel-exact on the anchor
+at each end, closing what was previously the one pose with no way in or out. Both bridge
+through one drawn frame, `_sit_mid()` — the single place `mascot()` still draws a
+seated-ish pose, because it is the only frame that has to connect a *drawn* standing
+figure to the *imported* seated one, and nothing imported exists partway between those two
+poses. What that bridge costs is the new known gap below.
 
 **The checkmark belongs to `done`, not to `sit-to-stand`.** `sit-to-stand` fires on every
 departure from the desk — including into `waiting` and into a panel shutdown — so a
@@ -329,7 +356,7 @@ of `variantGroup`: both would read as "which group is this in", but one says whi
 *loop* rotates within and the other which state a *one-shot* may fire for, and a single
 field answering both could only be read by first checking `loops`. At weight 0.2 each they total 1.8 against `fidget-stretch` and
 `fidget-look`'s 2.0, so a fidget is still slightly more likely to be a small one than a
-whole trip offscreen. The four `sitting` fidgets in the loops section above follow the
+whole trip offscreen. The five `sitting` fidgets in the loops section above follow the
 same shape, scoped by `fidgetGroup: "working"` instead.
 
 Fidgets are motion with no cause — the thing that separates "animated" from "alive". They
@@ -403,8 +430,24 @@ stall.
    is re-authoring the sway's turned frames so the eyes shift and the head narrows together,
    keeping the silhouette one width throughout — not a repair pass on the existing frames —
    and that is a separate task.
-5. **`work-idea`'s spark sits ~6 rows above the seated head with nothing bridging the
-   gap**, where `thinking-alt`'s bubble has a puff tail; it may read as floating rather than
-   as his.
-6. **`work-coffee`'s mug occupies the far arm's position rather than being held at the end
-   of it**, so "holding" is implied by adjacency rather than drawn.
+5. ~~`work-idea`'s spark sits ~6 rows above the seated head with nothing bridging the gap~~ —
+   **closed.** The imported seated head tops out at row 18, two rows lower than the retired
+   drawn one, and `work_idea()` places the spark at row 17 — one clear row above the head —
+   which closes most of the old gap for free and the rest by deliberate placement.
+6. ~~`work-coffee`'s mug occupies the far arm's position rather than being held at the end
+   of it, so "holding" is implied by adjacency rather than drawn~~ — **closed**, in the
+   rebuilt clip. The cup is now drawn in front of the torso with a see-through C-shaped
+   handle, and both `MASCOT` hand blocks are drawn at its sides while the far hand's
+   baked-on keyboard fingers clear to `LAPTOP_GREY` for the duration — holding is drawn now,
+   not implied by where the prop sits.
+7. **The sit edges pop.** Measured, not guessed: `_standing_anchor()` and
+   `_sitting_anchor()` differ by **293 pixels** — a structural gap between a drawn
+   rectangle figure and an imported photographic-silhouette one, not just a difference in
+   pose — and the three-frame `stand-to-sit`/`sit-to-stand` transition leaves a worst
+   frame-to-frame delta of **166 px**, against **21–42 px** for the worst frame of each of
+   the five seated beats. A grid search over `_sit_mid()`'s own parameters (`by`, `dx`,
+   leg fold, arm position, desk slide offset) could not bring the worse of the transition's
+   two hops below ~157–160px. This is a structural consequence of a drawn standing figure
+   meeting imported seated art, not a tuning miss: closing it means either more frames to
+   spread the movement across, or redrawing one end of the bridge to match the other's own
+   geometry — not a parameter tweak to the existing three-frame register.

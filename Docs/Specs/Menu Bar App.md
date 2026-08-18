@@ -85,7 +85,7 @@ Clips are either looping (variant loops at their pose, eligible for fidgets) or 
 
 Loop clips at a pose can have multiple variants (same pose, different animation). The choreographer selects one deterministically based on a time epoch, never storing "last played"; called twice in the same epoch with the same inputs, it returns the same clip, so the answer is stable and reproducible from three inputs alone (`target`, `displayed`, `now`).
 
-Ambient fidgets (blinks, look-arounds, stretches) play during long holds at a pose, selected with the same deterministic epoch-based method. They are self-edges (`fromPose == toPose`), so they return the mascot exactly where it stood, and fire when the epoch's seeded roll falls under `fidgetChance` — never during a transition, and never for `.off`.
+Ambient fidgets (blinks, look-arounds, stretches) play during long holds at a pose, selected with the same deterministic epoch-based method. They are self-edges (`fromPose == toPose`), so they return the mascot exactly where it stood, and fire when the epoch's seeded roll falls under `fidgetChance` — one roll per 20-second `rotationPeriod` epoch (`Choreographer.swift`), not one per loop of whatever clip is on screen — never during a transition, and never for `.off`.
 
 `<group>-enter` one-shots play exactly once when arriving at a pose, if the manifest has one (e.g., a celebration on `done`). Declaring one wrong fails silently, so the test coverage is important.
 

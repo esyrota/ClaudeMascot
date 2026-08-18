@@ -451,14 +451,23 @@
     ]
   },
   "working": {
-    "gif_bytes": 1072,
-    "crc32": 2519451423,
-    "outer_chunks": 1,
-    "ble_packets": 3,
+    "gif_bytes": 5232,
+    "crc32": 888578910,
+    "outer_chunks": 2,
+    "ble_packets": 12,
     "packet_lengths": [
       509,
       509,
-      70
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      509,
+      509,
+      134
     ]
   },
   "workout": {

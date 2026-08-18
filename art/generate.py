@@ -1081,6 +1081,10 @@ def _desk_sprite() -> Image.Image:
 # The closing anchor frame of `working()` dwells a little longer than the source's
 # own 70ms cadence, so the loop visibly breathes on the join instead of strobing.
 WORKING_CLOSE_MS = 140
+# How many times `working()` repeats the source's typing cycle. See its docstring:
+# the cycle is half a second, fidgets are rolled per 20s epoch rather than per
+# loop, so the bare cycle let the beats crowd out the typing they punctuate.
+WORKING_CYCLES = 6
 
 
 def working():
@@ -1098,8 +1102,18 @@ def working():
     pixel-identically, the same contract idle()'s frame 0 satisfies for
     `standing`. The source's 70ms cadence is kept for every frame except that
     closing one, which gets `WORKING_CLOSE_MS` instead.
+
+    **The source cycle is repeated `WORKING_CYCLES` times inside this one clip**,
+    which is a cadence decision and not a padding one. The cycle is 5 frames at
+    70ms -- barely half a second -- and a fidget is rolled per *epoch*, not per
+    loop (`Choreographer.rotationPeriod`, 20s), so shipping the bare cycle made
+    the seated beats fall between half-second loops and dominate a state that is
+    meant to read as steady work. Six cycles put ~3s of uninterrupted typing
+    between beats, which is the ratio the user asked for: several loops of
+    typing, then one alt. Adjacent identical frames coalesce at the seams, so the
+    shipped frame count is lower than 5 x WORKING_CYCLES.
     """
-    frames = imported(WORK_TYPING_SRC, _typing_recolour)
+    frames = imported(WORK_TYPING_SRC, _typing_recolour) * WORKING_CYCLES
     anchor_im, _ = frames[0]
     return frames + [(anchor_im, WORKING_CLOSE_MS)]
 
