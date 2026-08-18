@@ -32,9 +32,9 @@
     },
     "doze-to-stand": {
       "file": "doze-to-stand.gif",
-      "frameCount": 3,
-      "durationMs": 3900,
-      "motionMs": 1400,
+      "frameCount": 14,
+      "durationMs": 7400,
+      "motionMs": 4060,
       "loops": false,
       "fromPose": "dozing",
       "toPose": "standing"
@@ -117,9 +117,9 @@
     },
     "stand-to-doze": {
       "file": "stand-to-doze.gif",
-      "frameCount": 3,
-      "durationMs": 3900,
-      "motionMs": 1400,
+      "frameCount": 5,
+      "durationMs": 3820,
+      "motionMs": 1320,
       "loops": false,
       "fromPose": "standing",
       "toPose": "dozing"

@@ -131,7 +131,7 @@ MAX_ARM_LIFT = -ARM_TOP
 # There is no `lying` geometry any more. The mascot used to sleep as a 20x6 blob on
 # the floor with a hump for a head, which was legible as a blob and not as this
 # creature -- see `Docs/Specs/Animation Catalogue.md`. It now sleeps standing, from
-# art/sources/sleep.gif, on exactly the silhouette above.
+# art/sources/sleeping.gif, on exactly the silhouette above.
 
 # Seated geometry for the drawn halfway pose only: chunk 10 redefined
 # `_sitting_anchor()` onto the imported typing art, and chunk 11 rebuilt every other
@@ -410,124 +410,145 @@ def done():
     return out
 
 
-# The mascot dozes off standing, from art/sources/sleep.gif: the same silhouette as
-# every other standing clip, arms slumped four rows down onto the legs and the eyes
-# drawn as closed lids, with a one-eye peek twice a cycle. Its palette is a single
-# orange family against black -- no shade tone, and the lids are simply background --
-# so the threshold below is one comparison rather than appear.gif's three-way split.
-SLEEP_SRC = SOURCES / "sleep.gif"
-# The source is authored at a flat 1000ms a frame, which is the drawing tool's default
-# rather than an intention: it would put 18 seconds between one Z and the next. The Zs
-# are the only thing moving, so their cadence IS the clip's cadence, and this is what
-# sets it.
+# The mascot dozes off standing: the same silhouette as every other standing clip,
+# arms slumped four rows down onto the legs and the eyes drawn as closed lids, with a
+# one-eye peek twice a cycle. All three dozing clips are imported from hand-drawn art
+# that shares one silhouette, so the edges land on the loop's own frame 0 pixel-exactly
+# rather than on a drawn approximation of it -- see `_dozing_anchor()`.
+SLEEPING_SRC = SOURCES / "sleeping.gif"
+STAND_TO_DOZE_SRC = SOURCES / "stand-to-doze.gif"
+DOZE_TO_STAND_SRC = SOURCES / "doze-to-stand.gif"
+# `sleeping.gif` is authored at a flat 1000ms a frame, which is the drawing tool's
+# default rather than an intention: it would put 18 seconds between one bubble and the
+# next. The bubbles are the only thing moving, so their cadence IS the clip's cadence,
+# and this is what sets it. The two transitions are authored at deliberate rates (330ms and 140ms)
+# and keep their own.
 SLEEP_FRAME_MS = 500
-# The doze pose read off sleep.gif frame 0, so the transition below can land exactly
-# on it: the arms drop 4 rows (to 24-27, resting on the legs) and the face slides down
-# with a bowed head -- the anchor's 2x2 open eyes at rows 18-19 become 4x1 shut lids at
-# row 24. `stand_to_doze()`'s middle frame is halfway along both of those.
-DOZE_ARM_DROP = 4
-DOZE_MID_ARM_DROP = 2
-DOZE_MID_LID_Y = 21
-DOZE_MID_LID_W = 3
-DOZE_MID_LID_XS = (10, 19)
 
 
-def sleep_frames():
-    """Every frame of sleep.gif, recoloured, at SLEEP_FRAME_MS. NOT coalesced.
+def _doze_recolour(rgb):
+    """Map the dozing sources' palette onto the panel's.
+
+    All three carry one orange family against black -- no secondary tone, and the lids
+    are simply background -- so the body is one comparison rather than appear.gif's
+    three-way split. What needs a second test is `doze-to-stand`'s startle sparks,
+    authored near-white: they are a prop, like the bubbles and the flag, not a lit body
+    pixel. Splitting on chroma keeps them white, the way `_typing_recolour()` keeps the
+    laptop logo white. The families are far apart in both tests -- every body colour
+    has a chroma of 195 or more and every spark 13 or less, every lit pixel is 230 or
+    brighter and every dithered background pixel 40 or darker -- so both thresholds
+    have a wide berth.
+    """
+    if max(rgb) < SHADE_MIN:
+        return BG
+    return PROP if max(rgb) - min(rgb) < TYPING_CHROMA_MIN else MASCOT
+
+
+def sleeping_frames():
+    """Every frame of sleeping.gif, recoloured, at SLEEP_FRAME_MS. NOT coalesced.
 
     Coalescing here would collapse 18 frames to 4 -- the source holds the sleeping
-    pose for seconds at a time -- and the Zs drawn over them need every frame to
+    pose for seconds at a time -- and the bubbles drawn over them need every frame to
     drift on. Timing is overridden wholesale, so the source's own durations, which
     are what coalesce() would have summed, are not information being thrown away.
     """
-    recolour = lambda rgb: BG if max(rgb) < SHADE_MIN else MASCOT
-    return [(im, SLEEP_FRAME_MS) for im, _ in imported(SLEEP_SRC, recolour)]
+    return [(im, SLEEP_FRAME_MS)
+            for im, _ in imported(SLEEPING_SRC, _doze_recolour)]
 
 
 def _dozing_anchor() -> Image.Image:
-    """The `dozing` anchor: sleep.gif frame 0, bare -- no Zs over it yet.
+    """The `dozing` anchor: sleeping.gif frame 0, bare -- no bubbles over it yet.
 
     `dozing` is a pose in its own right, not a dressed-up `standing`. It was the
     old `lying` node, which died with the floor-blob art it was drawn for; the node
     itself was never the problem, and `sleeping` still needs somewhere to be that
     `stand_to_doze()` can carry the mascot to and back from.
     """
-    return sleep_frames()[0][0]
+    return sleeping_frames()[0][0]
+
+
+# Two bubbles drifting up out of the top-right corner, which the slumped arms clear
+# even more of than the standing anchor's do. Four steps up and slightly out, growing
+# as they rise the way a real bubble does, the pair half a cycle apart so there are
+# always two on the panel; at 500ms a frame one bubble takes 2s to leave.
+#
+# This used to be two Zs, and they are gone on the user's request: the letter is not a
+# neutral shape to a Ukrainian reader. Bubbles say "asleep" just as plainly, and the
+# swap is confined to this block -- the sleeping figure underneath is untouched art.
+BUBBLE_STEPS = 4
+BUBBLE_AT = (24, 12)     # where a bubble is blown, just off the right shoulder
+BUBBLE_DRIFT = (1, -4)   # per step: up the panel and a little further out
+BUBBLE_SIZES = (2, 3, 4, 4)  # per step -- it swells as it rises, then holds
+
+
+def _draw_bubble(d: ImageDraw.ImageDraw, x, y, size, colour=PROP) -> None:
+    """A round bubble in a size x size box: the perimeter, minus its four corners.
+
+    Dropping the corners is what makes it read as round rather than as a square ring,
+    and it is what a circle degenerates to at this scale -- at size 3 the remainder is
+    a four-pixel diamond, at size 4 an eight-pixel ring. Below that there is no inside
+    to hollow out, so the smallest bubble is simply solid.
+    """
+    if size <= 2:
+        rect(d, x, y, size, size, colour)
+        return
+    for i in range(1, size - 1):
+        rect(d, x + i, y, 1, 1, colour)                 # top, corners off
+        rect(d, x + i, y + size - 1, 1, 1, colour)      # bottom, corners off
+        rect(d, x, y + i, 1, 1, colour)                 # left side
+        rect(d, x + size - 1, y + i, 1, 1, colour)      # right side
 
 
 def sleeping():
-    """Dozed off standing: eyes shut, arms slumped, Zs drifting up.
+    """Dozed off standing: eyes shut, arms slumped, bubbles drifting up.
 
-    Frame 0 is the bare `dozing` anchor -- no Zs drawn over it -- and the anchor is
+    Frame 0 is the bare `dozing` anchor -- nothing drawn over it -- and the anchor is
     appended again at the end, so this loop begins and ends pixel-identical to what
     `stand_to_doze()` lands on and `doze_to_stand()` departs from, the same contract
     idle()'s own frame 0 satisfies for `standing`.
 
-    The append is not belt-and-braces: sleep.gif's LAST frame is one of its two
+    The append is not belt-and-braces: sleeping.gif's LAST frame is one of its two
     one-eye peeks, not a second copy of its first, so ending on it would leave the
     loop a blinked eye away from the anchor and pop on every swap.
     """
     out = []
-    for i, (im, ms) in enumerate(sleep_frames()):
+    for i, (im, ms) in enumerate(sleeping_frames()):
         if i == 0:
             out.append((im, ms))
             continue
         d = ImageDraw.Draw(im)
-        # Two Zs rising out of the top-right, drawn for exactly this standing
-        # figure -- the slumped arms clear even more of that corner than the
-        # anchor's do.
         for j in (0, 1):
-            step = (i + j * 2) % 4
-            zx = 22 + step
-            zy = 13 - step * 4
-            if zy < 0:
-                continue
-            size = 3 if j == 0 else 2
-            rect(d, zx, zy, size, 1, PROP)                  # top bar
-            rect(d, zx, zy + size - 1, size, 1, PROP)       # bottom bar
-            rect(d, zx + size // 2, zy + 1, 1, max(0, size - 2), PROP)  # diagonal
+            step = (i + j * (BUBBLE_STEPS // 2)) % BUBBLE_STEPS
+            x = BUBBLE_AT[0] + step * BUBBLE_DRIFT[0]
+            y = BUBBLE_AT[1] + step * BUBBLE_DRIFT[1]
+            _draw_bubble(d, x, y, BUBBLE_SIZES[step])
         out.append((im, ms))
     out.append((_dozing_anchor(), SLEEP_FRAME_MS))
     return out
 
 
-def _doze_mid() -> Image.Image:
-    """The one drawn frame between standing and dozing: hands and eyes half down.
+def _doze_edge(src: Path) -> list:
+    """One imported dozing transition, its last frame held as the dwell.
 
-    Everything else in this clip is either the standing anchor or sleep.gif's own
-    art; this is the single in-between, and it exists because the cut straight from
-    one to the other dropped the arms four rows and shut the eyes on a single frame.
+    Both sources already begin and end on an anchor exactly -- `stand-to-doze` frame 0
+    is `_standing_anchor()` and its last frame is `_dozing_anchor()`, `doze-to-stand`
+    the reverse -- which is what lets these be imported whole instead of drawn. All
+    that is added is the long tail every transition ends on, so a hand-off arriving
+    late shows a mascot standing (or sleeping) still rather than a restarted motion.
     """
-    im = frame()
-    d = ImageDraw.Draw(im)
-    mascot(d, HOME_Y, arms=(DOZE_MID_ARM_DROP, DOZE_MID_ARM_DROP))
-    # mascot() has already drawn the open eyes at their standing rows; paint them
-    # out and drop half-lidded ones down the face instead. Adding an eye offset to
-    # mascot() for one frame would put a parameter no other clip uses in the one
-    # function every clip goes through.
-    for ex in EYE_XS:
-        rect(d, ex, HOME_Y + EYE_TOP, EYE_W, EYE_H, MASCOT)
-    for lx in DOZE_MID_LID_XS:
-        rect(d, lx, DOZE_MID_LID_Y, DOZE_MID_LID_W, 1, EYE)
-    return im
+    frames = imported(src, _doze_recolour)
+    frames[-1] = (frames[-1][0], APPEAR_TAIL_MS)
+    return frames
 
 
 def stand_to_doze():
     """Transition: nods off where it stands -- hands and eyes down, then asleep."""
-    return [
-        (_standing_anchor(), 700),
-        (_doze_mid(), 700),
-        (_dozing_anchor(), APPEAR_TAIL_MS),  # long dwell -- the dozing anchor
-    ]
+    return _doze_edge(STAND_TO_DOZE_SRC)
 
 
 def doze_to_stand():
-    """Transition: wakes back up to standing, the settle run backwards."""
-    return [
-        (_dozing_anchor(), 700),
-        (_doze_mid(), 700),
-        (_standing_anchor(), APPEAR_TAIL_MS),  # long dwell -- the standing anchor
-    ]
+    """Transition: startles awake, stretches, and settles back to standing."""
+    return _doze_edge(DOZE_TO_STAND_SRC)
 
 
 # --------------------------------------------------------------------------
@@ -1240,9 +1261,11 @@ def work_look_down():
 
 
 # The two edges connecting `standing` and `sitting` -- `stand_to_sit()` lowers him to
-# the desk as it slides in, `sit_to_stand()` is the reverse. Same three-frame register
-# as `stand_to_doze()`/`doze_to_stand()` above: an anchor, one drawn halfway frame,
-# the anchor at the other end held as a long dwell.
+# the desk as it slides in, `sit_to_stand()` is the reverse. Three frames each: an
+# anchor, one drawn halfway frame, the anchor at the other end held as a long dwell.
+# The dozing edges above used to be built the same way and are now imported whole,
+# which is the shape these two want as well -- see their known gap in
+# [[Animation Catalogue]].
 #
 # `_sit_mid()`'s own parameters were chosen by measurement, not eyeballing: the raw
 # pixel difference between `_standing_anchor()` and `_sitting_anchor()` is 293px, a

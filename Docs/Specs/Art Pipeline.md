@@ -8,10 +8,11 @@ poses are joined by transition clips. **[[Animation Catalogue]] is the inventory
 clip, its numbers and the pose graph, with a playable image of each. This page covers how
 they are *made*.
 
-Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`),
-`sleeping`, and the seated pose (`working`, `work-look-down`, from the two `work-typing`
-sources) are imported from hand-drawn art instead. **`starting`'s silhouette is the
-reference the drawn clips are built to match.** No clip ships from a sprite sheet any
+Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`), the
+whole of `dozing` (`sleeping` plus both its edges), and the seated pose (`working`,
+`work-look-down`, from the two `work-typing` sources) are imported from hand-drawn art
+instead. **`starting`'s silhouette is the reference the drawn clips are built to match**,
+and the `dozing` sources are drawn on it too. No clip ships from a sprite sheet any
 more — the sheet imports that used to (`working-alt`, the retired broom sweep) are gone;
 see [[Animation Catalogue]]'s `sitting` section for why.
 
@@ -39,7 +40,7 @@ own override folder, is `AnimationLibrary.swift`.
 
 ## The anchor contract
 
-**Every looping clip at a pose begins *and* ends on that pose's pixel-identical anchor frame.** Not "roughly standing" — the same 1024 pixels. One violation makes the mascot flicker or shimmy when the panel loops the clip or when a transition drops into the middle and waits for the next hand-off. The mascot's figure must not resize or drift; the panel's loop restart at frame 0 must land seamlessly on whatever is currently on screen. **Nothing currently enforces this automatically.** `GifPacketizerTests` pins packet bytes and `ChoreographerTests` runs against synthetic manifests; neither compares pixels. The contract was verified by hand when each clip was authored (comparing frame 0 and the final frame against `idle.gif`/`sleeping.gif` frame 0). Adding that comparison as an assertion in `generate.py`, where the frames are already in memory, is the obvious place to close the gap.
+**Every looping clip at a pose begins *and* ends on that pose's pixel-identical anchor frame.** Not "roughly standing" — the same 1024 pixels. One violation makes the mascot flicker or shimmy when the panel loops the clip or when a transition drops into the middle and waits for the next hand-off. The mascot's figure must not resize or drift; the panel's loop restart at frame 0 must land seamlessly on whatever is currently on screen. **Nothing currently enforces this automatically.** `GifPacketizerTests` pins packet bytes and `ChoreographerTests` runs against synthetic manifests; neither compares pixels. The contract was verified by hand when each clip was authored (comparing frame 0 and the final frame against `idle.gif`/`sleeping.gif` frame 0) — the `dozing` clips satisfy it at both ends of both edges, because all three are imported from sources drawn on one silhouette. Adding that comparison as an assertion in `generate.py`, where the frames are already in memory, is the obvious place to close the gap.
 
 ## Clip shapes
 
@@ -115,10 +116,10 @@ Two consequences worth knowing before editing a state:
 `generate.py`'s `imported()` takes each hand-drawn source whole — no crop, and **no frame
 subsampling**: the source durations *are* the animation. What it does do is resample
 each frame to the art's own pixel grid, which is not always the file's, then blow that
-grid up by a whole number of panel pixels and place it. Four sources go through it today:
-`appear.gif`, `sleep.gif`, and the two `work-typing` sources below. `import_gif.py` is the
-different tool for a different job: art we are importing blind, cropped to a
-power-of-two window and flattened to one colour.
+grid up by a whole number of panel pixels and place it. Six sources go through it today:
+`appear.gif`, the three `dozing` sources, and the two `work-typing` sources below.
+`import_gif.py` is the different tool for a different job: art we are importing blind,
+cropped to a power-of-two window and flattened to one colour.
 
 ## The entrance (`starting.gif`)
 

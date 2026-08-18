@@ -54,7 +54,7 @@ Each one cost a wrong diagnosis to find.
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
 | Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling |
 | Event log | `EventLog.swift` | **shipped** — always-on input + decision JSONL under Application Support |
-| Art generator | `art/generate.py` | working, **23 clips** — 11 loops, 12 transitions. See [[Animation Catalogue]] |
+| Art generator | `art/generate.py` | working, **39 clips** — 12 loops, 27 one-shots. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Sprite-sheet importer | `art/sheet_import.py` | standalone — nothing imports a sheet any more; kept for a future one |
@@ -94,7 +94,8 @@ Written up in `_tasks/`, in the order they are worth doing:
   is left is a per-channel sweep to turn the fitted rule into a real transfer curve.
 
 Still open, and small enough to live in [[Animation Catalogue]] → Known gaps rather than
-their own task: a `dozing` fidget, and the second Z that collapses to a 2×2 dot.
+their own task: a `dozing` fidget. (The Z-shaped sleep marks are gone — they are bubbles
+now, at the user's request; see [[Animation Catalogue]] → `dozing`.)
 
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.
