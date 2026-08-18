@@ -41,7 +41,11 @@ final class AnimationLibraryTests: XCTestCase {
       .appendingPathComponent("Animations")
     try FileManager.default.createDirectory(at: animationsDir, withIntermediateDirectories: true)
 
-    for state in PanelState.allCases {
+    // `.away` is skipped throughout: it is the one state with no asset of its
+    // own, because leaving resolves to whichever walk-off edge the pose graph
+    // picks (`walk-off-left` / `walk-off-right`) rather than to a clip named
+    // after the state.
+    for state in PanelState.allCases where state != .away {
       let sourceURL = fixturesDirectory.appendingPathComponent("\(state.rawValue).gif")
       let destURL =
         animationsDir
@@ -57,7 +61,11 @@ final class AnimationLibraryTests: XCTestCase {
     library.bundleOverride = mockBundle
 
     // Every state's clip (a synthetic one, id == file == "<state>.gif") should resolve.
-    for state in PanelState.allCases {
+    // `.away` is skipped throughout: it is the one state with no asset of its
+    // own, because leaving resolves to whichever walk-off edge the pose graph
+    // picks (`walk-off-left` / `walk-off-right`) rather than to a clip named
+    // after the state.
+    for state in PanelState.allCases where state != .away {
       let clip = Clip(
         id: state.rawValue,
         file: "\(state.rawValue).gif",

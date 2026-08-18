@@ -340,3 +340,111 @@ func aGroupedFidgetIsNeverPickedAsAVariant() {
     clock.advance(30)
   }
 }
+
+// MARK: - Arriving and leaving
+
+@Test @MainActor
+func theEntranceIsSuppressedWhenTheMascotIsAlreadyOnScreen() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let starting = edgeClip("starting", from: .offBottom, to: .standing)
+  // The wander is the trap this regression is about: it is a standing
+  // self-edge, so `transition(from: .standing, to: .standing)` matches it, and
+  // the mascot answered a `SessionStart` by walking off the panel.
+  let wander = selfEdgeClip("wander-off-left-in-right", pose: .standing, fidgetGroup: "idle")
+  let choreographer = Choreographer(
+    manifest: manifest([idle, starting, wander]), clock: { clock() }, fidgetChance: 0)
+
+  // Standing there already: the arrival has nothing to do, so it settles into
+  // the standing loop rather than removing the mascot in order to bring it back.
+  #expect(choreographer.clip(for: .starting, displayed: idle)?.id == "idle")
+}
+
+@Test @MainActor
+func theEntranceStillPlaysFromOffScreen() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let starting = edgeClip("starting", from: .offBottom, to: .standing)
+  let walkInLeft = edgeClip("walk-in-left", from: .offLeft, to: .standing)
+  let walkOffLeft = edgeClip("walk-off-left", from: .standing, to: .offLeft)
+  let choreographer = Choreographer(
+    manifest: manifest([idle, starting, walkInLeft, walkOffLeft]), clock: { clock() })
+
+  // Nothing on screen at all (a dark panel, or a fresh launch): rise.
+  #expect(choreographer.clip(for: .starting, displayed: nil)?.id == "starting")
+  // Off to one side, because it walked off: come back the way it went, not up
+  // through the floor.
+  #expect(choreographer.clip(for: .starting, displayed: walkOffLeft)?.id == "walk-in-left")
+}
+
+@Test @MainActor
+func leavingWalksOffThePanel() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let walkOffLeft = edgeClip("walk-off-left", from: .standing, to: .offLeft)
+  let walkOffRight = edgeClip("walk-off-right", from: .standing, to: .offRight)
+  let choreographer = Choreographer(
+    manifest: manifest([idle, walkOffLeft, walkOffRight]), clock: { clock() })
+
+  let exit = choreographer.clip(for: .away, displayed: idle)
+  #expect(exit?.id == "walk-off-left" || exit?.id == "walk-off-right")
+  #expect(exit?.toPose?.isOffscreen == true)
+}
+
+@Test @MainActor
+func leavingFromDozingStandsUpFirst() {
+  let clock = FakeClock()
+  let sleeping = loopClip("sleeping", pose: .dozing, group: "sleeping")
+  let dozeToStand = edgeClip("doze-to-stand", from: .dozing, to: .standing)
+  let walkOffLeft = edgeClip("walk-off-left", from: .standing, to: .offLeft)
+  let walkOffRight = edgeClip("walk-off-right", from: .standing, to: .offRight)
+  let choreographer = Choreographer(
+    manifest: manifest([sleeping, dozeToStand, walkOffLeft, walkOffRight]), clock: { clock() })
+
+  // One edge at a time: the mascot has to get up before it can walk anywhere,
+  // and the route is found without anything spelling it out.
+  #expect(choreographer.clip(for: .away, displayed: sleeping)?.id == "doze-to-stand")
+}
+
+@Test @MainActor
+func leavingResolvesToNothingOnceAlreadyGone() {
+  let clock = FakeClock()
+  let walkOffLeft = edgeClip("walk-off-left", from: .standing, to: .offLeft)
+  let choreographer = Choreographer(
+    manifest: manifest([walkOffLeft]), clock: { clock() })
+
+  // Already off screen: there is no clip for "gone", and `PanelController`
+  // reads the arrival off `displayed` rather than expecting one.
+  #expect(choreographer.clip(for: .away, displayed: walkOffLeft) == nil)
+}
+
+@Test @MainActor
+func leavingResolvesToNothingWhenNoExitExists() {
+  let clock = FakeClock()
+  // A synthetic manifest, not the shipped one: `sitting` has no edge back to
+  // `standing` here, so this proves the graceful-degradation path rather than
+  // anything about what the real manifest ships.
+  let working = loopClip("working", pose: .sitting, group: "working")
+  let walkOffLeft = edgeClip("walk-off-left", from: .standing, to: .offLeft)
+  let choreographer = Choreographer(
+    manifest: manifest([working, walkOffLeft]), clock: { clock() })
+
+  #expect(choreographer.clip(for: .away, displayed: working) == nil)
+}
+
+@Test @MainActor
+func sitAndStandRouteThroughTheSitEdges() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let working = loopClip("working", pose: .sitting, group: "working")
+  let standToSit = edgeClip("stand-to-sit", from: .standing, to: .sitting)
+  let sitToStand = edgeClip("sit-to-stand", from: .sitting, to: .standing)
+  let choreographer = Choreographer(
+    manifest: manifest([idle, working, standToSit, sitToStand]), clock: { clock() })
+
+  // Standing, wants to be sitting: the drawn sit edge, not a direct swap onto `working`.
+  #expect(choreographer.clip(for: .working, displayed: idle)?.id == "stand-to-sit")
+
+  // Seated, wants to be standing: the reverse edge.
+  #expect(choreographer.clip(for: .idle, displayed: working)?.id == "sit-to-stand")
+}

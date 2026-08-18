@@ -21,4 +21,13 @@ struct Clip: Sendable, Equatable, Identifiable {
   let weight: Double  // 1.0 when absent
   let fromPose: Pose?  // transition clips only
   let toPose: Pose?  // transition clips only
+
+  /// Where this clip leaves the mascot: its own pose if it loops at one,
+  /// otherwise the pose its edge ends at.
+  var endPose: Pose? { pose ?? toPose }
+
+  /// Whether the mascot is off the panel once this clip has played. What
+  /// `PanelController` reads to know a departure has finished, so the power
+  /// is only cut on an empty screen.
+  var endsOffscreen: Bool { endPose?.isOffscreen ?? false }
 }

@@ -38,6 +38,11 @@ struct PanelTimings: Sendable {
   /// `0` (the default) disables the entrance outright, which is what every
   /// existing test relies on to see its expected state upload immediately.
   var startingHold: TimeInterval = 0
+  /// How long the mascot gets to walk off the panel before the power is cut
+  /// regardless. Generous next to the ~0.6s walk, because it exists to bound
+  /// a departure that is *failing* (upload retries at 2s apiece), not to pace
+  /// one that is working.
+  var leaveBy: TimeInterval = 20
 }
 
 /// A clip resolution failure, surfaced through the same retry/backoff path
@@ -112,6 +117,11 @@ final class PanelController: ObservableObject {
   private var idleSince: TimeInterval?
   /// Backoff gate: `tick()` performs no new I/O attempt before this time.
   private var nextRetryAt: TimeInterval?
+
+  /// When the current departure began, so it can be bounded. `nil` whenever
+  /// the panel is not on its way off, which is also what makes a departure
+  /// interrupted by a new prompt start over cleanly next time.
+  private var leavingSince: TimeInterval?
 
   /// When `displayed` was last successfully uploaded, so boundary scheduling
   /// knows how far into its loop (or its one-shot motion) it is. `nil`
@@ -234,19 +244,41 @@ final class PanelController: ObservableObject {
     }
 
     if shouldBeOff(now: now) {
-      if !isPanelOff {
+      if isPanelOff { return }
+      // The mascot walks off before the panel goes dark. Only once it has
+      // actually left (or the departure has run out of time) is there nothing
+      // left on screen worth keeping lit.
+      if hasLeftScreen(now: now) || departureExpired(now: now) {
         await attemptPowerOff()
+        return
       }
+      if leavingSince == nil { leavingSince = now }
+      await driveTowards(.away, now: now)
       return
     }
+    leavingSince = nil
 
     if isPanelOff {
       await attemptWake(now: now)
       return
     }
 
-    let targetState = currentTarget(now: now)
+    await driveTowards(currentTarget(now: now), now: now)
+  }
+
+  /// One boundary-gated step towards `targetState`: resolve it to a clip and
+  /// upload that clip if the thing on screen has reached a seam. Shared by
+  /// the ordinary path and the departure, so walking off the panel obeys the
+  /// same "never interrupt mid-animation" rule as everything else.
+  private func driveTowards(_ targetState: PanelState, now: TimeInterval) async {
     guard let targetClip = resolve(targetState, displayed) else {
+      if targetState == .away {
+        // No route off the panel from where the mascot stands. Waiting out
+        // the departure deadline would leave it lit and motionless for no
+        // gain; go dark now, as this machine did before it could walk.
+        await attemptPowerOff()
+        return
+      }
       // The resolver has nothing for this state. Treat it like a failed
       // upload: back off and retry, rather than getting stuck silently on a
       // stale `displayed`.
@@ -288,17 +320,44 @@ final class PanelController: ObservableObject {
   // MARK: - Target derivation
 
   private func shouldBeOff(now: TimeInterval) -> Bool {
-    // `.off` (SessionEnd) blanks the panel immediately; idle escalation
-    // blanks it only after sitting idle for `offAfter`.
+    // `.off` (SessionEnd) skips the idle timers; idle escalation reaches the
+    // same place only after sitting idle for `offAfter`. Neither cuts power
+    // on the spot any more — both walk the mascot off first (`.away`).
     if desired == .off { return true }
     guard desired == .idle, let idleSince else { return false }
     return now - idleSince >= timings.offAfter
   }
 
+  /// Whether the mascot is no longer on the panel: the clip showing ends at
+  /// an offscreen pose and has played its motion out. Nothing on screen at
+  /// all counts as gone — there is no one left to walk off.
+  private func hasLeftScreen(now: TimeInterval) -> Bool {
+    guard let displayed, let clipStartedAt else { return true }
+    guard displayed.endsOffscreen else { return false }
+    return now >= clipStartedAt + displayed.motion
+  }
+
+  /// Whether the departure has taken too long. A backstop, not a schedule:
+  /// the walk itself is under a second, but a failing upload retries on a 2s
+  /// backoff, and a panel that stays lit because the mascot cannot finish
+  /// leaving is a worse outcome than one that blinks out the old way.
+  private func departureExpired(now: TimeInterval) -> Bool {
+    guard let leavingSince else { return false }
+    return now - leavingSince >= timings.leaveBy
+  }
+
   /// Starts (or restarts) the entrance animation. A no-op when the entrance
   /// is disabled, which keeps `startingHold: 0` meaning "never show it".
+  ///
+  /// Also a no-op when the mascot is already on the panel. The entrance is
+  /// the mascot *arriving from nothing*, so playing it over a mascot that is
+  /// standing right there has to first take it away — which is what a
+  /// `SessionStart` on a visible mascot used to look like, and read as a
+  /// glitch rather than a greeting. On screen already, a new session simply
+  /// finds it where it stands.
   private func beginAppearing(now: TimeInterval) {
     guard timings.startingHold > 0 else { return }
+    guard isPanelOff || (displayed.map(\.endsOffscreen) ?? true) else { return }
     appearingUntil = now + timings.startingHold
   }
 

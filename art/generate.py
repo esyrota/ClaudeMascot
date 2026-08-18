@@ -9,8 +9,7 @@ Shape: ONE silhouette -- a torso block with arms protruding from either side, an
 hanging off the bottom edge. The geometry is taken from art/sources/appear.gif (see
 `GEOMETRY SOURCE` below), which is hand-drawn art, not generated here -- every drawn
 state matches its silhouette exactly so any state can cut to any other without the
-figure changing size or shape. The second hand-drawn state, working.gif, is the one
-exception: its mascot is drawn smaller, to clear floor space for the broom.
+figure changing size or shape.
 
 Style: the mascot is one flat colour with pure black eyes, plus a deeper orange used
 only for shading a turn. No highlight band, no floor.
@@ -28,8 +27,6 @@ import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw
-
-import sheet_import
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
@@ -103,6 +100,22 @@ MAX_ARM_LIFT = -ARM_TOP
 # the floor with a hump for a head, which was legible as a blob and not as this
 # creature -- see `Docs/Specs/Animation Catalogue.md`. It now sleeps standing, from
 # art/sources/sleep.gif, on exactly the silhouette above.
+
+# Seated geometry for the drawn halfway pose only: chunk 10 redefined
+# `_sitting_anchor()` onto the imported typing art, and chunk 11 rebuilt every other
+# seated clip to composite onto copies of it, so `_sit_mid()` below -- the one
+# remaining drawn seated-ish frame, bridging a drawn standing figure to the imported
+# seated one -- is the last caller of these three constants.
+SIT_DX = -4        # figure shifted left, clearing room for the laptop on the right
+SIT_TORSO_Y = 18    # torso top 2px below HOME_Y -- seated is shorter, not lower
+SIT_LEG_FOLD = 2    # shortens LEG_H's 4px legs to 2px stubs on rows 30-31
+
+# The laptop's grey, still needed: `_typing_recolour()` snaps the imported source's
+# own laptop pixels onto it, and `_desk_sprite()` below lifts exactly those pixels
+# back out of `_sitting_anchor()` for the sit edges' slide. Chunk 11 retired the
+# hand-drawn `laptop()` and the LAPTOP_LID/LAPTOP_DECK/LOGO/KEYS tables that only it
+# used -- the laptop lives in the imported art now, not as a second, drawn shape.
+LAPTOP_GREY = (134, 134, 134)
 
 
 def frame() -> Image.Image:
@@ -569,11 +582,10 @@ def done_enter():
 # holds, so the dwell is what makes a hand-off during it look like a still mascot
 # rather than a restarted clip.
 #
-# stand<->sit is deliberately not here -- see the chunk brief's scope note. The
-# sitting anchor comes from imported, hand-drawn art (`sweep()`) that a later chunk
-# replaces; matching it procedurally now would be building against art about to
-# change. The choreographer's graceful degradation (direct swap when no edge
-# exists) covers stand<->sit until then.
+# stand<->sit lives with the seated art instead of here: `stand_to_sit()` and
+# `sit_to_stand()` sit just below `working()`, needing `_sitting_anchor()` and
+# `_desk_sprite()` in scope the same way `stand_to_doze()`/`doze_to_stand()` sit
+# right after `_dozing_anchor()` above.
 # --------------------------------------------------------------------------
 
 def walk_off_left():
@@ -695,7 +707,7 @@ def imported(src: Path, recolour, *, native: int = SIZE, scale: int = 1, at=(0, 
     `at` places the result, so imported art can be landed exactly on the geometry the
     drawn states use. Anything falling outside the panel is cropped. `at` is either a
     fixed (dx, dy) or a callable taking the resampled frame, which lets the crop
-    follow the figure instead of standing still -- see `working_at()`.
+    follow content that moves within the frame instead of standing still.
 
     There is no frame subsampling: the source durations are the animation.
     (`art/import_gif.py` subsamples, crops to a power-of-two window and flattens to a
@@ -829,239 +841,22 @@ def dancing():
     return out
 
 
-# The sweep comes from the mascot's own loading animation, exported at 200x200. Its
-# art is 19x19 -- one native pixel every 10.53 file pixels -- and at that resolution
-# it is EXACTLY the geometry above at half scale: an 8x6 torso, 2-tall arms, 1x1 eyes
-# and four 1x2 legs. Doubling it therefore lands on the same 16x12 torso, 4x4 arms and
-# 2x4 legs every drawn state uses, with the feet flush on the bottom row, which is
-# what WORKING_AT places. Importing it at 1:1 instead would put a half-size mascot on
-# the panel, and cutting to it from any other state would visibly shrink the figure.
-#
-# The one cost of 2x is horizontal: at that size the sweep wants 38 columns and the
-# panel has 32. No fixed offset fits both the figure and its broom, so `working_at()`
-# tracks the figure instead -- see there.
-WORKING_SRC = SOURCES / "claude-claude-code-1.gif"
-WORKING_NATIVE, WORKING_SCALE = 19, 2
-WORKING_BODY, WORKING_SHADE_SRC, WORKING_PAPER = (216, 112, 80), (184, 104, 72), (0, 0, 0)
-WORKING_PALETTE = {
-    WORKING_PAPER: BG,              # background, and the eyes
-    WORKING_BODY: MASCOT,
-    WORKING_SHADE_SRC: MASCOT_SHADE,  # the drawn shading down one side
-    (136, 136, 136): PROP,          # the broom
-}
-
-# The source's standing frames are redrawn rather than held, and two of those wobbles
-# stop reading as life and start reading as damage once they are doubled onto a 32px
-# panel: frames 1-4 widen the mascot's LEFT eye to two cells while the right stays at
-# one, and frames 1-4 and 32-33 draw the legs a cell short, filling the row where the
-# four gaps belong. Both are repaired against frame 0 -- the same pose, drawn right.
-#
-# Each entry names the cells on the 19x19 grid, the colour they must currently hold,
-# and the colour to paint. Checking the current colour means a changed source fails
-# the build loudly instead of being silently mispainted somewhere else.
-WORKING_REPAIRS = [
-    ((1, 2, 3, 4), ((5, 10),), WORKING_PAPER, WORKING_BODY),
-    ((1, 2, 3, 4, 32, 33), ((4, 13), (6, 13), (7, 13), (9, 13)),
-     WORKING_BODY, WORKING_PAPER),
-]
+# art/sources/claude-claude-code-1.gif -- the mascot's own loading-animation broom
+# sweep, once imported here as the retired `sweeping` clip -- stays in art/sources as
+# reference art. Nothing here imports it any more.
 
 
-def working_class(rgb):
-    """Snap a source pixel to the panel palette, nearest colour wins.
-
-    A handful of anti-aliased pixels from the 200x200 export survive on cell
-    boundaries; this puts each back on the side it came from.
-    """
-    return min(WORKING_PALETTE.items(),
-               key=lambda kv: sum((a - b) ** 2 for a, b in zip(rgb, kv[0])))[1]
-
-
-def working_repair(index, im) -> None:
-    """Fix the source's two standing-frame wobbles -- see WORKING_REPAIRS."""
-    px = im.load()
-    for frames, cells, expect, paint in WORKING_REPAIRS:
-        if index not in frames:
-            continue
-        for x, y in cells:
-            if working_class(px[x, y]) != working_class(expect):
-                raise SystemExit(
-                    f"{WORKING_SRC.name} frame {index}: cell ({x},{y}) holds "
-                    f"{px[x, y]}, expected {expect} -- the art changed, recheck "
-                    f"WORKING_REPAIRS")
-            px[x, y] = paint
-
-
-def working_at(source, native):
-    """
-    Pin the mascot's left edge to the panel's, frame by frame.
-
-    Doubled, the sweep spans 38 columns against the panel's 32, so a single fixed
-    offset always gives something up: centring the figure clips the broom down to a
-    smudge, and pushing the broom on clips the figure's own left arm while it stands.
-    Tracking the figure costs neither. Its left edge only ever takes two values -- it
-    steps right as it crouches -- so this is one 4px pan twice a loop, both times
-    inside a pose change big enough to hide it. In exchange every silhouette is whole
-    and the broom is fully on the panel through the entire sweep; the only thing still
-    cropped is the tip of the handle in the three frames where it is in mid-air.
-    """
-    body = {MASCOT, MASCOT_SHADE}
-    left = min(x for y in range(native) for x in range(native)
-               if working_class(source[x, y]) in body)
-    return (-WORKING_SCALE * left, 2)
-
-
-def sweep():
-    """Working: the mascot sweeps the floor with a broom while Claude works."""
-    return imported(WORKING_SRC, working_class, native=WORKING_NATIVE,
-                    scale=WORKING_SCALE, at=working_at, repair=working_repair)
-
-
-# --------------------------------------------------------------------------
-# Imported sprite sheets -- hand-authored loop variants, sliced by sheet_import.py
-# rather than a GIF read frame by frame (see "Edge art is procedural, loop art is
-# imported" in Task.md). Two 36-frame contact-sheet screenshots: a standing
-# "thinking" set with speech/thought/question/exclamation beats, and a seated
-# "working" set at a grey laptop. Both are screenshots, not clean exports -- see
-# sheet_import.py's module docstring for the tile-detection and resampling this
-# rests on.
-# --------------------------------------------------------------------------
-
-# The thinking sheet is no longer a source: thinking_alt() is drawn now, and
-# idle-think, the only other clip cut from it, was dropped for the same reason --
-# the sheet's figure is 87% of the drawn silhouette. Only the working sheet below
-# is still imported. The file stays in art/sources as reference art.
-WORKING_SHEET = SOURCES / "186F7A97-0B62-4283-9DC4-65E953629BDC.png"
-
-# Anti-aliasing/JPEG noise in a screenshot means source pixels never land exactly on
-# a named constant, so classification here is by shape, not by exact match:
-#   - dark (background, eyes)            -> BG
-#   - achromatic but not dark (R=G=B-ish) -> PROP
-#   - everything else (the orange body)   -> MASCOT
-# The achromatic bucket is what makes this safe rather than fragile: it catches the
-# working sheet's grey laptop (~(134,134,134), brightest channel 134) and its white
-# speech/exclamation marks (~(255,255,255)) with the same rule, and it is why
-# neither sheet ever hits MASCOT_DARK/MASCOT_SHADE -- neither draws a second body
-# tone, so the classifier never has to choose between them.
-#
-# Plain nearest-neighbour against the full named palette (the way working_class()
-# above snaps sweep()'s already-clean colours) was tried first and rejected: in
-# Euclidean RGB distance, grey (134,134,134) is closer to MASCOT (255,68,4) -- ~190
-# -- than to PROP (255,255,255) -- ~210 -- so it would have painted the laptop
-# orange, exactly the panel-colour-rule violation this palette exists to prevent
-# (see the module docstring above: a colour whose brightest channel is under 255
-# renders blue-violet, and there is deliberately no grey constant to reach for
-# instead).
-SHEET_DARK = 40
-SHEET_ACHROMATIC_SPREAD = 40
-
-
-def sheet_classify(rgb):
-    if max(rgb) < SHEET_DARK:
-        return BG
-    if max(rgb) - min(rgb) < SHEET_ACHROMATIC_SPREAD:
-        return PROP
-    return MASCOT
-
-
-def _bg_components(px, left, top, right, bottom):
-    """4-connected BG-coloured blobs within [left,right]x[top,bottom], inclusive."""
-    seen = set()
-    comps = []
-    for y in range(top, bottom + 1):
-        for x in range(left, right + 1):
-            if (x, y) in seen or px[x, y] != BG:
-                continue
-            stack, comp = [(x, y)], []
-            seen.add((x, y))
-            while stack:
-                cx, cy = stack.pop()
-                comp.append((cx, cy))
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = cx + dx, cy + dy
-                    if (left <= nx <= right and top <= ny <= bottom
-                            and (nx, ny) not in seen and px[nx, ny] == BG):
-                        seen.add((nx, ny))
-                        stack.append((nx, ny))
-            comps.append(comp)
-    return comps
-
-
-def sheet_repair(index, im) -> None:
-    """
-    Erase whatever is drawn directly below the eyes, back to MASCOT.
-
-    Both sheets draw the eyes as a pair of small squares near the top of the head.
-    The working sheet's three-quarter view also draws a mouth immediately beneath
-    them -- confirmed by inspecting the source screenshot at native resolution, a
-    stepped ~3px dark mark, absent from the thinking sheet's flat front-on view. At
-    32x32 the mascot is ~16px tall, so that mark reads as noise rather than an
-    expression: the eyes already carry the face in every other clip (idle,
-    thinking, waiting, ...), so it comes off here rather than riding along as a
-    stray mark.
-
-    Unlike WORKING_REPAIRS above, there is no fixed coordinate table -- each
-    tile's own bounding box (and so the head's exact placement) differs slightly
-    frame to frame, by design; see sheet_import.py's module docstring on why tiles
-    are never assumed to share a pitch. Instead: find the two small BG blobs in
-    the top third of the body (the eyes), and clear any BG pixel in the two rows
-    directly beneath them, between their inner edges. Requiring exactly two small
-    blobs is what keeps this a safe no-op on frames where the pose (a raised arm,
-    a turned head) makes the eyes ambiguous, or on the thinking sheet, which has
-    no mouth to begin with, rather than mangling a frame it cannot read
-    confidently -- following `imported()`'s own `repair=` callback pattern, called
-    per-frame on the already-resampled image.
-    """
-    px = im.load()
-    body = [(x, y) for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT]
-    if not body:
-        return
-    left = min(x for x, _ in body)
-    right = max(x for x, _ in body)
-    top = min(y for _, y in body)
-    bottom = max(y for _, y in body)
-    band = top + max(1, (bottom - top) // 3)  # top third -- where the eyes live
-    holes = _bg_components(px, left, top, right, band)
-    eyes = [c for c in holes if len(c) <= 6]
-    if len(eyes) != 2:
-        return
-    eyes.sort(key=lambda c: min(x for x, _ in c))
-    eye_l, eye_r = eyes
-    inner_l = max(x for x, _ in eye_l) + 1
-    inner_r = min(x for x, _ in eye_r) - 1
-    if inner_r < inner_l:
-        return
-    eye_bottom = max(max(y for _, y in eye_l), max(y for _, y in eye_r))
-    for y in range(eye_bottom + 1, min(SIZE - 1, eye_bottom + 3) + 1):
-        for x in range(inner_l, inner_r + 1):
-            if px[x, y] == BG:
-                px[x, y] = MASCOT
+# Both hand-authored reference sheets -- art/sources/186F7A97-...png (seated at a
+# laptop) and the thinking sheet already noted below -- stay in art/sources as
+# reference art. Nothing here imports either any more: thinking_alt() replaced
+# the thinking sheet's clip, and working_alt(), the last clip cut from the
+# working sheet, is retired -- see [[Animation Catalogue]]'s `sitting` section.
 
 
 def _standing_anchor() -> Image.Image:
     """The exact `standing` anchor pixels -- idle.gif frame 0 -- for the loop
-    boundary contract the sheet variants below guarantee mechanically."""
+    boundary contract every standing loop variant guarantees mechanically."""
     return mascot_at()
-
-
-def _sheet_frames(sheet: Path) -> list:
-    """
-    Slice, recolour and repair one 36-frame sheet into panel-ready tiles.
-
-    Deliberately separate from this file's own `imported()`: that function reads
-    an already-32x32-native GIF frame by frame, while a sheet is a single
-    screenshot that first has to be cut into 36 tiles (sheet_import.slice_sheet)
-    before any per-frame processing is possible.
-    """
-    tiles = sheet_import.slice_sheet(sheet)
-    out = []
-    for index, tile in enumerate(tiles):
-        px = tile.load()
-        for y in range(SIZE):
-            for x in range(SIZE):
-                px[x, y] = sheet_classify(px[x, y])
-        sheet_repair(index, tile)
-        out.append(tile)
-    return out
 
 
 # The thought bubble, drawn rather than imported. Centred where the panel is empty
@@ -1150,36 +945,464 @@ def thinking_alt():
     return out
 
 
-def working_alt():
-    """
-    Working variant: a full pass through the seated-at-a-laptop sheet.
+# The two hand-authored typing sources -- see the chunk 10 brief. Both are native
+# 32x32, 5 frames at 70ms each, figure at x0..20 rows 18..31 (the same rows the old
+# drawn seated anchor used), laptop at roughly x21..28 rows 22..31. The only
+# difference between them is a one-row eye shift; their moving pixels (rows 22-30,
+# the hands) are byte-identical.
+WORK_TYPING_SRC = SOURCES / "work-typing.gif"
+WORK_TYPING_LOOK_DOWN_SRC = SOURCES / "work-typing-look-down.gif"
 
-    Unlike the thinking sheet, this one is not several beats stitched together --
-    36 frames of one continuous work session (a typing burst, a coffee, a glance
-    at the screen, code scrolling by, a satisfied checkmark) -- so the whole
-    thing ships as a single loop, in sheet order.
+# Classified by shape (max channel), the same style as `_appear_recolour()`, rather
+# than matched to exact values -- the source is hand-authored and dithered, so it
+# carries antialiasing fragments no exact-match table would list.
+#
+# Below TYPING_DARK is background: NOT a single dither colour but a two-tone
+# checkerboard -- an achromatic family ((0,0,0)/(1,1,1)/(3,3,3)) alternating with a
+# warm-tinted one ((10,4,0)/(13,5,0)/(18,7,0)) -- tiled across the WHOLE empty
+# canvas, including past the laptop's edge, not only under it. (The chunk 10
+# brief's "measured facts" named (13,5,0)/(18,7,0) as the laptop's own fill;
+# pixel inspection shows those are this background dither's warm tile instead --
+# see the chunk 10 report.) Both tones flatten to pure BG: [[Panel Quirks]] is
+# explicit that near-black left in empty space genuinely lights those LEDs, and a
+# lower cutoff that let the warm tile through as grey painted a visible
+# checkerboard into the background, exactly that mistake.
+#
+# From TYPING_DARK up to TYPING_BODY_MIN is the laptop -- already drawn
+# near-grey in the source (130-139, plus a (247,247,247) highlight and an
+# (82,82,82) shadow fleck) -- which snaps onto the exact LAPTOP_GREY the drawn
+# lid uses. TYPING_BODY_MIN and up is the body, (255,95,5) plus its antialiasing
+# halo, which snaps to MASCOT so the seated figure matches the standing one. The
+# gap between the two families (dither tops out at 32, the grey laptop starts at
+# 82) leaves TYPING_DARK room anywhere in [33, 81]; 40 sits comfortably inside it.
+TYPING_DARK, TYPING_BODY_MIN = 40, 180
 
-    No anchor-frame prepend/append here, unlike thinking_alt()/idle_think()
-    above: those guarantee the `standing` anchor contract, but this clip is
-    `pose: "sitting"`, and there is no established sitting anchor to guarantee
-    against yet -- sweep()'s own imported art is what currently defines
-    "sitting", and stand<->sit transition edges are explicitly out of scope for
-    this chunk (see the chunk brief). Swapping straight to/from this clip at a
-    pose boundary is exactly the graceful-degradation path the choreographer
-    already covers when an edge is missing.
+# Eye columns in the imported art, measured off `_sitting_anchor()` the same way
+# TYPING_DARK/TYPING_BODY_MIN were: both eyes sit at rows 20-21 (SIT_TORSO_Y + 2, the
+# same EYE_TOP the drawn figure uses), 2px square, at x5-6 and x14-15 -- see the
+# chunk 10 brief's own measured facts. `EYE_W`/`EYE_H` above already describe their
+# size; this just adds where they land on the imported figure.
+TYPING_EYE_XS = (5, 14)
+TYPING_EYE_ROW = SIT_TORSO_Y + EYE_TOP
+
+
+def _typing_recolour(rgb):
+    value = max(rgb)
+    if value < TYPING_DARK:
+        return BG
+    if value < TYPING_BODY_MIN:
+        return LAPTOP_GREY
+    return MASCOT
+
+
+def _paste_over(base: Image.Image, sprite: Image.Image, ox: int = 0, oy: int = 0,
+                 *, transparent=BG) -> Image.Image:
     """
-    frames = _sheet_frames(WORKING_SHEET)
-    # Typing has a steady rhythm; the handful of named beats below get a longer
-    # dwell so each reads as a beat instead of blurring past mid-loop.
-    durations = [130] * 36
-    for i in (3, 17, 22):
-        durations[i] = 170  # "!" typing-burst reactions
-    for i in (9, 10):
-        durations[i] = 220  # the coffee-mug pause
-    durations[27] = 200      # a stray thought bubble
-    durations[30] = 260      # code scrolls up the screen -- let it be read
-    durations[32] = 260      # the checkmark -- the satisfying beat
-    return list(zip(frames, durations))
+    Copy `sprite`'s non-`transparent` pixels onto a COPY of `base`, offset by
+    `(ox, oy)` and clipped to the panel.
+
+    `Image.paste()` alone can't do this: a plain paste overwrites `base` with every
+    one of `sprite`'s pixels, including its background, so anything drawn underneath
+    would vanish. This is the masked version `mascot_at()` never needed (it always
+    pastes onto a blank `frame()`) but every seated composite below does -- the desk
+    sprite sliding in over a drawn figure, and a thought bubble offset down over an
+    imported one.
+    """
+    out = base.copy()
+    src = sprite.load()
+    dst = out.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            colour = src[x, y]
+            if colour == transparent:
+                continue
+            dx, dy = x + ox, y + oy
+            if 0 <= dx < SIZE and 0 <= dy < SIZE:
+                dst[dx, dy] = colour
+    return out
+
+
+def _typing_eye_lift(base: Image.Image, ex: int, *, up: int = 1) -> Image.Image:
+    """
+    A copy of an imported typing frame with the eye at column `ex` painted over and
+    redrawn `up` rows higher -- `thinking_alt()`'s own eye-lift technique, applied to
+    the imported art instead of a `mascot()` draw. `work-look-down` already proved
+    the mirror image of this (eyes authored a row LOWER in a second source GIF);
+    this does it in code instead of a second source, since there is no hand-authored
+    "looks up" file to import.
+    """
+    im = base.copy()
+    d = ImageDraw.Draw(im)
+    rect(d, ex, TYPING_EYE_ROW, EYE_W, EYE_H, MASCOT)     # erase the drawn eye
+    rect(d, ex, TYPING_EYE_ROW - up, EYE_W, EYE_H, EYE)   # and lift it
+    return im
+
+
+def _sitting_anchor() -> Image.Image:
+    """
+    The `sitting` anchor: frame 0 of the recoloured `work-typing` import -- the
+    hands-at-rest frame, in the shape of `_standing_anchor()` and `_dozing_anchor()`
+    above, the pixel-identical frame every seated clip opens and closes on.
+
+    Chunk 10: redefined from the drawn `mascot()` + `laptop()` build to the
+    hand-authored typing art -- see the chunk 10 brief for why (the geometry
+    already matches ours, and the motion is confined to the hands while the head
+    stays still). The figure and the desk are both in the imported pixels now, so
+    this no longer draws `mascot()` or calls `laptop()` at all. Chunk 11 rebuilt
+    every dependent (the sit edges, the four `work-*` fidgets) to composite onto
+    copies of this frame instead of the old drawn shapes -- see the chunk 11 brief.
+    """
+    return imported(WORK_TYPING_SRC, _typing_recolour)[0][0]
+
+
+def _desk_sprite() -> Image.Image:
+    """
+    The desk (laptop lid, deck, hinge -- all of it) lifted out of the imported
+    `_sitting_anchor()` into its own sprite: every `LAPTOP_GREY` pixel kept at its
+    own coordinates, everything else `BG`.
+
+    Chunk 8's `laptop()` drew the desk with `mascot()`-style rectangles so the sit
+    edges could slide a lid in independent of the figure. The desk is baked into the
+    imported art now (see the chunk 10 brief), so that mechanism is gone -- this
+    restores it without a second, hand-drawn laptop existing anywhere: paste this
+    sprite at an offset with `_paste_over()`, the same way `mascot_at()` pastes a
+    figure, and the slide comes back.
+    """
+    src = _sitting_anchor().load()
+    out = frame()
+    dst = out.load()
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if src[x, y] == LAPTOP_GREY:
+                dst[x, y] = LAPTOP_GREY
+    return out
+
+
+# The closing anchor frame of `working()` dwells a little longer than the source's
+# own 70ms cadence, so the loop visibly breathes on the join instead of strobing.
+WORKING_CLOSE_MS = 140
+# How many times `working()` repeats the source's typing cycle. See its docstring:
+# the cycle is half a second, fidgets are rolled per 20s epoch rather than per
+# loop, so the bare cycle let the beats crowd out the typing they punctuate.
+WORKING_CYCLES = 6
+
+
+def working():
+    """
+    Default seated loop: the imported `work-typing` art, hands at the keyboard,
+    typing confined to the hands while the head stays still. `sitting` is on
+    screen for most of a turn, so this stays calm rather than busy -- see the
+    chunk brief's own framing.
+
+    Chunk 10: rebuilt from the hand-authored source (see `_typing_recolour()`) in
+    place of the old drawn breathe-and-jitter loop -- the source's own geometry
+    and motion already do the same job better. Frame 0, the hands-at-rest pose,
+    IS `_sitting_anchor()`; appending it again at the end (5 imported frames
+    become 6) is what makes the loop open and close on the anchor
+    pixel-identically, the same contract idle()'s frame 0 satisfies for
+    `standing`. The source's 70ms cadence is kept for every frame except that
+    closing one, which gets `WORKING_CLOSE_MS` instead.
+
+    **The source cycle is repeated `WORKING_CYCLES` times inside this one clip**,
+    which is a cadence decision and not a padding one. The cycle is 5 frames at
+    70ms -- barely half a second -- and a fidget is rolled per *epoch*, not per
+    loop (`Choreographer.rotationPeriod`, 20s), so shipping the bare cycle made
+    the seated beats fall between half-second loops and dominate a state that is
+    meant to read as steady work. Six cycles put ~3s of uninterrupted typing
+    between beats, which is the ratio the user asked for: several loops of
+    typing, then one alt. Adjacent identical frames coalesce at the seams, so the
+    shipped frame count is lower than 5 x WORKING_CYCLES.
+    """
+    frames = imported(WORK_TYPING_SRC, _typing_recolour) * WORKING_CYCLES
+    anchor_im, _ = frames[0]
+    return frames + [(anchor_im, WORKING_CLOSE_MS)]
+
+
+def work_look_down():
+    """
+    Fidget: the imported `work-typing-look-down` cycle -- byte-identical motion to
+    `working()`'s own, eyes one row lower -- played a few times over, then a return
+    to the `working` anchor.
+
+    A single 350ms pass of the source is too short to register as a beat, so the
+    recoloured cycle repeats ~3 times (~1s) before closing. Self-edge at `sitting`,
+    the same shape as the other `work-*` fidgets: opens and closes on
+    `_sitting_anchor()` pixel-identically, and is registered with
+    `fidgetGroup: "working"` so it only ever fires alongside them, not at any other
+    seated state.
+    """
+    anchor = _sitting_anchor()
+    cycle = imported(WORK_TYPING_LOOK_DOWN_SRC, _typing_recolour)
+    out = [(anchor, 300)]
+    for _ in range(3):
+        out += cycle
+    out.append((anchor, APPEAR_TAIL_MS))
+    return out
+
+
+# The two edges connecting `standing` and `sitting` -- `stand_to_sit()` lowers him to
+# the desk as it slides in, `sit_to_stand()` is the reverse. Same three-frame register
+# as `stand_to_doze()`/`doze_to_stand()` above: an anchor, one drawn halfway frame,
+# the anchor at the other end held as a long dwell.
+#
+# `_sit_mid()`'s own parameters were chosen by measurement, not eyeballing: the raw
+# pixel difference between `_standing_anchor()` and `_sitting_anchor()` is 293px, a
+# structural gap (rectangle-mascot geometry vs. the imported figure's photographic
+# silhouette, not just position) that a grid search over every `by`/`dx`/`legs`/
+# `arms`/`squash`/slide-offset combination this function can produce never brought
+# the WORSE of its two hops below ~157-160px -- short of the chunk 11 brief's <=120
+# target. `by=18, dx=0, legs=(1,)*4, arms=(-1, None)` with the desk pasted at its
+# native offset (no partial slide) is the best the search found (worst hop 160px);
+# see the chunk 11 report for the full numbers and why the target could not be met
+# within this three-frame register.
+def _sit_mid() -> Image.Image:
+    """The one drawn frame between standing and sitting: the figure most of the way
+    down, legs half-folded, one arm already reaching for the keyboard, the desk
+    already in place. The single place `mascot()` still draws a seated-ish pose --
+    it has to, since this frame bridges a DRAWN standing figure to the IMPORTED
+    seated one, and nothing imported exists partway between those two poses.
+
+    `by=SIT_TORSO_Y` (seated height already, not a halfway height -- "seated is
+    shorter, not lower"), `dx=0` (measured best; `_sitting_anchor()`'s own figure
+    isn't drawn at a shifted `dx`, so no shift approximates it better than a partial
+    one), legs half-folded, the far arm hidden and the near arm dropped a pixel as
+    if reaching for the keys. The desk is pasted at its native offset rather than
+    partway through a slide -- see the comment above this function for why: every
+    slide offset the search tried made the worse of the two hops bigger, not
+    smaller, because it moves the mid frame further from `_sitting_anchor()`'s own
+    fully-present desk without moving it meaningfully closer to `_standing_anchor()`
+    (which has no desk at all either way).
+    """
+    im = frame()
+    d = ImageDraw.Draw(im)
+    mascot(d, SIT_TORSO_Y, dx=0, arms=(-1, None), legs=(1,) * 4)
+    return _paste_over(im, _desk_sprite())
+
+
+def stand_to_sit():
+    """Transition: lowers himself to the desk as it slides in from the right -- one
+    action, not a sit followed by a laptop handed to him."""
+    return [
+        (_standing_anchor(), 700),
+        (_sit_mid(), 700),
+        (_sitting_anchor(), APPEAR_TAIL_MS),  # long dwell -- the sitting anchor
+    ]
+
+
+def sit_to_stand():
+    """Transition: the reverse -- the desk recedes as he straightens back up.
+
+    No checkmark, no celebration: this edge fires on every departure from the desk,
+    including into `waiting` and into a panel shutdown, not only on a finished turn.
+    The checkmark belongs to `done_enter()` alone -- see its own docstring -- so a
+    genuine completion plays this clip and then that one, back to back.
+    """
+    return [
+        (_sitting_anchor(), 700),
+        (_sit_mid(), 700),
+        (_standing_anchor(), APPEAR_TAIL_MS),  # long dwell -- the standing anchor
+    ]
+
+
+def work_idea():
+    """
+    Fidget: an idea strikes -- one eye lifts, a spark flashes close above the head,
+    then a burst of faster typing as he acts on it.
+
+    Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
+    Composited onto copies of the imported typing frames, not drawn -- see the chunk
+    11 brief. The eye lift is `_typing_eye_lift()`, `thinking_alt()`'s own
+    paint-over-and-redraw technique reused for the imported art. The spark sits at
+    row 17, ONE clear row above the imported head's own top row (18): the old drawn
+    version sat six rows clear and was logged as known gap 5, floating -- the
+    imported head topping out two rows lower than the old drawn one closes most of
+    that gap for free, and placing the spark at 17 instead of the old 12 closes the
+    rest of it deliberately. The typing burst is not a new gesture: it is the SAME
+    imported frames `working()` plays, just stepped through at a faster cadence,
+    which is what "got on with it" needs to read as.
+    """
+    anchor = _sitting_anchor()
+    typing = [im for im, _ in imported(WORK_TYPING_SRC, _typing_recolour)]
+    ex = TYPING_EYE_XS[1]  # the same eye the standing `thinking_alt()` raises
+
+    def lifted(*, spark=False):
+        im = _typing_eye_lift(anchor, ex)
+        if spark:
+            d = ImageDraw.Draw(im)
+            cy = 17  # one clear row above the imported head's own top row, 18
+            rect(d, ex, cy - 2, 1, 2, PROP)
+            rect(d, ex - 2, cy, 2, 1, PROP)
+            rect(d, ex + 1, cy, 2, 1, PROP)
+        return im
+
+    out = [(anchor, 300)]
+    out.append((lifted(), 260))                  # an eye lifts
+    out.append((lifted(spark=True), 220))         # the spark
+    out.append((lifted(spark=True), 260))         # held an instant
+    out.append((typing[1], 90))                   # faster typing --
+    out.append((typing[2], 90))                   # he got on with it
+    out.append((typing[3], 90))
+    # typing[4] is byte-identical to typing[0]/`anchor` (the imported cycle's own
+    # hands-at-rest close), so it doubles as the closing anchor and its long dwell.
+    out.append((typing[4], APPEAR_TAIL_MS))
+    return out
+
+
+def work_coffee():
+    """
+    Fidget: a cup comes up in front of him, he grips it with both hands, lifts it
+    for a sip, sets it down, and it goes.
+
+    Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
+    Composited onto copies of the imported anchor, not drawn. Chunk 8's C-shaped
+    handle survives unchanged, gap and all -- see its own comment below. His hands
+    are baked onto the keyboard in the imported art now, one of them (the far hand's
+    fingers, resting on the keys) as three isolated pixels sitting inside the desk's
+    own `LAPTOP_GREY` -- `HAND_ON_KEYS` below, measured by diffing `MASCOT` pixels
+    against the desk's bounding box in `_sitting_anchor()`. Clearing them back to
+    `LAPTOP_GREY` on the frames where he holds the cup is what "a hand lifts off the
+    keyboard" means mechanically here, the way the old version hid a drawn arm.
+
+    The cup never rises above row `CUP_TOP - CUP_LIFT` = 23, four rows clear of the
+    eyes at rows 20-21 -- checked mechanically in this chunk's verification, not just
+    by construction. Its columns (5-13 including the hands) stay clear of the desk
+    (>=13) too, so nothing here needs to occlude or be occluded by it.
+
+    The handle is a C, not a bulge: two columns to the right of the body, with the
+    middle pixel of the near column left unpainted so the torso shows through the
+    gap -- at this size a handle only reads as a loop if there is a hole in it.
+    """
+    CUP_W, CUP_H = 5, 5   # the cup body; the handle adds 2 more columns to the right
+    CUP_X = 7                  # centred under the torso, clear of both eye columns
+    CUP_TOP = 25                # rest row
+    CUP_LIFT = 2                 # raised toward the chest for the sip
+    HAND_W, HAND_H = 2, 2
+    HAND_ON_KEYS = ((26, 26), (27, 26), (26, 27))  # the far hand's fingers on the keys
+
+    anchor = _sitting_anchor()
+
+    def seated(*, cup=False, hands=False, lift=0):
+        im = anchor.copy()
+        d = ImageDraw.Draw(im)
+        if hands:
+            for x, y in HAND_ON_KEYS:
+                rect(d, x, y, 1, 1, LAPTOP_GREY)  # the hand lifts clear of the keys
+        if cup:
+            cy = CUP_TOP - lift
+            rect(d, CUP_X, cy, CUP_W, CUP_H, PROP)  # the 5x5 body
+            hx0, hx1 = CUP_X + CUP_W, CUP_X + CUP_W + 1  # the handle's two columns
+            rect(d, hx0, cy + 1, 1, 1, PROP)
+            rect(d, hx1, cy + 1, 1, 1, PROP)
+            rect(d, hx1, cy + 2, 1, 1, PROP)
+            # (hx0, cy + 2) is deliberately left unpainted -- the gap in the loop.
+            rect(d, hx0, cy + 3, 1, 1, PROP)
+            rect(d, hx1, cy + 3, 1, 1, PROP)
+            if hands:
+                rect(d, CUP_X - HAND_W, cy + 1, HAND_W, HAND_H, MASCOT)
+                rect(d, CUP_X + CUP_W - 1, cy + 1, HAND_W, HAND_H, MASCOT)
+        return im
+
+    out = [(anchor, 300)]
+    out.append((seated(cup=True), 260))                                # the cup comes in
+    out.append((seated(cup=True, hands=True), 220))                    # both hands come to it
+    out.append((seated(cup=True, hands=True, lift=CUP_LIFT), 220))     # lifted toward the chest
+    out.append((seated(cup=True, hands=True, lift=CUP_LIFT), 420))     # the sip
+    out.append((seated(cup=True, hands=True), 220))                    # back down
+    out.append((seated(cup=True), 240))                                 # hands release
+    out.append((seated(cup=False), 260))                                 # and it goes
+    out.append((anchor, APPEAR_TAIL_MS))
+    return out
+
+
+def work_look():
+    """
+    Fidget: the eyes lift as if he's looking up from the screen, hands still going,
+    then back down -- the mirror of `work_look_down()`'s own idiom (eyes authored a
+    row LOWER there, in a second hand-authored source GIF): this lifts them a row
+    instead, in code, since there is no hand-authored "looks up" file to import.
+
+    Self-edge at `sitting`, the calmest of the four. Composited onto the SAME
+    imported typing cycle `working()` plays -- looking up does not stop him
+    mid-keystroke -- with both eyes lifted a row on every frame of it. Repeats about
+    a second, the same construction `work_look_down()` uses, then closes on the
+    anchor.
+    """
+    anchor = _sitting_anchor()
+
+    def lifted(im):
+        for ex in TYPING_EYE_XS:
+            im = _typing_eye_lift(im, ex)
+        return im
+
+    cycle = [(lifted(im), ms) for im, ms in imported(WORK_TYPING_SRC, _typing_recolour)]
+    out = [(anchor, 300)]
+    for _ in range(3):
+        out += cycle
+    out.append((anchor, APPEAR_TAIL_MS))
+    return out
+
+
+def work_think():
+    """
+    Fidget: a thought bubble grows over the desk, fills its "...", holds, and
+    retreats the way it came -- `thinking_alt()`'s own beat, moved to the seated
+    pose and composited onto copies of the imported anchor instead of drawn.
+
+    `_thought_bubble()`'s geometry (`BUBBLE_CX/CY`, `BUBBLE_PUFFS`) is authored
+    against the standing figure: centred at `BUBBLE_CX`=24, above the standing
+    figure's right shoulder (torso x8-23). The imported seated figure sits far
+    LEFT instead -- his head spans x0-16, centre ~x8 -- and tops out at row 18, two
+    rows lower than the standing figure's row 16. Composited unmoved, the bubble
+    would hang over the desk (x18-29) with its tail pointing at empty air beside
+    him, reading as the laptop's thought, not his. `_thought_bubble()` and its
+    `BUBBLE_*` constants are never touched (`thinking_alt()` still depends on them
+    exactly as authored); instead the whole bubble is rendered onto a scratch frame
+    and composited `(BUBBLE_DX, BUBBLE_DY)` over with `_paste_over()` -- both
+    offsets applied at the call site.
+    """
+    BUBBLE_DX = 8 - BUBBLE_CX  # recentres the bubble over the head's own centre,
+                                # ~x8, instead of the standing figure's ~x16 -- the
+                                # full bubble lands at roughly x2-13
+    BUBBLE_DY = 4  # brings the lowest puff (row 14) down to row 18, the imported
+                    # head's own top row -- level with him, not just closer, so the
+                    # tail visibly reaches rather than stopping short in clear air
+                    # the way the un-offset geometry would against this lower head
+
+    anchor = _sitting_anchor()
+    ex = TYPING_EYE_XS[1]
+
+    def seated(*, lift=0, stage=-1, dots=0, puffs=0):
+        im = _typing_eye_lift(anchor, ex) if lift else anchor
+        if stage >= 0 or puffs:
+            scratch = frame()
+            _thought_bubble(ImageDraw.Draw(scratch), stage, dots, puffs)
+            im = _paste_over(im, scratch, ox=BUBBLE_DX, oy=BUBBLE_DY)
+        return im
+
+    # (eye lift, bubble stage, dots, puffs, ms) -- same shape as thinking_alt()'s own
+    # `steps`, minus its leading/trailing anchor frames (this clip gets those from
+    # explicit `anchor` entries instead) and its `breath` column: the imported figure
+    # is composited onto, not drawn, so there is no torso squash to apply here.
+    steps = [
+        (1, -1, 0, 0, 380),   # an eye goes up: something occurred to it
+        (1, -1, 0, 1, 340),
+        (1, 0, 0, 2, 340),    # the bubble starts
+        (1, 1, 0, 2, 320),
+        (1, 2, 0, 2, 320),    # full size, still empty
+        (1, 2, 1, 2, 300),
+        (1, 2, 2, 2, 300),
+        (1, 2, 3, 2, 650),    # "..." complete -- the beat to hold on
+        (1, 2, 3, 2, 650),
+        (1, 1, 0, 2, 300),    # and back down
+        (1, 0, 0, 1, 300),
+        (1, -1, 0, 0, 380),
+        (0, -1, 0, 0, 320),
+    ]
+    out = [(anchor, 300)]
+    for lift, stage, dots, puffs, ms in steps:
+        out.append((seated(lift=lift, stage=stage, dots=dots, puffs=puffs), ms))
+    out.append((anchor, APPEAR_TAIL_MS))
+    return out
 
 
 def off():
@@ -1209,8 +1432,14 @@ STATES = {
     "thinking-alt": thinking_alt,
     "thinking-pace": thinking_pace,
     "workout": workout,
-    "working": sweep,
-    "working-alt": working_alt,
+    "working": working,
+    "stand-to-sit": stand_to_sit,
+    "sit-to-stand": sit_to_stand,
+    "work-idea": work_idea,
+    "work-coffee": work_coffee,
+    "work-look": work_look,
+    "work-think": work_think,
+    "work-look-down": work_look_down,
     "waiting": waiting,
     "done": done,
     "done-enter": done_enter,
@@ -1329,19 +1558,79 @@ CLIP_METADATA = {
         "toPose": "standing",
     },
     "working": {
+        # Chunk 10: imported from art/sources/work-typing.gif, not drawn -- see
+        # working()'s own docstring and `_typing_recolour()`. Replaces the old
+        # broom sweep that used to live at this id; that art is retired outright,
+        # not rehomed -- see [[Animation Catalogue]]'s `sitting` section.
+        # `working-alt`, the other clip that used to share this variantGroup, is
+        # also retired: it was imported from a reference sheet at ~87% of the
+        # drawn silhouette, the same problem that got idle-think cut -- see
+        # [[Animation Catalogue]].
         "loops": True,
         "pose": "sitting",
         "variantGroup": "working",
         "weight": 1.0,
     },
-    "working-alt": {
-        # Same variantGroup as "working" -- imported from the seated-at-a-laptop
-        # sprite sheet, see working_alt()'s docstring for why it carries no
-        # anchor-frame prepend/append the way the standing-pose variants above do.
-        "loops": True,
-        "pose": "sitting",
-        "variantGroup": "working",
-        "weight": 0.5,
+    "stand-to-sit": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "sitting",
+    },
+    "sit-to-stand": {
+        # The way back. Without it `sitting` is a one-way trap: the choreographer
+        # would walk the mascot to the desk and have no route off it, including into
+        # `waiting` when the user's turn comes, or into a graceful shutdown.
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "standing",
+    },
+    # The four `sitting` fidgets -- self-edges like fidget-stretch/fidget-look, but
+    # each carries a fidgetGroup for the same reason the wander fidgets do: fidget
+    # selection is by POSE, so an untagged sitting fidget would fire in any sitting
+    # state. "working" keeps each of these to `sitting` alone. work-look is the
+    # calmest of the four -- a held look, then back down -- so it carries the
+    # highest weight; work-coffee is the most eventful (a prop enters and leaves),
+    # so it carries the lowest. All four stay well under fidget-stretch/fidget-look's
+    # implicit 1.0 default so a beat stays occasional rather than constant.
+    "work-idea": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.25,
+    },
+    "work-coffee": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.15,
+    },
+    "work-look": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.4,
+    },
+    "work-think": {
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.25,
+    },
+    "work-look-down": {
+        # Chunk 10: the fifth `sitting` fidget, imported rather than drawn -- see
+        # work_look_down()'s own docstring. Same fidgetGroup as its four siblings
+        # so selection stays confined to `sitting`; weight matches work-idea and
+        # work-think, a middling beat, neither the calmest (work-look) nor the
+        # most eventful (work-coffee).
+        "loops": False,
+        "fromPose": "sitting",
+        "toPose": "sitting",
+        "fidgetGroup": "working",
+        "weight": 0.25,
     },
     "sleeping": {
         # At `dozing`, its own pose: the mascot sleeps standing but the slumped

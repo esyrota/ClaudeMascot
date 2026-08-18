@@ -117,6 +117,16 @@
       284
     ]
   },
+  "sit-to-stand": {
+    "gif_bytes": 625,
+    "crc32": 4195107706,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      132
+    ]
+  },
   "sleeping": {
     "gif_bytes": 3805,
     "crc32": 998834705,
@@ -141,6 +151,16 @@
     "packet_lengths": [
       509,
       98
+    ]
+  },
+  "stand-to-sit": {
+    "gif_bytes": 625,
+    "crc32": 3133682663,
+    "outer_chunks": 1,
+    "ble_packets": 2,
+    "packet_lengths": [
+      509,
+      132
     ]
   },
   "starting": {
@@ -363,35 +383,78 @@
       274
     ]
   },
-  "working": {
-    "gif_bytes": 7322,
-    "crc32": 1777027318,
-    "outer_chunks": 2,
-    "ble_packets": 16,
+  "work-coffee": {
+    "gif_bytes": 1535,
+    "crc32": 1641327347,
+    "outer_chunks": 1,
+    "ble_packets": 4,
     "packet_lengths": [
       509,
       509,
       509,
-      509,
-      509,
-      509,
-      509,
-      509,
-      40,
-      509,
-      509,
-      509,
-      509,
-      509,
-      509,
-      188
+      24
     ]
   },
-  "working-alt": {
-    "gif_bytes": 7188,
-    "crc32": 220580282,
+  "work-idea": {
+    "gif_bytes": 1493,
+    "crc32": 2178420091,
+    "outer_chunks": 1,
+    "ble_packets": 3,
+    "packet_lengths": [
+      509,
+      509,
+      491
+    ]
+  },
+  "work-look": {
+    "gif_bytes": 3142,
+    "crc32": 2789560726,
+    "outer_chunks": 1,
+    "ble_packets": 7,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      104
+    ]
+  },
+  "work-look-down": {
+    "gif_bytes": 3147,
+    "crc32": 3320892233,
+    "outer_chunks": 1,
+    "ble_packets": 7,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      109
+    ]
+  },
+  "work-think": {
+    "gif_bytes": 2885,
+    "crc32": 3283400373,
+    "outer_chunks": 1,
+    "ble_packets": 6,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      356
+    ]
+  },
+  "working": {
+    "gif_bytes": 5232,
+    "crc32": 888578910,
     "outer_chunks": 2,
-    "ble_packets": 16,
+    "ble_packets": 12,
     "packet_lengths": [
       509,
       509,
@@ -404,11 +467,7 @@
       40,
       509,
       509,
-      509,
-      509,
-      509,
-      509,
-      54
+      134
     ]
   },
   "workout": {

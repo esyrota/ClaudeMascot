@@ -8,18 +8,20 @@ poses are joined by transition clips. **[[Animation Catalogue]] is the inventory
 clip, its numbers and the pose graph, with a playable image of each. This page covers how
 they are *made*.
 
-Most are drawn programmatically; `starting`, `working` and the sprite-sheet variants are
-imported from hand-drawn art. **`starting`'s silhouette is the reference the drawn clips
-are built to match** — see the one deliberate exception under
-[[#The sweep (`working.gif`)]].
+Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`),
+`sleeping`, and the seated pose (`working`, `work-look-down`, from the two `work-typing`
+sources) are imported from hand-drawn art instead. **`starting`'s silhouette is the
+reference the drawn clips are built to match.** No clip ships from a sprite sheet any
+more — the sheet imports that used to (`working-alt`, the retired broom sweep) are gone;
+see [[Animation Catalogue]]'s `sitting` section for why.
 
 ## Tools
 
 | Script | Purpose |
 |---|---|
-| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + clips.json + a 6× contact sheet `preview.png`. Draws six states; imports two (see below) |
+| `art/generate.py` | Writes every bundled state to `Sources/ClaudeMascot/Resources/Animations/` + clips.json + a 6× contact sheet `preview.png`. Draws most states; imports the rest from hand-drawn GIFs (see below) |
 | `art/import_gif.py` | Converts an *oversized* arbitrary GIF into a panel-ready animation in `Animations/custom/` — coalesce, crop, downscale, subsample |
-| `art/sheet_import.py` | Slices a *screenshot* contact sheet (grey page, gaps, label strips, irregular tiles) into 32×32 frames — detects each tile's own bbox, never a fixed pitch |
+| `art/sheet_import.py` | Standalone tool, not called by `generate.py`: slices a *screenshot* contact sheet (grey page, gaps, label strips, irregular tiles) into 32×32 frames — detects each tile's own bbox, never a fixed pitch. Nothing ships from a sheet any more; see [[Animation Catalogue]]'s `sitting` section for why `working-alt`, the last clip that did, was retired |
 | `art/export_golden.py` | Re-frames the bundled GIFs into `Tests/Fixtures/`; run after any art change — see [[BLE Protocol]] |
 | `art/export_docs.py` | Regenerates the 6× images in [[Animation Catalogue]] from the bundled GIFs, so the page cannot drift from what ships |
 | `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |
@@ -44,7 +46,7 @@ own override folder, is `AnimationLibrary.swift`.
 The choreographer keys off three clip shapes; declaring one wrong fails silently.
 
 - **Looping variant** — loops indefinitely, shares a `variantGroup` (e.g. "idle", "thinking"), has a `weight` for selection against other variants in the group. Multiple variants at one pose are rotated by the choreographer, deterministically from time, never the same twice in a row. The loop begins and ends on the anchor frame.
-- **Fidget** — non-looping, self-edge (`fromPose == toPose`), id does *not* end in `-enter`. Blinks, look-arounds, a stretch — motion with no cause, injected at randomised intervals during long holds to separate "animated" from "alive". Selection is by **pose**, so a fidget fires in every state at that pose; an optional `fidgetGroup` (and `weight`) narrows it to one state, which is what keeps the wander clips to `idle`. `fidgetGroup` is a separate field from `variantGroup` on purpose — a variant pool for loops and a fidget scope for one-shots are different questions.
+- **Fidget** — non-looping, self-edge (`fromPose == toPose`), id does *not* end in `-enter`. Blinks, look-arounds, a stretch — motion with no cause, injected at randomised intervals during long holds to separate "animated" from "alive". Selection is by **pose**, so a fidget fires in every state at that pose; an optional `fidgetGroup` (and `weight`) narrows it to one state, which is what keeps the wander clips to `idle` and the five `work-*` clips to `sitting`. `fidgetGroup` is a separate field from `variantGroup` on purpose — a variant pool for loops and a fidget scope for one-shots are different questions.
 - **Entrance one-shot** — id ends in `-enter` (e.g. `done-enter`). Plays exactly once when arriving at a pose, if present in the manifest. The only way to re-entrance is to leave the pose and return. Declaring one wrong is silent, so test coverage is essential.
 
 Transition clips are never looping; they end on a long dwell frame so a hand-off inside the dwell reads as a still mascot, not as interrupting mid-motion.
@@ -52,8 +54,10 @@ Transition clips are never looping; they end on a long dwell frame so a hand-off
 ## Mascot geometry
 
 Read straight off the resting pose (last frame) of `art/sources/appear.gif`. Every
-generated state matches it exactly, so any state can cut to any other without the
-figure changing size or shape:
+generated *drawn* state matches it exactly, so any of them can cut to any other without
+the figure changing size or shape. The imported seated pose is a separate case — see
+[[Animation Catalogue]]'s `sitting` section for why its own geometry, not this table, is
+what `_sit_mid()` bridges to:
 
 | Part | 32px coordinates |
 |---|---|
@@ -79,15 +83,16 @@ Two consequences worth knowing before editing a state:
 ## Style rules
 
 - One flat colour for every mascot pixel — `MASCOT = (255, 68, 4)`
-- Two shades, because the two hand-drawn sources shade by different amounts. Both
+- Two shading constants, because the hand-drawn sources shade by different amounts. Both
   deepen the hue rather than dimming it — green and blue down, red pinned at 255 —
   which is the only way the hardware allows, so both read as a deeper red-orange
   rather than a true shadow:
   - `MASCOT_DARK = (255, 24, 0)` for `appear.gif`, whose own shade genuinely is dark
     (its source drops from 246–255 to `(120, 50, 16)`)
-  - `MASCOT_SHADE = (255, 50, 2)` for the sweep, whose shading is only a 15% step
-    (`(216,112,80)` → `(184,104,72)`). Sending that to `MASCOT_DARK` turned a gentle
-    roll of the body into a hard two-tone band
+  - `MASCOT_SHADE = (255, 50, 2)` was authored for the broom sweep's own gentle 15% step
+    (`(216,112,80)` → `(184,104,72)`) and is unused now that the sweep is retired outright
+    — see [[Animation Catalogue]]'s `sitting` section. Left defined rather than deleted,
+    the way the sweep's own source stays in `art/sources` as reference.
 - Pure black eyes, no floor, no highlight or shade bands
 - Max channel must stay at 255 — see [[Panel Quirks]] before changing the colour
 - ≥ `MIN_COLORS` (9) distinct colours per frame, padded invisibly via blue-channel
@@ -95,10 +100,11 @@ Two consequences worth knowing before editing a state:
 
 ## Importing the hand-drawn states
 
-`generate.py`'s `imported()` takes both sources whole — no crop, and **no frame
+`generate.py`'s `imported()` takes each hand-drawn source whole — no crop, and **no frame
 subsampling**: the source durations *are* the animation. What it does do is resample
 each frame to the art's own pixel grid, which is not always the file's, then blow that
-grid up by a whole number of panel pixels and place it. `import_gif.py` is the
+grid up by a whole number of panel pixels and place it. Four sources go through it today:
+`appear.gif`, `sleep.gif`, and the two `work-typing` sources below. `import_gif.py` is the
 different tool for a different job: art we are importing blind, cropped to a
 power-of-two window and flattened to one colour.
 
@@ -116,54 +122,47 @@ The last frame is given a long dwell (`APPEAR_TAIL_MS`) so the panel, which loop
 whatever GIF it holds, shows a mascot standing still rather than a restarted entrance
 if the hand-off runs late. The motion length (duration minus tail) is read from `clips.json` at runtime, so no hand-sync is needed.
 
-## The sweep (`working.gif`)
+## The seated pose (`work-typing.gif` / `work-typing-look-down.gif`)
 
-Imported from `art/sources/claude-claude-code-1.gif` — the mascot's own loading
-animation, exported at 200×200: it flings a broom up, catches it, bends over and
-sweeps the floor, then straightens up. 36 frames, 3.7s, on the source's own irregular
-timings, which carry the animation and must not be re-evened.
+Both are native 32×32, 5 frames at 70ms each, the user's own hand-authored typing loop —
+figure at x0–20 rows 18–31 (the same rows the retired drawn seated anchor used), laptop at
+roughly x21–28 rows 22–31. `work-typing-look-down.gif` differs from `work-typing.gif` in
+exactly one respect, the eyes one row lower; their moving pixels (the hands, rows 22–30)
+are byte-identical.
 
-Its palette maps by nearest colour rather than by threshold, because the export left a
-handful of anti-aliased pixels on cell boundaries. The broom's mid-grey becomes `PROP`
-white: a mid-grey would render blue-violet, see [[Panel Quirks]].
+`_typing_recolour()` classifies by the same max-channel-threshold approach as
+`starting.gif` above rather than matching exact values, because the source is
+hand-authored and dithered and carries antialiasing fragments no exact-match table would
+list. Two cutoffs (`TYPING_DARK = 40`, `TYPING_BODY_MIN = 180`) split the source into three
+families: below `TYPING_DARK` is background, from there up to `TYPING_BODY_MIN` is the
+laptop (already drawn near-grey in the source, snapped to the same `LAPTOP_GREY` the
+retired drawn laptop used), and above that is the body, snapped to `MASCOT`.
 
-**The art is 19×19, not 200×200** — one native pixel every 10.53 file pixels — and at
-that resolution it is exactly [[#Mascot geometry]] at *half* scale: an 8×6 torso,
-2-tall arms, 1×1 eyes, four 1×2 legs. So it is resampled to 19×19 and doubled, which
-lands the figure on the same silhouette every drawn state uses. Importing at 1:1
-instead would put a half-size mascot on the panel and cutting to it from any other
-state would visibly shrink the figure.
+**The background band flattens a genuine dither, not noise to be cleaned up.** The source
+tiles a two-tone checkerboard — an achromatic family (`(0,0,0)`/`(1,1,1)`/`(3,3,3)`)
+alternating with a warm-tinted one (`(10,4,0)`/`(13,5,0)`/`(18,7,0)`) — across the whole
+canvas, including past the laptop's own edge. [[Panel Quirks]] is explicit that near-black
+left in empty space genuinely lights those LEDs, so both tones snap to `BG` on import; a
+lower cutoff that let the warm tile through as grey painted a visible checkerboard into the
+background instead.
 
-### The crop tracks the figure
+`_sitting_anchor()` is frame 0 of the recoloured `work-typing.gif` import — the
+`sitting`-pose anchor, in the shape `_standing_anchor()`/`_dozing_anchor()` already are —
+and `_desk_sprite()` lifts every `LAPTOP_GREY` pixel back out of it into its own sprite so
+the sit edges can slide the desk independently of the figure, now that there is no second,
+drawn laptop shape to move instead. See [[Animation Catalogue]]'s `sitting` section for the
+full account of why this pose is imported rather than drawn, and what it cost in return
+(the sit edges' pop, a known gap there).
 
-Doubled, the sweep spans 38 columns against the panel's 32, and no *fixed* offset
-fits both the figure and its prop: centring the mascot clips the broom to a smudge,
-and pushing the broom on clips the mascot's own left arm while it stands. So
-`working_at()` pins the figure's left edge to the panel's, frame by frame. Its left
-edge only ever takes two values — it steps right as it crouches — so this is one 4px
-pan twice a loop, both times inside a pose change big enough to hide it. Every
-silhouette then survives whole and the broom is fully on-panel through the sweep; the
-only thing still cropped is the tip of the handle in the three frames where it is in
-mid-air.
+## Retired: the broom sweep
 
-### Two repairs to the source
-
-The source's standing frames are redrawn rather than held, and two of those wobbles
-stop reading as life and start reading as damage once doubled onto 32px. `frame 0` is
-the same pose drawn correctly, so `WORKING_REPAIRS` fixes both against it:
-
-| Frames | Wobble |
-|---|---|
-| 1–4 | the **left eye** is two cells wide while the right stays at one |
-| 1–4, 32–33 | the **legs** are a cell short, filling the row where the four gaps belong |
-
-Each repair names the cells, the colour they must currently hold, and the colour to
-paint. The check on the current colour is the point: if the source art is ever
-replaced, the build fails loudly instead of silently painting over something else.
-
-Still unrepaired, and visible in the same frames: the mascot's **arms sit at different
-heights** there (left at eye level, right two cells lower). Fixing it means moving a
-limb rather than patching four cells, so it is left alone.
+`art/sources/claude-claude-code-1.gif` — the mascot's own loading-animation broom sweep,
+exported at 200×200 — was imported here as a clip through several renames (`working`,
+then, once `working` came to mean the drawn seated pose, `sweeping`). It is retired
+outright now, not re-authored: the user's verdict was that it "has the old posture",
+drawn on a silhouette that predates the current figure — see [[Animation Catalogue]]'s
+`sitting` section. The source file stays in `art/sources` as reference art; nothing in
+`generate.py` imports it any more.
 
 ## The app icon
 

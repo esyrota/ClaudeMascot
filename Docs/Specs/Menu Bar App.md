@@ -58,7 +58,13 @@ Defaults live in `Settings.swift` (`@AppStorage`); the idle timings are read onc
 
 ## Event handling and session tracking
 
-Incoming hook events are applied to `SessionTracker`, which holds per-session state and reduces multiple live sessions to one desired `PanelState` by priority: `waiting > working > thinking > done > idle`. This fixes the case where session A's `Stop` cancels session B's `thinking`. Sessions are reaped on `SessionEnd` and on a staleness timeout (default 30m); without the timeout, one crashed session would pin the panel in `thinking` with no way out.
+Incoming hook events are applied to `SessionTracker`, which holds per-session state and reduces multiple live sessions to one desired `PanelState` by priority: `waiting > working > thinking > done > idle`. This fixes the case where session A's `Stop` cancels session B's `thinking`. Sessions are reaped on a debounced `SessionEnd` (see below) and on a staleness timeout (default 30m); without the timeout, one crashed session would pin the panel in `thinking` with no way out.
+
+**The reduction is not a pure function of the last event per session.** A session also carries whether it has done real work in the current turn, and a stored `thinking` reads as `working` while that holds — `SessionTracker.swift` is where this lives. The reason is measured, not aesthetic: `PostToolUse` maps to `thinking`, a standing state, so a mascot that read every event literally stood up and sat back down between tool calls — 56 sit↔stand swaps in one 96-minute window across ~7 turns, one every ~100s. Once sitting has edges to walk, that churn becomes the dominant motion on the panel. Sitting for the whole turn instead of once per tool call fixes it at the source: he stands only for the stretch before the first tool call, which is the one moment `thinking` is actually true.
+
+**`done` is debounced and must be earned.** A `Stop` does not become `done` outright; it becomes `done` only after a grace window passes with no further tool activity for that session, and only if the session did real work since its last `UserPromptSubmit`. Both conditions are measured failures, not hypotheticals: a `Stop` once arrived for a session that was mid-tool — `PreToolUse` two seconds earlier, eleven more tool events in the next two minutes — because a nested `claude` run's lifecycle events landed attributed to the outer session. And a `done` that fires on every `Stop` regardless of whether anything was accomplished is indistinguishable from `idle`: `Stop` fired 18 times for 18 turns in the same log window, each one a celebration and a 30s hold reverting to `idle` — so the two states end up meaning the same thing. Contradicting tool activity during the grace window cancels the pending `done` and the turn simply continues.
+
+**`SessionEnd → off` carries the same debounce**, for the same reason and a matching measured failure: a `SessionEnd` once powered the panel down while its session kept working for another ten minutes, with no intervening `SessionStart`.
 
 Subagent count (tracked via `PreToolUse` / `SubagentStop` events) feeds *intensity* — more agents makes the mascot look busier without changing pose.
 
@@ -79,7 +85,7 @@ Clips are either looping (variant loops at their pose, eligible for fidgets) or 
 
 Loop clips at a pose can have multiple variants (same pose, different animation). The choreographer selects one deterministically based on a time epoch, never storing "last played"; called twice in the same epoch with the same inputs, it returns the same clip, so the answer is stable and reproducible from three inputs alone (`target`, `displayed`, `now`).
 
-Ambient fidgets (blinks, look-arounds, stretches) play during long holds at a pose, selected with the same deterministic epoch-based method. They are self-edges (`fromPose == toPose`), so they return the mascot exactly where it stood, and fire when the epoch's seeded roll falls under `fidgetChance` — never during a transition, and never for `.off`.
+Ambient fidgets (blinks, look-arounds, stretches) play during long holds at a pose, selected with the same deterministic epoch-based method. They are self-edges (`fromPose == toPose`), so they return the mascot exactly where it stood, and fire when the epoch's seeded roll falls under `fidgetChance` — one roll per 20-second `rotationPeriod` epoch (`Choreographer.swift`), not one per loop of whatever clip is on screen — never during a transition, and never for `.off`.
 
 `<group>-enter` one-shots play exactly once when arriving at a pose, if the manifest has one (e.g., a celebration on `done`). Declaring one wrong fails silently, so the test coverage is important.
 
@@ -95,13 +101,18 @@ Both are always on, size-capped, and rotated; tool input is never logged, matchi
 ## Behaviour
 
 - Listen for JSON events on the socket and drive the panel through the choreographer.
-- States: `idle`, `thinking`, `working`, `waiting`, `done`, `sleeping`, plus `starting` (the entrance) and `off` (written by `SessionEnd`, blanks the panel immediately).
-- **The entrance** plays at the three moments the mascot arrives from nothing: app launch, `SessionStart`, and a wake from a dark panel — so a prompt arriving at a black panel shows the mascot appear before it is seen thinking. It is never sat in: `PanelController` holds it for `startingHold` (the motion length of `starting.gif`, read from clips.json) and then hands off to the state actually wanted.
-- `done` is a one-shot celebration (chunk 9's `done-enter`), followed by a satisfied-idle loop, held for a minimum of **30s** before reverting to `idle`, unless another state arrives first.
-- Idle escalation becomes physical: `idle` → nod off (`stand-to-doze`) → `sleeping` → wake up (`doze-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**; a wake walks back in from a random side. The timings come from settings: default 5m to sleeping, 10m to off.
-- `off` short-circuits straight to panel-off, without waiting out that escalation.
+- States: `idle`, `thinking`, `working`, `waiting`, `done`, `sleeping`, plus three the hooks never name — `starting` (arriving), `away` (leaving) and `off` (the panel dark, driven by `SessionEnd`).
+- **`starting` and `away` are journeys, not places.** Neither has a pose of its own; each resolves against wherever the mascot currently is (see `PanelState.pose`). Everything else in the state set is somewhere the mascot can be.
+- **The entrance plays only when the mascot is actually off screen** — app launch, a wake from a dark panel, or a `SessionStart` that finds it gone. A `SessionStart` on a mascot standing right there does nothing visible, because the alternative is removing it in order to bring it back. It is never sat in: `PanelController` holds it for `startingHold` (the motion length of `starting.gif`, read from clips.json) and then hands off to the state actually wanted.
+- **Which entrance is a matter of where it left from**, and falls out of the pose graph for free: nothing on screen rises through the floor (`starting`), a mascot that walked off left comes back in from the left (`walk-in-left`).
+- `done` is a one-shot celebration (`done-enter`), followed by a satisfied-idle loop, held for a minimum of **30s** before reverting to `idle`, unless another state arrives first.
+- Idle escalation is physical: `idle` → nod off (`stand-to-doze`) → `sleeping` → wake up (`doze-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**. The timings come from settings: default 5m to sleeping, 10m to off.
+- **The panel never goes dark under a mascot that is still standing on it.** Every route to off targets `away` first and cuts power only once the mascot has left; the panel blinking out from wherever it stood read as the hardware failing rather than as the mascot going away. The walk itself is boundary-gated like any other swap — starting it mid-loop would break the anchor contract — but the power cut is not, so it lands on the tick that notices.
+- `off` (`SessionEnd`) skips the idle *timers*, not the departure: it walks off at the next seam rather than waiting out `offAfter`.
+- **The departure is bounded** by `PanelTimings.leaveBy` (20s): a mascot that cannot finish leaving within it must not hold the panel lit forever, so it is abandoned outright rather than stalling the panel — a pose with no route off the panel can still occur in principle, even though `sitting` now has one.
 - No 15-minute quit — a resident native app is cheap, and reconnecting is the slow part. It keeps the BLE connection.
 - Reconnect automatically if the panel drops off: exponential backoff to a 30s ceiling, plus a **connect timeout**, because CoreBluetooth's own `connect` has none and will pend forever — see [[macOS Bluetooth TCC]].
+- **The reconnect chain must never end.** Waking from system sleep reconnects immediately (backoff discarded — the panel is right there), and every tick calls `BLEClient.ensureConnecting()`, which restarts the chain if the client is disconnected with no retry armed. A sleeping Mac used to leave the panel dark until the app was relaunched; [[macOS Bluetooth TCC]] has the anatomy.
 - **Connection stability is a design constraint.** Only a new BLE connection flashes the panel's own icon; everything else stays visible. Dropping and reconnecting is the only visible artefact we cannot hide.
 
 ## Observability

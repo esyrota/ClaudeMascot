@@ -71,4 +71,31 @@ enum EventPolicy {
   static func isSubagentSpawn(_ event: HookEvent) -> Bool {
     event.event == "PreToolUse" && event.tool == "Task"
   }
+
+  /// Whether `event` ends the assistant's turn. Unlike every other
+  /// recognised event, `SessionTracker` cannot take `state(for:)`'s `.done`
+  /// at face value here: a `Stop` must not resolve to `.done` until a grace
+  /// window has passed with no contradicting activity, so `SessionTracker`
+  /// needs to recognise the event itself in order to record a pending done
+  /// instead of storing the state this file would otherwise hand it.
+  static func isTurnEnd(_ event: HookEvent) -> Bool {
+    event.event == "Stop"
+  }
+
+  /// Whether `event` starts a new turn. `SessionTracker` resets its
+  /// per-turn "did this session do real work" flag on this event rather
+  /// than on `state(for:)`'s `.thinking` mapping, since `PostToolUse` maps
+  /// to `.thinking` too and must not reset that flag mid-turn.
+  static func isTurnStart(_ event: HookEvent) -> Bool {
+    event.event == "UserPromptSubmit"
+  }
+
+  /// Whether `event` is a tool call, i.e. real work happened. `SessionTracker`
+  /// sets its per-turn work flag on this event, separately from `state(for:)`'s
+  /// `.working` mapping, because the flag needs to survive past the tool call
+  /// itself (through the following `PostToolUse`'s `.thinking`) for as long as
+  /// the turn lasts, not just for as long as this one event's state does.
+  static func isToolCall(_ event: HookEvent) -> Bool {
+    event.event == "PreToolUse"
+  }
 }

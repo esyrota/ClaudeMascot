@@ -96,6 +96,15 @@
       "fromPose": "standing",
       "toPose": "offBottom"
     },
+    "sit-to-stand": {
+      "file": "sit-to-stand.gif",
+      "frameCount": 3,
+      "durationMs": 3900,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "standing"
+    },
     "sleeping": {
       "file": "sleeping.gif",
       "frameCount": 19,
@@ -114,6 +123,15 @@
       "loops": false,
       "fromPose": "standing",
       "toPose": "dozing"
+    },
+    "stand-to-sit": {
+      "file": "stand-to-sit.gif",
+      "frameCount": 3,
+      "durationMs": 3900,
+      "motionMs": 1400,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "sitting"
     },
     "starting": {
       "file": "starting.gif",
@@ -299,25 +317,70 @@
       "fidgetGroup": "idle",
       "weight": 0.2
     },
+    "work-coffee": {
+      "file": "work-coffee.gif",
+      "frameCount": 7,
+      "durationMs": 4640,
+      "motionMs": 1880,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.15
+    },
+    "work-idea": {
+      "file": "work-idea.gif",
+      "frameCount": 7,
+      "durationMs": 3810,
+      "motionMs": 1310,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.25
+    },
+    "work-look": {
+      "file": "work-look.gif",
+      "frameCount": 15,
+      "durationMs": 3850,
+      "motionMs": 1350,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.4
+    },
+    "work-look-down": {
+      "file": "work-look-down.gif",
+      "frameCount": 15,
+      "durationMs": 3850,
+      "motionMs": 1350,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.25
+    },
+    "work-think": {
+      "file": "work-think.gif",
+      "frameCount": 13,
+      "durationMs": 7700,
+      "motionMs": 4880,
+      "loops": false,
+      "fromPose": "sitting",
+      "toPose": "sitting",
+      "fidgetGroup": "working",
+      "weight": 0.25
+    },
     "working": {
       "file": "working.gif",
-      "frameCount": 36,
-      "durationMs": 3650,
-      "motionMs": 3650,
+      "frameCount": 25,
+      "durationMs": 2240,
+      "motionMs": 2240,
       "loops": true,
       "pose": "sitting",
       "variantGroup": "working",
       "weight": 1.0
-    },
-    "working-alt": {
-      "file": "working-alt.gif",
-      "frameCount": 36,
-      "durationMs": 5310,
-      "motionMs": 5310,
-      "loops": true,
-      "pose": "sitting",
-      "variantGroup": "working",
-      "weight": 0.5
     },
     "workout": {
       "file": "workout.gif",

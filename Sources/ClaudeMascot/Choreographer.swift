@@ -37,7 +37,9 @@ final class Choreographer {
     manifest: ClipManifest,
     clock: @escaping () -> TimeInterval,
     rotationPeriod: TimeInterval = 20,
-    fidgetChance: Double = 0.25
+    // 0.15 per rotation-period epoch is roughly one fidget every 7 loops --
+    // the sparser end of the "4-8 loops then an alt" the product wants.
+    fidgetChance: Double = 0.15
   ) {
     self.manifest = manifest
     self.clock = clock
@@ -54,11 +56,40 @@ final class Choreographer {
     let now = clock()
     let currentPose = pose(of: displayed)
 
-    // 1. `.starting` has no pose of its own — it *is* the transition onto
-    // the board. Hop straight toward `.standing`, the only node any state
-    // actually lives at once arrived.
-    guard let targetPose = target.pose else {
+    // 1. The two journeys. Neither has a pose of its own (see
+    // `PanelState.pose`), so each resolves its own ends here.
+    switch target {
+    case .starting:
+      // The entrance is an *edge from off screen*, not a state. Asking for it
+      // while the mascot is already standing there used to hand back
+      // `transition(from: .standing, to: .standing)` — which matches every
+      // self-edge in the manifest, so a `SessionStart` on a visible mascot
+      // drew a fidget, and one time in nine a *wander*: the mascot walked off
+      // the panel and strolled back in, for no reason the user could see.
+      // Already on screen means the arrival has nothing to do.
+      guard currentPose.isOffscreen else { break }
       return manifest.transition(from: currentPose, to: .standing)
+    case .away:
+      // The departure. Already gone is the terminal state, and
+      // `PanelController` reads that off `displayed` itself rather than from
+      // a clip here — there is nothing left to play.
+      guard !currentPose.isOffscreen else { return nil }
+      if let edge = nextEdge(from: currentPose, to: exitPose(now: now)) {
+        return edge
+      }
+      // No way off the panel from here (missing art). Reporting nothing is
+      // right: `PanelController` cuts power rather than stranding the mascot
+      // mid-walk or retrying an edge that does not exist.
+      return nil
+    default:
+      break
+    }
+
+    guard let targetPose = target.pose else {
+      // `.starting` on a mascot that is already standing: fall through to the
+      // pose it was arriving at anyway, so the entrance settles into idle
+      // instead of resolving to nothing.
+      return clip(for: .idle, displayed: displayed)
     }
 
     // 2. Not there yet: take the next step, not the whole trip. `nextEdge`
@@ -125,6 +156,19 @@ final class Choreographer {
     guard let displayed else { return .offBottom }
     if let pose = displayed.pose { return pose }
     return displayed.toPose ?? .offBottom
+  }
+
+  /// Which side the mascot leaves by, chosen per epoch like everything else
+  /// here so the answer stays a pure function of time.
+  ///
+  /// Deliberately the two walks and not `sink`: sinking through the floor is
+  /// the entrance played backwards, and reads as the mascot being swallowed
+  /// rather than choosing to go. Walking off is the mascot leaving on its own
+  /// terms, which is what the panel going dark should look like. `sink` keeps
+  /// its place inside the wander fidgets, where the mascot comes back.
+  private func exitPose(now: TimeInterval) -> Pose {
+    var rng = SplitMix64(seed: seed(for: "exit-side", epoch: Int(now / rotationPeriod)))
+    return rng.nextDouble() < 0.5 ? .offLeft : .offRight
   }
 
   // MARK: - Path finding
