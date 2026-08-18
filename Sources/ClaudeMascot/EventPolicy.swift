@@ -16,12 +16,15 @@ enum EventPolicy {
   /// would let it reset the panel mid-turn.
   ///
   /// `event.mode` (`permission_mode`) is intentionally never consulted
-  /// here. It reports the session's *configured* mode (`ask`/`allow`), not
-  /// whether Claude is currently waiting on a prompt — keying `.waiting`
-  /// off it would show `waiting` on every tool call in the default `ask`
-  /// mode. `Notification` is the only event that means the panel should
-  /// wait.
+  /// here. It reports the session's *configured* mode, not whether Claude
+  /// is currently waiting on a prompt — and in practice every event this
+  /// app has ever logged carried the same value, so it distinguishes
+  /// nothing. See [[Claude Code Plugin]].
   static func state(for event: HookEvent) -> PanelState? {
+    // Checked before the event switch, because it overrides `PreToolUse`'s
+    // usual `.working`.
+    if isUserBlocking(event) { return .waiting }
+
     switch event.event {
     // The entrance, not `.idle`: a new session is the mascot arriving, and
     // `PanelController` settles it into `.idle` once the animation finishes.
@@ -29,6 +32,9 @@ enum EventPolicy {
     case "UserPromptSubmit": return .thinking
     case "PreToolUse": return .working
     case "PostToolUse": return .thinking
+    // Mapped, but never observed firing — `isUserBlocking` above is what
+    // actually reaches `.waiting`. Kept because it costs one case, and if a
+    // future Claude Code build does emit it, it means exactly this.
     case "Notification": return .waiting
     case "Stop": return .done
     case "SubagentStop": return nil
@@ -36,6 +42,24 @@ enum EventPolicy {
     case "SessionEnd": return .off
     default: return nil
     }
+  }
+
+  /// The tools that block on a human: Claude calls them and then does
+  /// nothing at all until the user answers. There is no `permission_mode`
+  /// or `Notification` signal for this — `Notification` never fires (0 in
+  /// 3131 logged events across 52 sessions), which is why the flag wave had
+  /// never once been on the panel. The tool name is the signal that is
+  /// actually there, and it has been on the wire since plugin 2.0.0, so
+  /// reaching `.waiting` needed no plugin change.
+  static let userBlockingTools: Set<String> = ["AskUserQuestion", "ExitPlanMode"]
+
+  /// Whether `event` is the *start* of a wait on the user: a `PreToolUse`
+  /// for one of `userBlockingTools`. Only `PreToolUse` qualifies — the
+  /// matching `PostToolUse` is the user having answered, and must fall
+  /// through to its usual `.thinking` so the mascot goes back to work.
+  static func isUserBlocking(_ event: HookEvent) -> Bool {
+    guard event.event == "PreToolUse", let tool = event.tool else { return false }
+    return userBlockingTools.contains(tool)
   }
 
   /// Whether `event` announces a new session. `SessionTracker` treats this
@@ -90,12 +114,25 @@ enum EventPolicy {
     event.event == "UserPromptSubmit"
   }
 
-  /// Whether `event` is a tool call, i.e. real work happened. `SessionTracker`
-  /// sets its per-turn work flag on this event, separately from `state(for:)`'s
-  /// `.working` mapping, because the flag needs to survive past the tool call
-  /// itself (through the following `PostToolUse`'s `.thinking`) for as long as
-  /// the turn lasts, not just for as long as this one event's state does.
+  /// Whether `event` is a tool call that counts as *real work*.
+  /// `SessionTracker` sets its per-turn work flag on this event, separately
+  /// from `state(for:)`'s `.working` mapping, because the flag needs to
+  /// survive past the tool call itself (through the following
+  /// `PostToolUse`'s `.thinking`) for as long as the turn lasts, not just
+  /// for as long as this one event's state does.
+  ///
+  /// A `userBlockingTools` call is excluded: asking the user a question is
+  /// the assistant *not* working, so a turn whose only tool call was a
+  /// question has nothing to celebrate and its `Stop` should resolve to
+  /// `.idle` rather than `.done` (see `SessionSnapshot.didWorkThisTurn`).
+  /// A turn that did other work first keeps the flag — this only excludes
+  /// question-*only* turns, never a question raised in the middle of real
+  /// work.
+  ///
+  /// It also keeps the seating rule honest: without the exclusion, the
+  /// answering `PostToolUse` would read as `.working` and sit the mascot
+  /// down at a desk where nothing had been done.
   static func isToolCall(_ event: HookEvent) -> Bool {
-    event.event == "PreToolUse"
+    event.event == "PreToolUse" && !isUserBlocking(event)
   }
 }

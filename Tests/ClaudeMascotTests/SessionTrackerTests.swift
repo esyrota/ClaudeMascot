@@ -420,3 +420,83 @@ func multiSessionPriorityReductionHoldsWithPendingStates() {
   // waiting outranks working.
   #expect(tracker.derived == .waiting)
 }
+
+@MainActor
+@Test("an AskUserQuestion round trip reaches waiting and then goes back to work")
+func askUserQuestionDrivesWaitingEndToEnd() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction)
+
+  // The real 23:21:42 → 23:23:26 sequence from input.jsonl, which is the
+  // evidence that `waiting` was reachable all along without a plugin change.
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", tool: "Bash", session: "A"))
+  tracker.apply(hook("PostToolUse", tool: "Bash", session: "A"))
+  #expect(tracker.derived == .working)
+
+  tracker.apply(hook("PreToolUse", tool: "AskUserQuestion", session: "A"))
+  #expect(tracker.derived == .waiting)
+
+  // 104 seconds of a human reading the question. Nothing else arrives, and
+  // the mascot must still be waving at the end of it.
+  clock.advance(104)
+  #expect(tracker.derived == .waiting)
+
+  // Answered: `PostToolUse` maps to `.thinking`, which the seating rule
+  // reads as `.working` because the turn has done real work.
+  tracker.apply(hook("PostToolUse", tool: "AskUserQuestion", session: "A"))
+  #expect(tracker.derived == .working)
+}
+
+@MainActor
+@Test("a question in one session outranks another session's work")
+func waitingOutranksAConcurrentWorkingSession() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("SessionStart", session: "B"))
+  tracker.apply(hook("PreToolUse", tool: "Bash", session: "B"))
+  #expect(tracker.derived == .working)
+
+  tracker.apply(hook("PreToolUse", tool: "AskUserQuestion", session: "A"))
+  #expect(tracker.derived == .waiting)
+}
+
+@MainActor
+@Test("a turn whose only tool call was a question has nothing to celebrate")
+func questionOnlyTurnDoesNotCelebrate() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", tool: "AskUserQuestion", session: "A"))
+  tracker.apply(hook("PostToolUse", tool: "AskUserQuestion", session: "A"))
+  // Asking is the assistant *not* working, so the answer must not seat it at
+  // a desk where nothing has been done.
+  #expect(tracker.derived == .thinking)
+
+  tracker.apply(hook("Stop", session: "A"))
+  clock.advance(6)
+  #expect(tracker.derived == .idle)
+}
+
+@MainActor
+@Test("a question in the middle of real work still leaves the turn worth celebrating")
+func questionDoesNotEraseEarlierWork() {
+  let clock = FakeClock()
+  let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
+
+  tracker.apply(hook("SessionStart", session: "A"))
+  tracker.apply(hook("UserPromptSubmit", session: "A"))
+  tracker.apply(hook("PreToolUse", tool: "Bash", session: "A"))
+  tracker.apply(hook("PostToolUse", tool: "Bash", session: "A"))
+  tracker.apply(hook("PreToolUse", tool: "AskUserQuestion", session: "A"))
+  tracker.apply(hook("PostToolUse", tool: "AskUserQuestion", session: "A"))
+
+  tracker.apply(hook("Stop", session: "A"))
+  clock.advance(6)
+  #expect(tracker.derived == .done)
+}

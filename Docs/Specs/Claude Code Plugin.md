@@ -34,9 +34,9 @@ events are not tool-scoped and take no matcher.
 |-------|-------|-------------------|
 | `SessionStart` | yes | `starting` (the entrance, which settles into `idle`) |
 | `UserPromptSubmit` | yes | `thinking` |
-| `PreToolUse` | yes | `working` |
+| `PreToolUse` | yes | `working` — or `waiting`, when `tool` is one that blocks on the user (see below) |
 | `PostToolUse` | yes | `thinking` |
-| `Notification` | yes | `waiting` |
+| `Notification` | yes | `waiting` *(mapped, but never observed firing — see below)* |
 | `Stop` | yes | `done` |
 | `SubagentStop` | yes | *(ignored, returns nil)* |
 | `PreCompact` | yes | `working` |
@@ -48,7 +48,42 @@ events are not tool-scoped and take no matcher.
 
 ## Policy: why it lives in the app
 
-`permission_mode` (`ask` / `allow`) is forwarded but not consulted by the app. It reports the session's *configured* mode, not whether Claude is currently waiting. Using it to key `.waiting` would show the mascot waiting on every tool call in the default `ask` mode, which is wrong — only `Notification` means the panel should wait. It is forwarded anyway because it is free and a future policy may want it.
+### What actually means "waiting"
+
+`Notification` was the sole route to `.waiting`, and it **never fires here**. Across
+`input.jsonl` — 3131 events, 52 sessions, 2026-08-16 → 08-18 — it appears zero times, while
+every other mapped event appears in the hundreds. A live test confirmed it: an
+`AskUserQuestion` that held the session for 104 seconds produced no `Notification`. The
+state was unreachable, so the flag wave had never once been on the panel.
+
+The signal that *is* there is the tool name. Some tools block on a human by definition —
+Claude calls them and then does nothing until the user answers — and both ends of that wait
+already arrive as ordinary events the relay forwards:
+
+```
+PreToolUse   tool=AskUserQuestion   23:21:42   ← the wait starts
+PostToolUse  tool=AskUserQuestion   23:23:26   ← the user answered
+```
+
+So `EventPolicy` reads `PreToolUse` with `tool` in **`AskUserQuestion`** or
+**`ExitPlanMode`** as `.waiting`, and the matching `PostToolUse` returns the session to
+work. Six such round trips in the log ran 54s, 75s, 103s, 212s, 238s and four hours — every
+one a window the mascot should have spent waving.
+
+This needs **no plugin change**: `tool` has been on the wire since 2.0.0. That is the point
+of keeping policy in the app — the reachability bug was fixed without touching the frozen
+relay.
+
+`Notification` stays mapped. It costs one switch case, and if a future Claude Code build
+does emit it, it means exactly what the panel wants.
+
+### Why not `permission_mode`
+
+`permission_mode` is forwarded but not consulted. It reports the session's *configured*
+mode, not whether Claude is currently waiting, so keying `.waiting` off it would show the
+mascot waiting on every tool call in `ask` mode. The log sharpens this further: all 3131
+events carry `"mode":"auto"` — a single value across every session, distinguishing nothing.
+It is forwarded anyway because it is free and a future policy may want it.
 
 `SubagentStop` is a real Claude Code event but deliberately unmapped to any state. The app ignores it, returning `nil`, so the panel state does not change.
 

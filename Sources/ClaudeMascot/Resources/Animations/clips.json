@@ -182,6 +182,26 @@
       "variantGroup": "waiting",
       "weight": 1.0
     },
+    "waiting-hop": {
+      "file": "waiting-hop.gif",
+      "frameCount": 13,
+      "durationMs": 2180,
+      "motionMs": 2180,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "waiting",
+      "weight": 1.0
+    },
+    "waiting-semaphore": {
+      "file": "waiting-semaphore.gif",
+      "frameCount": 12,
+      "durationMs": 2020,
+      "motionMs": 2020,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "waiting",
+      "weight": 1.0
+    },
     "walk-in-left": {
       "file": "walk-in-left.gif",
       "frameCount": 5,
