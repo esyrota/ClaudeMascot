@@ -2,7 +2,9 @@
 
 **Outcome: ✅** with one deliberate non-delivery. All seven chunks landed; the turned-head
 trim was investigated, attempted, and reverted on purpose, and is recorded as a known gap
-rather than shipped. 127 tests green, `make-app.sh` builds, nothing verified on hardware yet.
+rather than shipped. 107 tests green, `make-app.sh` builds, nothing verified on hardware yet.
+(That count was reported as 127 throughout the run — the orchestrator was double-counting
+`swift test`'s rollup lines. 97 swift-testing plus 10 XCTest across two suites.)
 
 ## Numbers
 
