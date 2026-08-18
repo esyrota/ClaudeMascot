@@ -87,8 +87,11 @@ Written up in `_tasks/`, in the order they are worth doing:
   largest remaining win.
 - [[Waiting Never Fires]] — `Notification` fired zero times in 1102 events, so the flag
   wave has never once been on the panel.
-- [[Recheck the Panel Colour Rule]] — [[Panel Quirks]] vouches for a value the panel
-  demonstrably renders blue, and the whole palette rests on that page.
+- [[Docs GIFs as the Art Source]] — make the docs previews byte-faithful to what the
+  device gets, then edit animations as GIFs and build with one command. Part 1 (one
+  command) is small and worth doing on its own.
+- [[Recheck the Panel Colour Rule]] — mostly answered by the 2026-08-18 panel photo; what
+  is left is a per-channel sweep to turn the fitted rule into a real transfer curve.
 
 Still open, and small enough to live in [[Animation Catalogue]] → Known gaps rather than
 their own task: a `dozing` fidget, and the second Z that collapses to a 2×2 dot.

@@ -1,41 +1,57 @@
 # Recheck the Panel Colour Rule
 
-[[Panel Quirks]]' colour rule is the single most load-bearing fact in the art pipeline — it
-is why `MASCOT` is what it is, why there is no grey constant, and why several clips were
-redrawn. **It is now known to be wrong in at least one place, and untested in another.**
+**Mostly answered, 2026-08-18.** A trustworthy panel photo arrived — `work-idea`, shot in
+even room light — and the rule on [[Panel Quirks]] has been rewritten around it. What is
+left is the controlled sweep that would turn an empirical fit into a real transfer curve.
 
-## What happened
+## What the photo settled
 
-- The page says *"Very dark colours (`(24,14,10)`, value 0.09) render fine as dark."* A photo
-  of the panel shows the laptop lid drawn in **exactly `(24,14,10)` rendering as saturated
-  blue**. The page names that value as safe; it is not.
-- The page also says `(134,134,134)` renders blue-violet. **The seated laptop now ships in
-  exactly that grey**, at the user's direction. That is the deliberate next data point.
+- **`(134,134,134)` renders blue.** This was the deliberate open data point: the seated
+  laptop ships in exactly that grey, at the user's direction, precisely to find out. It
+  came back blue.
+- **`(255,68,4)` renders pink, not orange.** The page had it in a table as "correct deep
+  orange", from an earlier photo. It was wrong. A blue channel of **4** was enough to
+  recolour the whole body.
+- **The rule was the wrong shape.** "The brightest channel must be 255" fit the safe cases
+  by accident: saturated colours happen to carry almost no blue. Restated as *the panel
+  over-drives low channel values, hardest on blue*, it also covers the two data points the
+  old rule contradicted — `(24,14,10)` coming back saturated blue, and greys going blue —
+  which is why those sat on the page as unexplained anomalies for so long.
+- **Consequence, now shipped:** warm colours end in `B = 0`, and `MASCOT_DARK` is a plain
+  uniform scale of `MASCOT` rather than a hue shift. Darkening was never actually
+  forbidden; blue was.
 
-The correction is already recorded on the page as an observation contradicting the rule rather
-than as a new rule — because that same page warns, from experience, that a photo of the panel
-alone led to two wrong diagnoses.
+## What is still open
 
-## What to do
+The rule above is fitted to a handful of observed colours, not measured. Nobody has swept
+a channel. Until that happens it predicts well and explains everything, which is exactly
+what the two earlier wrong theories also did.
 
-1. **Send the test card first.** `art/testcard.py` puts four saturated quadrants on the panel.
-   That is the page's own advice and it exists for exactly this.
-2. **Photograph the panel and a monitor in the same frame**, showing the same art. Phone
-   cameras white-balance the panel heavily; a side-by-side is the only trustworthy comparison.
-   A photo of the panel alone is what produced the two wrong diagnoses.
-3. Sweep a ramp: pure black, `(24,14,10)`, `(64,64,64)`, `(134,134,134)`, `(200,200,200)`,
-   white, plus a saturated mid like `(0,150,255)`. One photo settles what a dozen theories
-   cannot.
-4. **Rewrite the rule to fit every data point**, and say plainly which are observed and which
-   are inferred. If grey turns out to render correctly, a great deal of art advice on that page
-   and in [[Animation Catalogue]] needs revisiting — including whether `MASCOT_DARK` and
-   `MASCOT_SHADE` need to be the deep hues they are.
+1. **Send the test card first.** `art/testcard.py` puts four saturated quadrants on the
+   panel. It exists for this.
+2. **Sweep one channel at a time.** A ramp of `(v,0,0)`, `(0,v,0)`, `(0,0,v)` and
+   `(v,v,v)` for `v` in roughly 8 steps, as separate uploads or tiled on one 32×32 frame.
+   That gives a per-channel response curve directly.
+3. **Photograph in even room light** — that is what made this photo usable where earlier
+   ones misled. A monitor showing the same art in frame is still the strongest check.
+4. **Write the curve down** and, if it is clean enough, use it: a `panel_preview()` that
+   maps authored RGB to predicted on-panel RGB would let the previews in
+   [[Animation Catalogue]] show what the panel will actually do. That is a dependency of
+   [[Docs GIFs as the Art Source]], not a nice-to-have — a reference image that lies about
+   colour is worse than none.
 
-## Why it matters beyond the laptop
+## Why it still matters
 
-The rule is why the art has no true shading and no mid-tones anywhere. If the real constraint
-is narrower than "brightest channel must be 255", the whole palette opens up — and if it is
-broader, at least two shipped clips are wrong today.
+Every remaining colour decision is guesswork without it, and two guesses have already
+been spent:
+
+- **The pink is unexplained.** `MASCOT` was changed from `(255,68,4)` to `(255,68,0)` on
+  the blue theory and photographs identically pink. That theory is dead as an explanation
+  of the body colour, though it still fits the greys and mid-tones.
+- **`SHADE_SCALE` was found by bisection, not by understanding.** ×0.852 (the reference
+  art's own step) was invisible, ×0.35 was muddy, and ×0.60 ships as the midpoint — three
+  panel photographs to place one number. A transfer curve would replace that with
+  arithmetic, and would say whether `LAPTOP_GREY` could be a grey that reads grey.
 
 ## Specs
 

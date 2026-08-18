@@ -135,10 +135,11 @@ def vivify(im, threshold=96, sat_boost=1.4):
 
     Two reasons, and they compound:
 
-    * The panel renders colors whose max channel is 255 correctly, and shifts
-      dimmer mid-tones toward blue-violet -- #DD775B (val 0.87) and this art's
-      (216,112,80) (val 0.85) both came out blue, while (255,108,40) and the
-      pure primaries were fine. So value goes to 1.0.
+    * The panel over-drives low channel values, hardest on blue, so any real
+      amount of blue turns a warm colour blue-violet -- #DD775B and this art's
+      (216,112,80) both came out blue. Driving value to 1.0 is one way to squeeze
+      blue out; zeroing it directly is the rule the palette follows now (see
+      [[Panel Quirks]]).
     * Value alone turns (216,112,80) into a pale salmon (255,132,94). Boosting
       saturation as well lands it near (255,92,38) -- an actually vivid orange,
       which is the look we're after on an LED panel.

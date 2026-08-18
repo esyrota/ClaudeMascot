@@ -82,14 +82,26 @@ Two consequences worth knowing before editing a state:
 
 ## Style rules
 
-- One flat colour for every mascot pixel — `MASCOT = (255, 68, 4)`
-- Two shading constants, because the hand-drawn sources shade by different amounts. Both
-  deepen the hue rather than dimming it — green and blue down, red pinned at 255 —
-  which is the only way the hardware allows, so both read as a deeper red-orange
-  rather than a true shadow:
-  - `MASCOT_DARK = (255, 24, 0)` for `appear.gif`, whose own shade genuinely is dark
-    (its source drops from 246–255 to `(120, 50, 16)`)
-  - `MASCOT_SHADE = (255, 50, 2)` was authored for the broom sweep's own gentle 15% step
+- One flat colour for every mascot pixel — `MASCOT = (255, 68, 0)`. The blue channel is
+  `0` as cheap insurance against the panel's near-black lift. Note it photographs **pink**
+  on the panel, and did so identically when it carried `B = 4` — that is unexplained and
+  waiting on [[Recheck the Panel Colour Rule]].
+- One shading constant, `MASCOT_DARK`, which is `MASCOT` scaled by `SHADE_SCALE = 0.60`.
+  Uniform scaling holds hue and saturation and moves only value, which is what a shadow
+  is. The reference art (the sweep in `claude-claude-code-1.gif`, body `(216,112,80)`
+  shading to `(184,104,72)` — hue +3°, saturation −0.02, value ×0.852) confirms that
+  *shape*, but not the size: shipping its own ×0.852 made the shade **invisible** on the
+  panel, which compresses the dark end far harder than any preview shows. The scale is set
+  from panel photographs instead, by bisection: ×0.85 vanishes, ×0.35 reads but goes muddy,
+  ×0.60 sits between. Green is what makes a shade visible and red is what makes it dirty,
+  so the usable window is narrow. See [[Panel Quirks]].
+
+  It used to be `(255, 24, 0)`, pinned at 255 on the old "brightest channel must be 255"
+  rule. Pinned there it could not change value at all, so the whole step landed on hue
+  (−10°) and read on the panel as a vivid red stripe beside the body rather than a shadow
+  on it. [[Panel Quirks]] has why the pinning was the wrong constraint. `MASCOT_SHADE`,
+  a second softer shade that existed for the same reason, is deleted — a scale factor
+  covers it.
     (`(216,112,80)` → `(184,104,72)`) and is unused now that the sweep is retired outright
     — see [[Animation Catalogue]]'s `sitting` section. Left defined rather than deleted,
     the way the sweep's own source stays in `art/sources` as reference.
@@ -130,13 +142,30 @@ roughly x21–28 rows 22–31. `work-typing-look-down.gif` differs from `work-ty
 exactly one respect, the eyes one row lower; their moving pixels (the hands, rows 22–30)
 are byte-identical.
 
-`_typing_recolour()` classifies by the same max-channel-threshold approach as
-`starting.gif` above rather than matching exact values, because the source is
-hand-authored and dithered and carries antialiasing fragments no exact-match table would
-list. Two cutoffs (`TYPING_DARK = 40`, `TYPING_BODY_MIN = 180`) split the source into three
-families: below `TYPING_DARK` is background, from there up to `TYPING_BODY_MIN` is the
-laptop (already drawn near-grey in the source, snapped to the same `LAPTOP_GREY` the
-retired drawn laptop used), and above that is the body, snapped to `MASCOT`.
+`_typing_recolour()` classifies by threshold rather than by matching exact values, because
+the source is hand-authored and dithered and carries antialiasing fragments no exact-match
+table would list. Unlike `starting.gif` above it cannot go on max channel alone: the laptop
+carries a white logo brighter than any body pixel, so the split above `TYPING_DARK = 40` is
+**by chroma first, value second**.
+
+- **Achromatic** (max − min < `TYPING_CHROMA_MIN = 64`) is the laptop. Above
+  `TYPING_LOGO_MIN = 200` it is the logo on the lid, kept `PROP` white as authored;
+  below, the lid, deck and hinge, snapped to the `LAPTOP_GREY` the retired drawn laptop
+  used.
+- **Chromatic** is the mascot, in the source's own two tones. At or above
+  `TYPING_BODY_MIN = 252` is the front of the body, snapped to `MASCOT`; below it is the
+  secondary colour the source authors for the back (columns x0–2) and for whichever arm is
+  turned away (x17–20, alternating with the typing cycle), snapped to `MASCOT_DARK`.
+
+Nothing in either source lands between the two families — every body colour has a spread of
+222 or more, every laptop colour 12 or less — so `TYPING_CHROMA_MIN` has a wide berth.
+
+**The secondary tone is silhouette, not shading, which is why it gets the big step.** The
+source's own step is about 8% (red 222–248 against 252–255) against `MASCOT_DARK`'s 15%.
+Rendering it a little firmer than authored is deliberate: here the tone tells you the back
+from the front and one arm from the other, and the panel compresses differences at the dark
+end. Flattening both tones to `MASCOT`, as the first version did, made the seated figure
+read as one orange slab.
 
 **The background band flattens a genuine dither, not noise to be cleaned up.** The source
 tiles a two-tone checkerboard — an achromatic family (`(0,0,0)`/`(1,1,1)`/`(3,3,3)`)
@@ -148,8 +177,9 @@ background instead.
 
 `_sitting_anchor()` is frame 0 of the recoloured `work-typing.gif` import — the
 `sitting`-pose anchor, in the shape `_standing_anchor()`/`_dozing_anchor()` already are —
-and `_desk_sprite()` lifts every `LAPTOP_GREY` pixel back out of it into its own sprite so
-the sit edges can slide the desk independently of the figure, now that there is no second,
+and `_desk_sprite()` lifts every `LAPTOP_GREY` pixel, plus the `PROP` logo painted on the
+lid, back out of it into its own sprite so the sit edges can slide the desk independently
+of the figure, now that there is no second,
 drawn laptop shape to move instead. See [[Animation Catalogue]]'s `sitting` section for the
 full account of why this pose is imported rather than drawn, and what it cost in return
 (the sit edges' pop, a known gap there).

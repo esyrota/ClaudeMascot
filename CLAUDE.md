@@ -56,9 +56,10 @@ line adding there by hand; the third command above keeps the existing images hon
   `NSBluetoothAlwaysUsageDescription` can be the responsible process, so BLE can never
   be tested from the Bash tool, a hook, or an MCP server — only by launching the built
   `.app`. See `Docs/Reference/macOS Bluetooth TCC.md`.
-- **The panel mangles colours whose brightest channel is under 255.** You cannot darken
-  the art by dimming channels; deepen the hue instead. See
-  `Docs/Reference/Panel Quirks.md`.
+- **The panel over-drives low channel values, worst of all on blue.** Warm colours must
+  end in `B = 0` — a body colour with `B = 4` photographed as *pink*. Darkening by
+  scaling channels is fine once blue is 0. See `Docs/Reference/Panel Quirks.md`, which
+  names the reference photo to check new colours against.
 
 When the panel misbehaves, read the logs before theorising:
 
