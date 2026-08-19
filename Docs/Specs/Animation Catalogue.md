@@ -36,9 +36,9 @@ once and every swap visibly jumps.
 **Every clip in the manifest satisfies it.** The last holdout was the flag wave that used
 to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
 four rows and conjured the flag in one frame, and it took a half-raised frame invented at
-each end to fix. The question mark that replaced it needs no such repair — see the
-`waiting` notes below for why an imported clip can get this for free and a drawn one
-cannot.
+each end to fix. The question mark that replaced it needs almost no such repair — its
+source opens *on* the anchor — see the `waiting` notes below for why hand-drawn art
+lands here nearly for free and assembled art has to be argued onto it.
 
 **A turned head must trim its far-side body edge — a constraint on new art, not a rule the
 shipped clips satisfy.** Any pose that turns the mascot to face the viewer should shift the
@@ -77,7 +77,7 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 |                                      |
 | ------------------------------------ |
 | ![waiting](_animations/waiting.gif)  |
-| **waiting** · 17f · 3.05s · w 1.0    |
+| **waiting** · 17f · 3.22s · w 1.0    |
 
 **done** — one.
 
@@ -144,12 +144,24 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   longest real wait in the logs was four hours, the median under two minutes), which is
   not long enough to wear out, so a second way of asking buys less than a first way that
   asks clearly.
-- **`waiting` satisfies the anchor contract for free, and that is a property of the
-  source.** It is imported whole from `art/sources/waiting-question.gif`, whose every
-  frame carries the standing anchor's own body pixels underneath — the raised arm only
-  *adds* to the silhouette, never moves it — so the clip is the standing mascot at every
-  frame and the two bare-anchor bookends are all it needs. The drawn flag wave had to
-  have a half-raised frame invented at each end to manage the same thing.
+- **`waiting` bounces, and the bounce keeps the floor line.** The mascot dips into a
+  crouch, springs up as the mark swells over its head, holds, and settles. The
+  silhouette travels five rows doing it and **all four feet stay welded to row 31 in
+  every one of the sixteen frames** — the rise is the torso stretching out of the
+  crouch, not the figure leaving the ground. This is the rule above satisfied by art
+  that had every excuse to break it, and it is why the clip reads as alive rather than
+  as a hop.
+- **`waiting` is the first clip to carry a shaded body outside `dancing`.** The source
+  shades its raised arm and the underside of the bounce; the shade is thin — eight
+  pixels at its peak — but it is what gives the raised arm an edge to be raised *in
+  front of*. **The source's own shade value is not shipped**, only the fact that a pixel
+  is shaded: it shades (255,109,36) to (200,91,35), a step so light the panel would
+  swallow it whole, so the import maps it to `MASCOT_DARK` — the step calibrated against
+  photographs. See [[Panel Quirks]].
+- **`waiting` satisfies the anchor contract almost for free.** The source's frame 0 *is*
+  the `standing` anchor, pixel for pixel, so the leading bookend is a hold rather than a
+  repair; only the last frame needs one, being a few pixels of the mark short. The drawn
+  flag wave it replaced had to have a half-raised frame invented at each end.
 - **`waiting` had never once played before the flag variants were drawn.** Its only
   trigger was the `Notification` hook, which fires zero times in this configuration; `AskUserQuestion`
   is what reaches the state now. The art was fine — it was unreachable. See

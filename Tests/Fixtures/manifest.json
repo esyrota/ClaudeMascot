@@ -195,10 +195,10 @@
     ]
   },
   "waiting": {
-    "gif_bytes": 3534,
-    "crc32": 1392621446,
+    "gif_bytes": 3556,
+    "crc32": 3154128094,
     "outer_chunks": 1,
-    "ble_packets": 7,
+    "ble_packets": 8,
     "packet_lengths": [
       509,
       509,
@@ -206,7 +206,8 @@
       509,
       509,
       509,
-      496
+      509,
+      9
     ]
   },
   "walk-in-left": {

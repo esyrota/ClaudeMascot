@@ -155,8 +155,8 @@
     "waiting": {
       "file": "waiting.gif",
       "frameCount": 17,
-      "durationMs": 3050,
-      "motionMs": 3050,
+      "durationMs": 3220,
+      "motionMs": 3220,
       "loops": true,
       "pose": "standing",
       "variantGroup": "waiting",

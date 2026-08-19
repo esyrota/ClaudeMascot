@@ -334,23 +334,28 @@ def thinking():
 # the state needs, and none of them said "I asked you something". This does: a question
 # mark grows out of the mascot's head while it lifts an arm toward it.
 #
-# Hand-drawn, and imported whole rather than redrawn, which is what makes the anchor
-# contract free here. Every one of the source's fifteen frames carries the standing
-# anchor's own body pixels underneath -- the raised arm only ADDS to the silhouette,
-# never moves it -- so the clip is already the standing mascot at every frame, and the
-# bookends below are the only thing needed to open and close on the bare anchor. (The
-# source's own first and last frames are a hair short of it: each still holds a few
-# pixels of the mark on its way in or out.)
+# Hand-drawn and imported whole. The mascot dips into a crouch, springs up as the mark
+# swells over its head, holds, and settles -- and the bounce is a body motion, not a
+# hop: **all four feet stay welded to row 31 in every one of the sixteen frames**, so
+# the clip keeps the floor line that is absolute at `standing`. The rise is the torso
+# stretching out of the crouch, which is why the silhouette can travel five rows
+# without a foot leaving the ground.
+#
+# The source's frame 0 IS `_standing_anchor()`, pixel for pixel, so the leading bookend
+# below is a hold rather than a repair -- PIL merges the two into one frame with their
+# durations summed. Its LAST frame is a few pixels of the mark short of the anchor,
+# which is what the trailing one is actually for.
 WAITING_QUESTION_SRC = SOURCES / "waiting-question.gif"
 # The source is authored at a flat 170ms and that rate is an intention, not a default
-# -- the mark's growth is paced by it -- so unlike `sleeping.gif` the timing is kept.
+# -- the bounce and the mark's growth are both paced by it -- so unlike `sleeping.gif`
+# the timing is kept.
 WAITING_ANCHOR_IN_MS = 200
 WAITING_ANCHOR_OUT_MS = 300
 
 
 def waiting():
-    """Waiting on the user: a question mark swells over the mascot's head."""
-    frames = imported(WAITING_QUESTION_SRC, _body_and_prop_recolour)
+    """Waiting on the user: bounces, and a question mark swells over its head."""
+    frames = imported(WAITING_QUESTION_SRC, _body_shade_prop_recolour)
     return ([(_standing_anchor(), WAITING_ANCHOR_IN_MS)]
             + frames
             + [(_standing_anchor(), WAITING_ANCHOR_OUT_MS)])
@@ -421,25 +426,50 @@ DOZE_TO_STAND_SRC = SOURCES / "doze-to-stand.gif"
 SLEEP_FRAME_MS = 500
 
 
-def _body_and_prop_recolour(rgb):
-    """Map a hand-drawn source's palette onto the panel's: body, prop, or background.
+# Where a shaded body pixel stops and a lit one starts, for the sources
+# `_body_shade_prop_recolour()` serves. It is NOT `BODY_MIN`, which does the same job
+# for appear.gif: these are different hands with different palettes, and this one
+# shades far more lightly. `waiting-question` shades (255,109,36) to (200,91,35) --
+# a step appear.gif would call body outright, since 200 clears BODY_MIN's 180. Set
+# from the measured gap rather than by feel: across all four sources every shaded
+# pixel has a value of 200 or less and every lit one 230 or more, so this sits in the
+# middle of a 30-wide hole with nothing in it.
+SHADED_BODY_MIN = 215
 
-    Used by every source authored as one orange family against black with a near-grey
-    prop over it -- the three dozing clips and `waiting-question` -- rather than by one
-    of them, because they all need the same two tests and neither test is about what
-    the clip depicts. The body is a single comparison, unlike appear.gif's three-way
-    split; there is no secondary tone and lids are simply background. What needs the
-    second test is the prop: `doze-to-stand`'s startle sparks and `waiting-question`'s
-    question mark are both authored near-white, and both are props like the bubbles,
-    not lit body pixels. Splitting on chroma keeps them white, the way
-    `_typing_recolour()` keeps the laptop logo white. The families are far apart in
-    both tests -- across all four sources every body colour has a chroma of 195 or more
-    and every prop 30 or less, every lit pixel is 230 or brighter and every dithered
-    background pixel 40 or darker -- so both thresholds have a wide berth.
+
+def _body_shade_prop_recolour(rgb):
+    """Map a hand-drawn source's palette onto the panel's: body, shade, prop, or background.
+
+    Used by every source authored as one orange family against black -- the three
+    dozing clips and `waiting-question` -- rather than by one of them, because they all
+    need the same tests and no test is about what the clip depicts. Three questions in
+    order:
+
+    Background is anything dark, lids included; the dozing sources draw shut eyes as
+    background rather than as a colour.
+
+    The prop is split off by CHROMA, not by value: `doze-to-stand`'s startle sparks and
+    `waiting-question`'s question mark are both authored near-white, and both are props
+    like the bubbles, not lit body pixels. This is the same test `_typing_recolour()`
+    uses to keep the laptop logo white.
+
+    What is left is body, and it splits by VALUE, which is what a shadow is a step in --
+    see `MASCOT_DARK`. Only `waiting-question` currently has a shaded pixel; the three
+    dozing clips are flat and simply never reach the lower tier. **The source's own
+    shade value is not shipped**, only the fact that a pixel is shaded: the panel
+    compresses the dark end far harder than any preview suggests, so a faithful step
+    would be invisible on it. `MASCOT_DARK` is the step calibrated against photographs.
+
+    Every threshold sits in a measured gap rather than on a guess -- across all four
+    sources every prop has a chroma of 30 or less and every body pixel 158 or more,
+    every lit pixel is 230 or brighter and every dithered background pixel 40 or
+    darker, and `SHADED_BODY_MIN` above covers the third.
     """
     if max(rgb) < SHADE_MIN:
         return BG
-    return PROP if max(rgb) - min(rgb) < TYPING_CHROMA_MIN else MASCOT
+    if max(rgb) - min(rgb) < TYPING_CHROMA_MIN:
+        return PROP
+    return MASCOT if max(rgb) >= SHADED_BODY_MIN else MASCOT_DARK
 
 
 def sleeping_frames():
@@ -451,7 +481,7 @@ def sleeping_frames():
     are what coalesce() would have summed, are not information being thrown away.
     """
     return [(im, SLEEP_FRAME_MS)
-            for im, _ in imported(SLEEPING_SRC, _body_and_prop_recolour)]
+            for im, _ in imported(SLEEPING_SRC, _body_shade_prop_recolour)]
 
 
 def _dozing_anchor() -> Image.Image:
@@ -534,7 +564,7 @@ def _doze_edge(src: Path) -> list:
     that is added is the long tail every transition ends on, so a hand-off arriving
     late shows a mascot standing (or sleeping) still rather than a restarted motion.
     """
-    frames = imported(src, _body_and_prop_recolour)
+    frames = imported(src, _body_shade_prop_recolour)
     frames[-1] = (frames[-1][0], APPEAR_TAIL_MS)
     return frames
 
