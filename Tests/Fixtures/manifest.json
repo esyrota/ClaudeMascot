@@ -90,18 +90,6 @@
       331
     ]
   },
-  "idle-alt": {
-    "gif_bytes": 1703,
-    "crc32": 3734782746,
-    "outer_chunks": 1,
-    "ble_packets": 4,
-    "packet_lengths": [
-      509,
-      509,
-      509,
-      192
-    ]
-  },
   "off": {
     "gif_bytes": 119,
     "crc32": 3889287003,
@@ -183,13 +171,13 @@
     ]
   },
   "thinking": {
-    "gif_bytes": 590,
-    "crc32": 221156456,
+    "gif_bytes": 967,
+    "crc32": 1129559788,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
       509,
-      97
+      474
     ]
   },
   "thinking-alt": {
@@ -206,59 +194,20 @@
       334
     ]
   },
-  "thinking-pace": {
-    "gif_bytes": 2795,
-    "crc32": 4155535568,
-    "outer_chunks": 1,
-    "ble_packets": 6,
-    "packet_lengths": [
-      509,
-      509,
-      509,
-      509,
-      509,
-      266
-    ]
-  },
   "waiting": {
-    "gif_bytes": 2519,
-    "crc32": 255324740,
+    "gif_bytes": 3556,
+    "crc32": 3154128094,
     "outer_chunks": 1,
-    "ble_packets": 5,
-    "packet_lengths": [
-      509,
-      509,
-      509,
-      509,
-      499
-    ]
-  },
-  "waiting-hop": {
-    "gif_bytes": 2670,
-    "crc32": 3184855327,
-    "outer_chunks": 1,
-    "ble_packets": 6,
+    "ble_packets": 8,
     "packet_lengths": [
       509,
       509,
       509,
       509,
       509,
-      141
-    ]
-  },
-  "waiting-semaphore": {
-    "gif_bytes": 2653,
-    "crc32": 2258940717,
-    "outer_chunks": 1,
-    "ble_packets": 6,
-    "packet_lengths": [
       509,
       509,
-      509,
-      509,
-      509,
-      124
+      9
     ]
   },
   "walk-in-left": {
