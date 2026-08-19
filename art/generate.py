@@ -280,232 +280,80 @@ def workout():
 
 
 def thinking():
-    """Thinking: standing still and breathing, focused on nothing visible.
+    """Thinking: standing still and breathing, one brow raised.
 
     The plainest clip in the manifest, on purpose. Thinking is mostly *not* visible
     from outside, and a mascot that always performs its thinking has nothing left to
     say when the thought is a hard one. Slower than idle()'s breath -- 600ms a frame
     against 320 -- so held stillness reads as concentration rather than as idle with
     the label changed.
+
+    The one thing it does perform is a raised brow: the left eye goes up a pixel and
+    stays there for the body of the clip, the same asymmetry `thinking_alt()` opens
+    with on the right eye and the only expression this face can carry. It is enough
+    to separate the clip from `idle` standing still, and it costs no silhouette.
+    `mascot()` has no per-eye offset -- nothing else needs one -- so the eye is
+    painted over in body colour and redrawn a row higher.
+
+    The lift is off on the first and last frames, not held throughout: those two are
+    the bare `standing` anchor, and the anchor contract every standing loop keeps is
+    pixel-identical, brow included.
     """
     out = []
-    for breath in (0, 0, 1, 1, 0, 0):
+    # (torso squash, eye lift). Anchor, brow up, breathe, brow down, anchor.
+    for breath, lift in ((0, 0), (0, 1), (1, 1), (1, 1), (0, 1), (0, 0)):
         im = frame()
         d = ImageDraw.Draw(im)
         mascot(d, HOME_Y, squash=breath)
+        if lift:
+            eye_y = HOME_Y + breath + EYE_TOP
+            rect(d, EYE_XS[0], eye_y, EYE_W, EYE_H, MASCOT)      # erase the drawn eye
+            rect(d, EYE_XS[0], eye_y - lift, EYE_W, EYE_H, EYE)  # and lift it
         out.append((im, 600))
     return out
 
 
-# Pacing: one lap is off the right edge and back in from the left, which on a panel
-# with no middle distance is what walking in circles looks like. Two laps ship in the
-# clip rather than one because the clip loops: a single lap would repeat on a perfect
-# metronome, and the two home pauses below differ so it does not.
-PACE_LAPS = 2
-# The exits and entrances are written for pose changes and dwell 2.5s offscreen,
-# which would read as leaving rather than pacing. Offscreen is a beat here, not a
-# destination.
-PACE_OFFSCREEN_MS = 200
-PACE_HOME_MS = (700, 1100)
+# `thinking_pace` used to live here: two laps off the right edge and back in from the
+# left, spliced out of the walk transitions. It is retired because it broke the
+# mascot's position. Every other clip in the `thinking` group is a standing loop that
+# never leaves the panel, so the choreographer can swap out of one at any frame; this
+# one spent most of its length offscreen or halfway through a doorway, and a swap
+# landing there had a mascot that was somewhere else to account for. The pose graph
+# has walks for going places -- see the wander fidgets -- and a *loop* is the wrong
+# clip to spend them in.
 
 
-def thinking_pace():
-    """Thinking variant: paces off one side and back in the other, twice."""
-    out = []
-    for lap in range(PACE_LAPS):
-        away = walk_off_right()
-        # Trim the offscreen dwell to a beat.
-        away[-1] = (away[-1][0], PACE_OFFSCREEN_MS)
-        # Drop walk_in_left()'s own leading empty frame: the exit above just supplied
-        # one, and two in a row would only lengthen the pause it already sets.
-        back = walk_in_left()[1:]
-        back[-1] = (back[-1][0], PACE_HOME_MS[lap])  # a pause at home, then off again
-        out += away + back
-    return out
-
-
-# The half-raised frame that gets `waiting` onto the standing anchor. Every frame of
-# the wave itself has the arm at full lift with the flag already arcing overhead, so
-# the clip used to open and close mid-gesture: it was the last clip in the manifest
-# failing the anchor contract, and swapping into it snapped the arm up four rows and
-# conjured the flag in one frame. This is the arm halfway and the flag just clearing
-# the head -- one frame each side, which is all the contract needs.
-WAITING_RAISE_ARM = -2
-WAITING_RAISE_TIP = (24, 13)
-WAITING_RAISE_FLAG = 3  # a smaller flag than the wave's 4x4: it is still unfurling
-
-
-def _flag_frame(tip_x, tip_y, arm_lift, flag_size, *, squash=0, legs=(0, 0, 0, 0), hop=0):
-    """The mascot with one arm up and a flag on a pole running out to (tip_x, tip_y).
-
-    `hop` lifts the finished frame off the floor line, for `waiting_hop()`. It is a
-    paste rather than a smaller `HOME_Y` because the flag has to travel with the
-    figure: drawing the mascot higher would leave the pole anchored to a hand that
-    had moved and the flag where it was.
-    """
-    im = frame()
-    d = ImageDraw.Draw(im)
-    mascot(d, HOME_Y, arms=(0, arm_lift), squash=squash, legs=legs)
-    hand_x = TORSO_X + TORSO_W + ARM_W // 2
-    hand_y = HOME_Y + squash + ARM_TOP + arm_lift + ARM_H // 2
-    d.line([hand_x, hand_y, tip_x, tip_y], fill=PROP)
-    rect(d, tip_x - flag_size, tip_y, flag_size, flag_size, PROP)
-    if not hop:
-        return im
-    lifted = frame()
-    lifted.paste(im, (0, -hop))
-    return lifted
+# `waiting` means Claude is asking the *user* for something, so it is the one state
+# whose whole job is to be noticed from across a room -- and, now that it is reachable
+# at all (`AskUserQuestion` is its trigger; see `EventPolicy.userBlockingTools` and
+# [[Claude Code Plugin]]), to say *what* it wants while it is being noticed.
+#
+# It used to be a flag wave with two variants built around the same flag -- one hopping
+# off the floor line, one waving a second flag in counter-phase. All three are retired.
+# A flag says "look at me" and nothing more; three ways of saying that is two more than
+# the state needs, and none of them said "I asked you something". This does: a question
+# mark grows out of the mascot's head while it lifts an arm toward it.
+#
+# Hand-drawn, and imported whole rather than redrawn, which is what makes the anchor
+# contract free here. Every one of the source's fifteen frames carries the standing
+# anchor's own body pixels underneath -- the raised arm only ADDS to the silhouette,
+# never moves it -- so the clip is already the standing mascot at every frame, and the
+# bookends below are the only thing needed to open and close on the bare anchor. (The
+# source's own first and last frames are a hair short of it: each still holds a few
+# pixels of the mark on its way in or out.)
+WAITING_QUESTION_SRC = SOURCES / "waiting-question.gif"
+# The source is authored at a flat 170ms and that rate is an intention, not a default
+# -- the mark's growth is paced by it -- so unlike `sleeping.gif` the timing is kept.
+WAITING_ANCHOR_IN_MS = 200
+WAITING_ANCHOR_OUT_MS = 300
 
 
 def waiting():
-    """Flag Waver: raises a flag, waves it over one shoulder, lowers it again."""
-    # The arm sits at full lift through the wave (MAX_ARM_LIFT keeps it joined to the
-    # torso); the wave is carried entirely by the flag arcing over its head.
-    arc = [(20, 10), (22, 7), (24, 4), (25, 2), (24, 4), (22, 7), (20, 10), (21, 9)]
-    raise_frame = _flag_frame(*WAITING_RAISE_TIP, WAITING_RAISE_ARM, WAITING_RAISE_FLAG)
-    out = [(_standing_anchor(), 200), (raise_frame, 120)]
-    for tip_x, tip_y in arc:
-        out.append((_flag_frame(tip_x, tip_y, MAX_ARM_LIFT, 4), 140))
-    out.append((raise_frame.copy(), 120))
-    out.append((_standing_anchor(), 300))
-    return out
-
-
-# --- waiting variants -------------------------------------------------------
-#
-# `waiting` means Claude is asking the *user* for something, so it is the one state
-# whose whole job is to be noticed from across a room. It shipped as a single clip for
-# a long time, which was gap 6 in [[Animation Catalogue]] -- and academic besides,
-# because the state was unreachable until `AskUserQuestion` became its trigger (see
-# `EventPolicy.userBlockingTools`). Now that the wave actually plays, two variants
-# join it, and both are built for peripheral vision rather than for detail:
-#
-#   waiting-hop        the same wave, off the floor -- the whole 24x16 silhouette
-#                      moves, and movement of the whole figure is what catches an
-#                      eye that is not pointed at the panel
-#   waiting-semaphore  two flags in counter-phase, sweeping the entire top half
-#
-# Both keep the base clip's flag, so the three read as one mascot doing one thing
-# three ways rather than as three unrelated states.
-
-# The hop's arc is lower than `waiting()`'s. At the apex the whole frame is pasted
-# HOP_PEAK rows up, and the wave's own tip at row 2 would take the flag's top row off
-# the panel; starting from row 6 keeps it on.
-HOP_PEAK = 4
-WAITING_HOP_CYCLE = [
-    # (hop, tip, squash, leg tuck)
-    (0, (21, 11), 1, 0),  # crouch
-    (2, (23, 8), 0, 1),
-    (HOP_PEAK, (25, 6), 0, 2),  # apex, legs tucked
-    (HOP_PEAK, (25, 6), 0, 2),
-    (2, (23, 8), 0, 1),
-    (0, (21, 11), 1, 0),  # land
-]
-WAITING_HOP_MS = 120
-WAITING_HOPS = 2
-
-
-def waiting_hop():
-    """Waiting variant: the flag wave with the mascot hopping on the spot."""
-    out = [(_standing_anchor(), 200)]
-    raise_frame = _flag_frame(*WAITING_RAISE_TIP, WAITING_RAISE_ARM, WAITING_RAISE_FLAG)
-    out.append((raise_frame, 120))
-    for _ in range(WAITING_HOPS):
-        for hop, tip, squash, tuck in WAITING_HOP_CYCLE:
-            out.append(
-                (
-                    _flag_frame(
-                        *tip,
-                        MAX_ARM_LIFT,
-                        4,
-                        squash=squash,
-                        legs=(tuck,) * 4,
-                        hop=hop,
-                    ),
-                    WAITING_HOP_MS,
-                )
-            )
-    out.append((raise_frame.copy(), 120))
-    out.append((_standing_anchor(), 300))
-    return out
-
-
-# The right flag's tip path, one full swing and back. The left flag mirrors it in
-# both axes -- `_mirror_tip()` below -- so the two are always in counter-phase, which
-# is what makes the pair read as semaphore rather than as arm-waving.
-SEMAPHORE_ARC = [(25, 2), (27, 5), (29, 8), (27, 5)]
-SEMAPHORE_SWINGS = 2
-SEMAPHORE_MS = 160
-SEMAPHORE_FLAG = 3  # smaller than the single wave's 4x4: two flags, same ink budget
-# The half-raised bookend, symmetric where `waiting()`'s is one-sided.
-SEMAPHORE_RAISE_ARM = -2
-SEMAPHORE_RAISE_TIP = (24, 13)
-SEMAPHORE_RAISE_FLAG = 2
-
-
-SEMAPHORE_ARC_TOP, SEMAPHORE_ARC_BOTTOM = 2, 8
-
-
-def _mirror_x(tip):
-    """The same tip on the other side of the panel, at the same height."""
-    x, y = tip
-    return (SIZE - 1 - x, y)
-
-
-def _counter_tip(tip):
-    """The opposite flag's tip during the sweep: mirrored *and* half a swing behind.
-
-    Inverting y within `SEMAPHORE_ARC`'s own top..bottom range is what puts the two
-    flags in counter-phase -- the left one is at the bottom of its sweep exactly when
-    the right one is at the top. It is only meaningful for tips that lie inside that
-    range, which is why the half-raised bookend uses `_mirror_x` instead: it sits
-    below the arc, and inverting it sent the left pole off the top of the panel.
-    """
-    x, y = tip
-    return (SIZE - 1 - x, SEMAPHORE_ARC_TOP + SEMAPHORE_ARC_BOTTOM - y)
-
-
-def _semaphore_frame(right_tip, left_tip, arm_lift, flag_size):
-    """The mascot with both arms up and a flag on a pole in each hand."""
-    im = frame()
-    d = ImageDraw.Draw(im)
-    mascot(d, HOME_Y, arms=(arm_lift, arm_lift))
-    hand_y = HOME_Y + ARM_TOP + arm_lift + ARM_H // 2
-    right_x = TORSO_X + TORSO_W + ARM_W // 2
-    left_x = TORSO_X - ARM_W + ARM_W // 2
-    # Each flag hangs inboard of its own tip, so neither runs off the panel edge the
-    # pole is reaching toward.
-    for hand_x, (tip_x, tip_y), flag_x in (
-        (right_x, right_tip, right_tip[0] - flag_size),
-        (left_x, left_tip, left_tip[0]),
-    ):
-        d.line([hand_x, hand_y, tip_x, tip_y], fill=PROP)
-        rect(d, flag_x, tip_y, flag_size, flag_size, PROP)
-    return im
-
-
-def waiting_semaphore():
-    """Waiting variant: two flags sweeping the top half in counter-phase."""
-    raise_frame = _semaphore_frame(
-        SEMAPHORE_RAISE_TIP,
-        _mirror_x(SEMAPHORE_RAISE_TIP),
-        SEMAPHORE_RAISE_ARM,
-        SEMAPHORE_RAISE_FLAG,
-    )
-    out = [(_standing_anchor(), 200), (raise_frame, 120)]
-    for _ in range(SEMAPHORE_SWINGS):
-        for tip in SEMAPHORE_ARC:
-            out.append(
-                (
-                    _semaphore_frame(
-                        tip, _counter_tip(tip), MAX_ARM_LIFT, SEMAPHORE_FLAG
-                    ),
-                    SEMAPHORE_MS,
-                )
-            )
-    out.append((raise_frame.copy(), 120))
-    out.append((_standing_anchor(), 300))
-    return out
+    """Waiting on the user: a question mark swells over the mascot's head."""
+    frames = imported(WAITING_QUESTION_SRC, _body_and_prop_recolour)
+    return ([(_standing_anchor(), WAITING_ANCHOR_IN_MS)]
+            + frames
+            + [(_standing_anchor(), WAITING_ANCHOR_OUT_MS)])
 
 
 # Where the celebration's props go, as offsets into the celebration (see
@@ -573,18 +421,21 @@ DOZE_TO_STAND_SRC = SOURCES / "doze-to-stand.gif"
 SLEEP_FRAME_MS = 500
 
 
-def _doze_recolour(rgb):
-    """Map the dozing sources' palette onto the panel's.
+def _body_and_prop_recolour(rgb):
+    """Map a hand-drawn source's palette onto the panel's: body, prop, or background.
 
-    All three carry one orange family against black -- no secondary tone, and the lids
-    are simply background -- so the body is one comparison rather than appear.gif's
-    three-way split. What needs a second test is `doze-to-stand`'s startle sparks,
-    authored near-white: they are a prop, like the bubbles and the flag, not a lit body
-    pixel. Splitting on chroma keeps them white, the way `_typing_recolour()` keeps the
-    laptop logo white. The families are far apart in both tests -- every body colour
-    has a chroma of 195 or more and every spark 13 or less, every lit pixel is 230 or
-    brighter and every dithered background pixel 40 or darker -- so both thresholds
-    have a wide berth.
+    Used by every source authored as one orange family against black with a near-grey
+    prop over it -- the three dozing clips and `waiting-question` -- rather than by one
+    of them, because they all need the same two tests and neither test is about what
+    the clip depicts. The body is a single comparison, unlike appear.gif's three-way
+    split; there is no secondary tone and lids are simply background. What needs the
+    second test is the prop: `doze-to-stand`'s startle sparks and `waiting-question`'s
+    question mark are both authored near-white, and both are props like the bubbles,
+    not lit body pixels. Splitting on chroma keeps them white, the way
+    `_typing_recolour()` keeps the laptop logo white. The families are far apart in
+    both tests -- across all four sources every body colour has a chroma of 195 or more
+    and every prop 30 or less, every lit pixel is 230 or brighter and every dithered
+    background pixel 40 or darker -- so both thresholds have a wide berth.
     """
     if max(rgb) < SHADE_MIN:
         return BG
@@ -600,7 +451,7 @@ def sleeping_frames():
     are what coalesce() would have summed, are not information being thrown away.
     """
     return [(im, SLEEP_FRAME_MS)
-            for im, _ in imported(SLEEPING_SRC, _doze_recolour)]
+            for im, _ in imported(SLEEPING_SRC, _body_and_prop_recolour)]
 
 
 def _dozing_anchor() -> Image.Image:
@@ -683,7 +534,7 @@ def _doze_edge(src: Path) -> list:
     that is added is the long tail every transition ends on, so a hand-off arriving
     late shows a mascot standing (or sleeping) still rather than a restarted motion.
     """
-    frames = imported(src, _doze_recolour)
+    frames = imported(src, _body_and_prop_recolour)
     frames[-1] = (frames[-1][0], APPEAR_TAIL_MS)
     return frames
 
@@ -710,22 +561,13 @@ def doze_to_stand():
 # contract as the states and transitions above.
 # --------------------------------------------------------------------------
 
-def idle_alt():
-    """Idle variant: a slower, lazier breathing cycle with a gentle weight shift."""
-    out = []
-    # (breath, dx, blink) -- a longer cycle than idle()'s, and a slight side-to-side
-    # lean instead of a pure vertical bob, so it reads as a different mood rather
-    # than a repeat of the same breath. `breath` is a torso squash, not a lift, for
-    # the same reason as idle(): the feet stay welded to the panel's bottom row.
-    frames = [(0, 0, False), (0, 1, False), (1, 1, False), (1, 1, False),
-              (1, 0, False), (0, 0, False), (0, -1, False), (1, -1, False),
-              (1, -1, False), (1, 0, True), (0, 0, False), (0, 0, False)]
-    for breath, dx, blink in frames:
-        im = frame()
-        d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y, dx=dx, squash=breath, blink=blink)
-        out.append((im, 380))
-    return out
+# `idle_alt` used to live here: idle()'s breath at half speed with a one-pixel lean
+# left and right underneath it. It is retired because the lean was the only thing
+# distinguishing it and the lean did not work -- a 24px figure sliding a pixel
+# sideways on a 32px panel reads as the whole mascot drifting, not as it shifting its
+# weight, and there is no middle distance here for a shift that small to land in. The
+# group keeps `idle`, `dancing` and `workout`, which is variety enough; a replacement
+# should do something (play with a ball, say) rather than do idle more slowly.
 
 
 def fidget_stretch():
@@ -1695,12 +1537,10 @@ def off():
 STATES = {
     "starting": appear,
     "idle": idle,
-    "idle-alt": idle_alt,
     "dancing": dancing,
     "sleeping": sleeping,
     "thinking": thinking,
     "thinking-alt": thinking_alt,
-    "thinking-pace": thinking_pace,
     "workout": workout,
     "working": working,
     "stand-to-sit": stand_to_sit,
@@ -1711,8 +1551,6 @@ STATES = {
     "work-think": work_think,
     "work-look-down": work_look_down,
     "waiting": waiting,
-    "waiting-hop": waiting_hop,
-    "waiting-semaphore": waiting_semaphore,
     "done": done,
     "done-enter": done_enter,
     "fidget-stretch": fidget_stretch,
@@ -1750,14 +1588,6 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 1.0,
     },
-    "idle-alt": {
-        # Same variantGroup as "idle" -- that is what makes this a variant rather
-        # than a new state -- at a lower weight so plain idle stays the common sight.
-        "loops": True,
-        "pose": "standing",
-        "variantGroup": "idle",
-        "weight": 0.4,
-    },
     "dancing": {
         # A fourth "idle" variant: appear.gif's own second half, which used to be
         # stranded at the tail of the entrance where it played once a session. It is
@@ -1776,12 +1606,6 @@ CLIP_METADATA = {
         "variantGroup": "thinking",
         "weight": 1.0,
     },
-    "thinking-pace": {
-        "loops": True,
-        "pose": "standing",
-        "variantGroup": "thinking",
-        "weight": 0.5,
-    },
     "workout": {
         # Was the "thinking" clip until "thinking" stopped meaning "do something
         # strenuous". An idle variant now -- see workout()'s docstring.
@@ -1799,23 +1623,8 @@ CLIP_METADATA = {
         "weight": 0.5,
     },
     "waiting": {
-        "loops": True,
-        "pose": "standing",
-        "variantGroup": "waiting",
-        "weight": 1.0,
-    },
-    "waiting-hop": {
-        # Same variantGroup as "waiting" -- see the block above waiting_hop().
-        # Weighted level with the base clip rather than below it, unlike the idle
-        # and thinking variants: those exist so a state on screen for hours does
-        # not become wallpaper, whereas every waiting clip is on screen for a
-        # minute at most and all three are trying equally hard to be seen.
-        "loops": True,
-        "pose": "standing",
-        "variantGroup": "waiting",
-        "weight": 1.0,
-    },
-    "waiting-semaphore": {
+        # The only clip in its group. The flag wave and its two variants are retired
+        # in favour of one that states the question -- see the block above waiting().
         "loops": True,
         "pose": "standing",
         "variantGroup": "waiting",

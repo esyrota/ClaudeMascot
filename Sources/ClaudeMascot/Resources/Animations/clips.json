@@ -67,16 +67,6 @@
       "variantGroup": "idle",
       "weight": 1.0
     },
-    "idle-alt": {
-      "file": "idle-alt.gif",
-      "frameCount": 9,
-      "durationMs": 4560,
-      "motionMs": 4560,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "idle",
-      "weight": 0.4
-    },
     "off": {
       "file": "off.gif",
       "frameCount": 1,
@@ -144,7 +134,7 @@
     },
     "thinking": {
       "file": "thinking.gif",
-      "frameCount": 3,
+      "frameCount": 5,
       "durationMs": 3600,
       "motionMs": 3600,
       "loops": true,
@@ -162,41 +152,11 @@
       "variantGroup": "thinking",
       "weight": 0.5
     },
-    "thinking-pace": {
-      "file": "thinking-pace.gif",
-      "frameCount": 17,
-      "durationMs": 4720,
-      "motionMs": 4720,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "thinking",
-      "weight": 0.5
-    },
     "waiting": {
       "file": "waiting.gif",
-      "frameCount": 12,
-      "durationMs": 1860,
-      "motionMs": 1860,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "waiting",
-      "weight": 1.0
-    },
-    "waiting-hop": {
-      "file": "waiting-hop.gif",
-      "frameCount": 13,
-      "durationMs": 2180,
-      "motionMs": 2180,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "waiting",
-      "weight": 1.0
-    },
-    "waiting-semaphore": {
-      "file": "waiting-semaphore.gif",
-      "frameCount": 12,
-      "durationMs": 2020,
-      "motionMs": 2020,
+      "frameCount": 17,
+      "durationMs": 3050,
+      "motionMs": 3050,
       "loops": true,
       "pose": "standing",
       "variantGroup": "waiting",
