@@ -418,6 +418,13 @@ same numbers.
 | ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif) |
 | **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **done-enter**<br>standing, 15f · motion 2.45s |
 
+|                                   |
+| --------------------------------- |
+| ![wave-off](_animations/wave-off.gif) |
+| **wave-off**<br>standing → standing, non-looping, `fidgetGroup: "away"` |
+
+`wave-off` fires on system sleep to wave goodbye before walking off. It declares `fidgetGroup: "away"` to keep `Choreographer.selectFidget` from drawing it as a random idle beat. The art is currently `dancing`'s frames pending a hand-drawn replacement.
+
 #### The wander fidgets
 
 |                                                                       |                                                                       |                                                       |
