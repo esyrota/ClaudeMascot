@@ -48,21 +48,30 @@ private final class MockPanel: PanelDriving {
 
   private(set) var calls: [Call] = []
   var failuresRemaining = 0
+  /// When set, only `upload` draws from `failuresRemaining` -- `setPower`
+  /// and `setBrightness` always succeed. Used by the departure-deadline
+  /// test, which needs the walk-off upload to fail indefinitely while still
+  /// proving the panel can be cut dark once the departure gives up on it.
+  var failUploadsOnly = false
 
   func setPower(on: Bool) async throws {
-    try record(.setPower(on))
+    calls.append(.setPower(on))
+    guard !failUploadsOnly else { return }
+    try consumeFailure()
   }
 
   func setBrightness(_ percent: Int) async throws {
-    try record(.setBrightness(percent))
+    calls.append(.setBrightness(percent))
+    guard !failUploadsOnly else { return }
+    try consumeFailure()
   }
 
   func upload(_ clip: Clip) async throws {
-    try record(.upload(clip))
+    calls.append(.upload(clip))
+    try consumeFailure()
   }
 
-  private func record(_ call: Call) throws {
-    calls.append(call)
+  private func consumeFailure() throws {
     if failuresRemaining > 0 {
       failuresRemaining -= 1
       throw MockError.failed
@@ -84,7 +93,9 @@ private final class MockPanel: PanelDriving {
 /// never interferes with tests that are really about `PanelTimings.startingHold`,
 /// not about clip boundary scheduling.
 @MainActor
-private func testClip(_ state: PanelState, loops: Bool = true, duration: TimeInterval = 1, motion: TimeInterval? = nil)
+private func testClip(
+  _ state: PanelState, loops: Bool = true, duration: TimeInterval = 1, motion: TimeInterval? = nil
+)
   -> Clip
 {
   Clip(
@@ -131,19 +142,43 @@ private let defaultTestClips: [PanelState: Clip] = {
   return clips
 }()
 
+/// The `wave-off` placeholder `depart` looks up by id, independent of
+/// `PanelState` -- see `PanelController.clipByID`. `motion: 1` matches the
+/// boundary a non-looping self-edge hands off at, so tests that advance the
+/// fake clock by the clip's own `motion` land exactly on the next seam.
+@MainActor
+private let waveOffClip = Clip(
+  id: "wave-off",
+  file: "wave-off.gif",
+  frameCount: 1,
+  duration: 1,
+  motion: 1,
+  loops: false,
+  pose: nil,
+  variantGroup: nil,
+  fidgetGroup: "away",
+  weight: 1,
+  fromPose: .standing,
+  toPose: .standing
+)
+
 @MainActor
 private func makeController(
   panel: MockPanel,
   timings: PanelTimings = PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600),
   clock: FakeClock,
+  clipByID: @escaping (String) -> Clip? = { _ in nil },
+  sleeper: @escaping (TimeInterval) async -> Void = { _ in },
   resolve: @escaping (PanelState, Clip?) -> Clip? = { state, _ in defaultTestClips[state] }
 ) -> PanelController {
   PanelController(
     panel: panel,
     resolve: resolve,
+    clipByID: clipByID,
     timings: timings,
     brightness: { 40 },
-    clock: { clock() }
+    clock: { clock() },
+    sleeper: sleeper
   )
 }
 
@@ -379,7 +414,9 @@ func sessionStartOnAVisibleMascotDoesNotReplayTheEntrance() async {
   clock.advance(5)
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.idle.rawValue)
-  #expect(panel.calls.contains(.upload(testClip(.starting, loops: false, duration: 6, motion: 0))) == false)
+  #expect(
+    panel.calls.contains(.upload(testClip(.starting, loops: false, duration: 6, motion: 0)))
+      == false)
 }
 
 @Test @MainActor
@@ -572,7 +609,8 @@ func nonLoopingClipHandsOffAtMotionNotDuration() async {
 
   clock.advance(1)  // total 3s: `motion` elapsed, `duration` (10) nowhere close
   await controller.tick()
-  #expect(controller.displayed?.id == PanelState.working.rawValue)  // hands off at motion, not duration
+  // Hands off at motion, not duration.
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
 }
 
 @Test @MainActor
@@ -665,4 +703,127 @@ func swapDoesNotLandBeforeTheLoopCompletes() async {
   await controller.tick()
   #expect(controller.displayed?.id == PanelState.thinking.rawValue)
   #expect(panel.uploadCount == 1)
+}
+
+// MARK: - Departure
+
+@Test @MainActor
+func departureWithWaveUploadsWaveThenWalksOffThenPowersOff() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel, clock: clock,
+    clipByID: { $0 == "wave-off" ? waveOffClip : nil },
+    sleeper: { clock.advance($0) })
+
+  await controller.tick()  // initial idle upload: standing, wave-eligible
+  #expect(controller.displayed?.id == PanelState.idle.rawValue)
+
+  await controller.depart(withWave: true, deadline: clock() + 100)
+
+  #expect(controller.isPanelOff == true)
+  #expect(
+    panel.calls == [
+      .upload(testClip(.idle)),
+      .upload(waveOffClip),
+      .upload(defaultTestClips[.away]!),
+      .setPower(false),
+    ])
+}
+
+@Test @MainActor
+func departureWithoutWaveSkipsItButStillWalksOff() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel, clock: clock,
+    clipByID: { $0 == "wave-off" ? waveOffClip : nil },
+    sleeper: { clock.advance($0) })
+
+  await controller.tick()  // initial idle upload: standing
+
+  await controller.depart(withWave: false, deadline: clock() + 100)
+
+  #expect(controller.isPanelOff == true)
+  #expect(panel.calls.contains(.upload(waveOffClip)) == false)
+  #expect(panel.calls.contains(.upload(defaultTestClips[.away]!)))
+  #expect(panel.calls.last == .setPower(false))
+}
+
+@Test @MainActor
+func departureWithWaveRequestedFromSittingSkipsTheWave() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel, clock: clock,
+    clipByID: { $0 == "wave-off" ? waveOffClip : nil },
+    sleeper: { clock.advance($0) })
+
+  controller.handle(.working)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.working.rawValue)  // sitting
+
+  // `wave-off` is a standing gesture: asked for anyway from a sitting pose,
+  // it must be skipped rather than played out of pose -- the departure
+  // still has to complete either way.
+  await controller.depart(withWave: true, deadline: clock() + 100)
+
+  #expect(controller.isPanelOff == true)
+  #expect(panel.calls.contains(.upload(waveOffClip)) == false)
+}
+
+@Test @MainActor
+func departureWithNoWavePlaceholderSkipsItCleanly() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  // `clipByID` never resolves `wave-off` -- the placeholder-free path any
+  // build without the art (or a lookup failure) has to degrade through.
+  let controller = makeController(panel: panel, clock: clock, sleeper: { clock.advance($0) })
+
+  await controller.tick()  // initial idle upload: standing
+
+  await controller.depart(withWave: true, deadline: clock() + 100)
+
+  #expect(controller.isPanelOff == true)
+  #expect(panel.calls.contains(.upload(waveOffClip)) == false)
+  #expect(panel.calls.contains(.upload(defaultTestClips[.away]!)))
+}
+
+@Test @MainActor
+func departureOnAnAlreadyOffPanelMakesNoPanelCalls() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock, sleeper: { clock.advance($0) })
+
+  // Nothing was ever displayed, so `.off` cuts power on the very first tick
+  // -- a departure request that arrives afterwards has no one left to walk.
+  controller.handle(.off)
+  await controller.tick()
+  #expect(controller.isPanelOff == true)
+
+  let callsBeforeDepart = panel.calls.count
+  await controller.depart(withWave: true, deadline: clock() + 100)
+
+  #expect(panel.calls.count == callsBeforeDepart)
+}
+
+@Test @MainActor
+func departureReturnsOnceThePanelGoesOffDespiteEveryWalkOffUploadFailing() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock, sleeper: { clock.advance($0) })
+
+  await controller.tick()  // initial idle upload: standing
+  // The walk-off upload never lands, so the only way out is the departure's
+  // own `leaveBy` backstop -- which still has to reach a dark panel, not
+  // hang forever waiting for an upload that will never succeed.
+  panel.failuresRemaining = .max
+  panel.failUploadsOnly = true
+
+  await controller.depart(withWave: false, deadline: clock() + 1_000)
+
+  #expect(controller.isPanelOff == true)
+  #expect(
+    panel.uploadCount > 1, "the walk-off upload must have been retried, not given up on early")
+  #expect(panel.calls.last == .setPower(false))
 }

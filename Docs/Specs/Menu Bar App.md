@@ -17,14 +17,14 @@ To survive a crash, the app unlinks any socket file at startup before binding �
 
 ## One instance only
 
-`SingleInstance.swift`, called from `ClaudeMascotApp.init()` before `AppModel` is built, terminates any other running copy of the bundle and waits for it to exit.
+`SingleInstance.swift`, called from `ClaudeMascotApp.init()` before `AppModel` is built, force-terminates any other running copy of the bundle.
 
 Two copies are actively harmful, not merely redundant, because **both external resources are single-owner**:
 
 - the panel accepts one BLE connection, so two clients steal it from each other and each steal fires the loser's reconnect path — the panel sits dark while both menu bar items read `disconnected`
 - the unlink-then-bind above means a second launch silently takes the hook socket from the first
 
-Newest-wins, rather than "second launch quits": the newer process wins the socket regardless, and during development the freshly built copy is the one worth keeping. A polite quit first, `SIGKILL` after 2s.
+Newest-wins, rather than "second launch quits": the newer process wins the socket regardless, and during development the freshly built copy is the one worth keeping. A graceful 2s AppleEvent wait would block the departing mascot mid-walk and delay every reinstall; force-termination is safe because `HookServer.start()` unlinks stale sockets and BLE drops on process death.
 
 It only sees copies LaunchServices knows about, i.e. launched as `.app` bundles. A bare `swift run` binary is invisible to it and can still collide.
 
@@ -111,6 +111,9 @@ Both are always on, size-capped, and rotated; tool input is never logged, matchi
 - Idle escalation is physical: `idle` → nod off (`stand-to-doze`) → `sleeping` → wake up (`doze-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**. The timings come from settings: default 5m to sleeping, 10m to off.
 - **The panel never goes dark under a mascot that is still standing on it.** Every route to off targets `away` first and cuts power only once the mascot has left; the panel blinking out from wherever it stood read as the hardware failing rather than as the mascot going away. The walk itself is boundary-gated like any other swap — starting it mid-loop would break the anchor contract — but the power cut is not, so it lands on the tick that notices.
 - `off` (`SessionEnd`) skips the idle *timers*, not the departure: it walks off at the next seam rather than waiting out `offAfter`.
+- **The mascot leaves before system sleep and before the app quits**, via held APIs that block the OS until the departure is done. Sleep holds for a maximum of **8s** (via IOKit's `IOAllowPowerChange`), quit/restart/shutdown hold for a maximum of **2.5s** (via `applicationShouldTerminate` returning `.terminateLater`), and both always release the hold on every path — success, error, or timeout. **Sleep adds a wave-on-departure**, a one-shot goodbye from `standing`; **quit walks off without waving**. Nothing connected means no hold at all — holding a Mac awake for 8s to animate a panel that is not there would be the kind of thing blamed on the OS. **Hitting either deadline cuts power** rather than stranding the mascot mid-walk; the existing `departureExpired` path handles it.
+- **The quit half is not live yet.** `AppModel` installs `onTerminate` by casting `NSApp.delegate`, and at its init the `@NSApplicationDelegateAdaptor`'s delegate is not on `NSApp` yet, so the cast fails and the closure is never installed — the log line `NSApp.delegate is not AppDelegate` is emitted on every launch. Sleep works; Cmd-Q, restart and shutdown still leave the mascot where he stands. The fix is a `static weak var shared` on `AppDelegate` set in its own `init`, replacing the cast and the timing assumption with it.
+- **Display sleep, screen lock and the screensaver do not take the mascot away** — only whole-machine sleep does, signalled via IOKit's `kIOMessageSystemWillSleep` which fires only when the *machine* sleeps, never on display-only sleep or lock. This is worth stating explicitly because `NSWorkspace.screensDidSleepNotification` fires on plain display sleep too, and a future "improvement" reaching for that notification would break the negative case.
 - **The departure is bounded** by `PanelTimings.leaveBy` (20s): a mascot that cannot finish leaving within it must not hold the panel lit forever, so it is abandoned outright rather than stalling the panel — a pose with no route off the panel can still occur in principle, even though `sitting` now has one.
 - No 15-minute quit — a resident native app is cheap, and reconnecting is the slow part. It keeps the BLE connection.
 - Reconnect automatically if the panel drops off: exponential backoff to a 30s ceiling, plus a **connect timeout**, because CoreBluetooth's own `connect` has none and will pend forever — see [[macOS Bluetooth TCC]].
@@ -186,6 +189,8 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 | `BLEClient.swift` | CoreBluetooth: scan, connect, write. See [[BLE Protocol]] |
 | `GifPacketizer.swift` | Pure bytes-in/packets-out; pinned by golden fixtures, no hardware |
 | `SingleInstance.swift` | Newest-launch-wins duplicate guard |
+| `SleepWatcher.swift` | IOKit power-management registration; holds sleep and always releases |
+| `AppDelegate.swift` | `applicationShouldTerminate` → `.terminateLater`; the one API Cmd-Q, logout, restart and shutdown all route through |
 | `Settings.swift` | `@AppStorage`, plus `SMAppService` for the login item |
 | `PluginInstaller.swift` | First-run marketplace + plugin install |
 

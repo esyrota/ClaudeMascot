@@ -297,11 +297,21 @@
       "fidgetGroup": "idle",
       "weight": 0.2
     },
+    "wave-off": {
+      "file": "wave-off.gif",
+      "frameCount": 18,
+      "durationMs": 3710,
+      "motionMs": 3150,
+      "loops": false,
+      "fromPose": "standing",
+      "toPose": "standing",
+      "fidgetGroup": "away"
+    },
     "work-coffee": {
       "file": "work-coffee.gif",
-      "frameCount": 7,
-      "durationMs": 4640,
-      "motionMs": 1880,
+      "frameCount": 43,
+      "durationMs": 10320,
+      "motionMs": 7820,
       "loops": false,
       "fromPose": "sitting",
       "toPose": "sitting",
