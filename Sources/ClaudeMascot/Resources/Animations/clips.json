@@ -309,9 +309,9 @@
     },
     "work-coffee": {
       "file": "work-coffee.gif",
-      "frameCount": 7,
-      "durationMs": 4640,
-      "motionMs": 1880,
+      "frameCount": 43,
+      "durationMs": 10320,
+      "motionMs": 7820,
       "loops": false,
       "fromPose": "sitting",
       "toPose": "sitting",

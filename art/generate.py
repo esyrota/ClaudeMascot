@@ -1035,6 +1035,7 @@ def thinking_alt():
 # difference between them is a one-row eye shift; their moving pixels (rows 22-30,
 # the hands) are byte-identical.
 WORK_TYPING_SRC = SOURCES / "work-typing.gif"
+WORK_COFFEE_SRC = SOURCES / "work-coffee.gif"
 WORK_TYPING_LOOK_DOWN_SRC = SOURCES / "work-typing-look-down.gif"
 
 # Classified by shape (max channel), the same style as `_appear_recolour()`, rather
@@ -1403,69 +1404,37 @@ def work_idea():
 
 def work_coffee():
     """
-    Fidget: a cup comes up in front of him, he grips it with both hands, lifts it
-    for a sip, sets it down, and it goes.
+    Fidget: he brings a cup up, sips it a few times, and sets it down.
 
-    Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
-    Composited onto copies of the imported anchor, not drawn. Chunk 8's C-shaped
-    handle survives unchanged, gap and all -- see its own comment below.
+    Hand-drawn by the user and imported, replacing the composited cup this used to
+    draw (a 5x5 body with a C-shaped handle stacked onto `_sitting_anchor()`). The
+    drawn version and its geometry constants are gone -- the art carries its own
+    cup now, and its own timing, per `imported()`'s rule that the source durations
+    ARE the animation.
 
-    His hands are baked onto the keyboard in the imported art, so nothing here
-    hides them; `hands` just brings a pair of `MASCOT` hands to the cup. It used
-    to ALSO clear three pixels at (26,26), (27,26), (26,27) to `LAPTOP_GREY`,
-    named `HAND_ON_KEYS` and believed to be the far hand's fingers resting inside
-    the desk -- they had been found by diffing `MASCOT` pixels against the desk's
-    bounding box, back when `_typing_recolour()` was painting the lid's white logo
-    orange and so leaving three stray `MASCOT` pixels there. They are the logo.
-    There is no far hand in the source: both hands are the block at x17-20 that
-    moves with the typing cycle. Clearing them blacked the mark out for the length
-    of the sip, so the clearing is gone.
+    Two things about the source are load-bearing:
 
-    The cup never rises above row `CUP_TOP - CUP_LIFT` = 23, four rows clear of the
-    eyes at rows 20-21 -- checked mechanically in this chunk's verification, not just
-    by construction. Its columns (5-13 including the hands) stay clear of the desk
-    (>=13) too, so nothing here needs to occlude or be occluded by it.
+    **It is already ping-pong.** The 46 frames go out (the lift, frames 0-8), sip
+    on the spot, and come back down the same way (frames 38-45 are 8..1 reversed).
+    Reversing it again here would play the return leg twice.
 
-    The handle is a C, not a bulge: two columns to the right of the body, with the
-    middle pixel of the near column left unpainted so the torso shows through the
-    gap -- at this size a handle only reads as a loop if there is a hole in it.
+    **Frame 0 recolours to `_sitting_anchor()` pixel-identically**, because it was
+    drawn from the same seated base -- so the self-edge's opening half of the pose
+    contract is satisfied by the art itself, with nothing to bookend.
+
+    The closing anchor is appended, though: the source is authored to LOOP, so it
+    ends one step short of the anchor (on what would be frame 1 of the next pass)
+    rather than resting. A non-looping self-edge has to come to a stop on the pose
+    it started from, and that final frame is the dwell the panel holds until it is
+    told what to show next -- hence `APPEAR_TAIL_MS`, as before.
+
+    `_typing_frames` does the palette work: the export is anti-aliased, carrying
+    near-blacks (10,10,10) down to (1,1,1) and four separate oranges, and
+    `_typing_recolour` collapses all of it onto the panel's five legal colours.
+    That matters more than tidiness here -- see [[Panel Quirks]] on what a
+    near-black photographs as.
     """
-    CUP_W, CUP_H = 5, 5   # the cup body; the handle adds 2 more columns to the right
-    CUP_X = 7                  # centred under the torso, clear of both eye columns
-    CUP_TOP = 25                # rest row
-    CUP_LIFT = 2                 # raised toward the chest for the sip
-    HAND_W, HAND_H = 2, 2
-
-    anchor = _sitting_anchor()
-
-    def seated(*, cup=False, hands=False, lift=0):
-        im = anchor.copy()
-        d = ImageDraw.Draw(im)
-        if cup:
-            cy = CUP_TOP - lift
-            rect(d, CUP_X, cy, CUP_W, CUP_H, PROP)  # the 5x5 body
-            hx0, hx1 = CUP_X + CUP_W, CUP_X + CUP_W + 1  # the handle's two columns
-            rect(d, hx0, cy + 1, 1, 1, PROP)
-            rect(d, hx1, cy + 1, 1, 1, PROP)
-            rect(d, hx1, cy + 2, 1, 1, PROP)
-            # (hx0, cy + 2) is deliberately left unpainted -- the gap in the loop.
-            rect(d, hx0, cy + 3, 1, 1, PROP)
-            rect(d, hx1, cy + 3, 1, 1, PROP)
-            if hands:
-                rect(d, CUP_X - HAND_W, cy + 1, HAND_W, HAND_H, MASCOT)
-                rect(d, CUP_X + CUP_W - 1, cy + 1, HAND_W, HAND_H, MASCOT)
-        return im
-
-    out = [(anchor, 300)]
-    out.append((seated(cup=True), 260))                                # the cup comes in
-    out.append((seated(cup=True, hands=True), 220))                    # both hands come to it
-    out.append((seated(cup=True, hands=True, lift=CUP_LIFT), 220))     # lifted toward the chest
-    out.append((seated(cup=True, hands=True, lift=CUP_LIFT), 420))     # the sip
-    out.append((seated(cup=True, hands=True), 220))                    # back down
-    out.append((seated(cup=True), 240))                                 # hands release
-    out.append((seated(cup=False), 260))                                 # and it goes
-    out.append((anchor, APPEAR_TAIL_MS))
-    return out
+    return _typing_frames(WORK_COFFEE_SRC) + [(_sitting_anchor(), APPEAR_TAIL_MS)]
 
 
 def work_look():

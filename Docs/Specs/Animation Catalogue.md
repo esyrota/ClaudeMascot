@@ -296,16 +296,15 @@ wander fidgets use for `idle`, below. `work-look-down` belongs here, not with th
 |                                         |                                             |                                         |                                           |                                                   |
 | --------------------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
 | ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif) | ![work-look](_animations/work-look.gif) | ![work-think](_animations/work-think.gif) | ![work-look-down](_animations/work-look-down.gif) |
-| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 7f · 1.88s      | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
+| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 43f · 10.32s      | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
 
 `work-idea` lifts an eye, sparks, and runs a fast typing burst — the same imported frames
-`working` plays, just stepped through at a faster cadence. `work-coffee` brings a cup up
-in front of him, held in both hands for a sip, then sets it back down and lets it go. It
-used to also clear three pixels on the lid to `LAPTOP_GREY` while the cup was held, taken
-for the far hand's fingers baked onto the keyboard; they are the logo, and only looked like
-stray hand pixels while the recolour was painting them orange. There is no far hand in the
-source — both hands are the block at x17–20 that moves with the typing cycle — so the
-clearing is gone and the mark stays white through the sip. `work-look` lifts both eyes to look up from the screen while the
+`working` plays, just stepped through at a faster cadence. `work-coffee` brings a cup up,
+sips it a few times and sets it down — hand-drawn art, imported rather than composited, so
+its shape and its timing are both the source's. It is the longest seated beat by some way,
+because the sip repeats. The source is authored as a ping-pong (its own return leg is in
+the file) and its first frame recolours to `_sitting_anchor()` exactly, so only the closing
+dwell is appended. `work-look` lifts both eyes to look up from the screen while the
 hands keep typing, then lets them back down. `work-look-down` is its mirror, imported
 rather than drawn: the same beat with the eyes authored a row lower in the second source
 file instead of raised in code. `work-think`
@@ -537,12 +536,11 @@ stall.
    drawn one, and `work_idea()` places the spark at row 17 — one clear row above the head —
    which closes most of the old gap for free and the rest by deliberate placement.
 6. ~~`work-coffee`'s mug occupies the far arm's position rather than being held at the end
-   of it, so "holding" is implied by adjacency rather than drawn~~ — **closed**, in the
-   rebuilt clip. The cup is now drawn in front of the torso with a see-through C-shaped
-   handle, and both `MASCOT` hand blocks are drawn at its sides — holding is drawn now,
-   not implied by where the prop sits. (The clip also cleared three "keyboard finger"
-   pixels for the duration; those turned out to be the lid's logo, and the clearing is
-   gone — see the `work-coffee` note above.)
+   of it, so "holding" is implied by adjacency rather than drawn~~ — **closed**, and then
+   superseded: the clip is hand-drawn art now, so the cup and the hands are whatever the
+   source says they are rather than a composite this file builds. The intermediate drawn
+   version — a 5x5 body with a see-through C-shaped handle, plus three "keyboard finger"
+   pixels it cleared before those turned out to be the lid's logo — is gone with it.
 7. **The sit edges pop.** Measured, not guessed: `_standing_anchor()` and
    `_sitting_anchor()` differ by **293 pixels** — a structural gap between a drawn
    rectangle figure and an imported photographic-silhouette one, not just a difference in
