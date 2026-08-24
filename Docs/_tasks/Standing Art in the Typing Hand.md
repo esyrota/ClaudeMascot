@@ -23,8 +23,9 @@ standing set in the same hand as the typing art, so the manifest holds one creat
 
 ## Scope sketch
 
-The standing set is `idle`, `idle-alt`, `dancing`, `workout`, the `thinking` group, `waiting`,
-`done`/`done-enter`, `sleeping` and the walks. Not all of them need redrawing at once: the
+The standing set is `idle`, `dancing`, `workout`, the `thinking` group,
+`done`/`done-enter` and the walks. `sleeping`, its two edges and `waiting` are already
+hand-authored imports and are out of scope — they are the target hand, not work for it. Not all of them need redrawing at once: the
 anchor is what everything joins to, so `_standing_anchor()` and the clips nearest it (`idle`,
 the sit edges) are the ones that pay for themselves first.
 

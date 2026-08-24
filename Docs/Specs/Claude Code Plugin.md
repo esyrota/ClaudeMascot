@@ -54,7 +54,8 @@ events are not tool-scoped and take no matcher.
 `input.jsonl` — 3131 events, 52 sessions, 2026-08-16 → 08-18 — it appears zero times, while
 every other mapped event appears in the hundreds. A live test confirmed it: an
 `AskUserQuestion` that held the session for 104 seconds produced no `Notification`. The
-state was unreachable, so the flag wave had never once been on the panel.
+state was unreachable, so the `waiting` art had never once been on the panel. (It was a
+flag wave then; the clip that plays now is the question mark — see [[Animation Catalogue]].)
 
 The signal that *is* there is the tool name. Some tools block on a human by definition —
 Claude calls them and then does nothing until the user answers — and both ends of that wait

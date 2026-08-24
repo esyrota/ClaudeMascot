@@ -33,10 +33,12 @@ pose at each end. `idle` frame 0 defines `standing`, `sleeping` frame 0 defines 
 `working` frame 0 defines `sitting`, and an offscreen anchor is an empty frame. Break this
 once and every swap visibly jumps.
 
-**Every clip in the manifest now satisfies it.** `waiting` was the last holdout: its wave
-opened and closed mid-gesture, so a swap into it snapped the arm up four rows and conjured
-the flag in one frame. It gains one half-raised frame at each end — the arm halfway, the
-flag just clearing the head — which is all the contract needs.
+**Every clip in the manifest satisfies it.** The last holdout was the flag wave that used
+to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
+four rows and conjured the flag in one frame, and it took a half-raised frame invented at
+each end to fix. The question mark that replaced it needs almost no such repair — its
+source opens *on* the anchor — see the `waiting` notes below for why hand-drawn art
+lands here nearly for free and assembled art has to be argued onto it.
 
 **A turned head must trim its far-side body edge — a constraint on new art, not a rule the
 shipped clips satisfy.** Any pose that turns the mascot to face the viewer should shift the
@@ -56,26 +58,26 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### standing
 
-**idle** — four variants, the richest set because idle is on screen most.
+**idle** — three variants, the richest set because idle is on screen most.
 
-|                               |                                       |                                     |                                     |
-| ----------------------------- | ------------------------------------- | ----------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![idle-alt](_animations/idle-alt.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **idle-alt** · 9f · 4.56s · w 0.4     | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
+|                               |                                     |                                     |
+| ----------------------------- | ----------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
-**thinking** — three variants, and none of them mimes thinking.
+**thinking** — two variants, and neither of them mimes thinking.
 
-|                                       |                                               |                                                 |
-| ------------------------------------- | --------------------------------------------- | ----------------------------------------------- |
-| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) | ![thinking-pace](_animations/thinking-pace.gif) |
-| **thinking** · 3f · 3.6s · w 1.0      | **thinking-alt** · 14f · 6.06s · w 0.5        | **thinking-pace** · 17f · 4.72s · w 0.5         |
+|                                       |                                               |
+| ------------------------------------- | --------------------------------------------- |
+| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) |
+| **thinking** · 5f · 3.6s · w 1.0      | **thinking-alt** · 14f · 6.06s · w 0.5        |
 
-**waiting** — three variants, all of them shouting.
+**waiting** — one, and it asks the question out loud.
 
-|                                     |                                                     |                                                                 |
-| ----------------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
-| ![waiting](_animations/waiting.gif) | ![waiting-hop](_animations/waiting-hop.gif)         | ![waiting-semaphore](_animations/waiting-semaphore.gif)         |
-| **waiting** · 12f · 1.86s · w 1.0   | **waiting-hop** · 13f · 2.18s · w 1.0               | **waiting-semaphore** · 12f · 2.02s · w 1.0                     |
+|                                     |
+| ----------------------------------- |
+| ![waiting](_animations/waiting.gif) |
+| **waiting** · 17f · 3.22s · w 1.0   |
 
 **done** — one.
 
@@ -88,24 +90,33 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   clip for as long as this project had four animations and four states to spread them
   over, but lifting weights says nothing about working on a prompt — it is the mascot
   doing something while nothing is happening, which is what idle means.
-- **The `thinking` group performs nothing.** `thinking` itself just stands and breathes,
-  slower than idle does; `thinking-pace` walks off one side and back in the other, twice,
-  which on a panel with no middle distance is what walking in circles looks like; only
-  `thinking-alt` shows a thought at all. Thinking is mostly not visible from outside, and
-  a mascot that always mimes it has nothing left to say when the thought is a hard one.
+- **The `thinking` group barely performs at all.** `thinking` itself stands and breathes,
+  slower than idle does, with one brow up; only `thinking-alt` shows a thought. Thinking
+  is mostly not visible from outside, and a mascot that always mimes it has nothing left
+  to say when the thought is a hard one.
   Now that a session with a tool call underway sits rather than stands (see
   [[Menu Bar App]]), standing `thinking` is honest for a narrower stretch than before — the
   moment before the first tool call, where nothing has started yet — which is exactly when
   performing nothing is most correct.
-- A fourth idle variant, `idle-think`, was cut: sliced out of the thinking sheet, it
-  carried that sheet's ~87% silhouette (the same problem `working-alt` had, below) and
-  read as a smaller creature.
+- **Three standing variants have been cut, each for a different reason, and none is
+  coming back as-is.** `idle-think` was sliced out of the thinking sheet and carried that
+  sheet's ~87% silhouette (the same problem `working-alt` had, below), so it read as a
+  smaller creature. `idle-alt` was idle's breath at half speed with a one-pixel lean left
+  and right underneath it, and the lean was the only thing distinguishing it: a 24px
+  figure sliding a pixel sideways on a 32px panel reads as the whole mascot drifting, not
+  as it shifting its weight. A fourth idle variant should *do* something — play with a
+  ball, say — rather than do idle more slowly. `thinking-pace` walked off one edge and
+  back in the other, twice, and it broke the mascot's position: every other clip in its
+  group is a standing loop that never leaves the panel, so the choreographer can swap out
+  at any frame, while this one spent most of its length offscreen or halfway through a
+  doorway. **The pose graph has walks for going places; a loop is the wrong clip to spend
+  them in** — see the wander fidgets.
 - **The floor line is absolute at `standing`.** Every idle variant keeps all four feet on
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
-  `idle`/`idle-alt` used to bob a pixel upward and read as a slow hop. Only a clip that
+  `idle` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing` and `sleeping` are imported; everything else above is drawn or assembled in
-  `art/generate.py`.
+- `dancing`, `sleeping` and `waiting` are imported; everything else above is drawn or
+  assembled in `art/generate.py`.
 - `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
   and fills in a "..." one dot at a time, holds, then retreats the way it came. It was
   sliced out of the 36-frame thinking sheet until that cost it three things at once — the
@@ -114,20 +125,45 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   juddered side to side; and the whole beat ran in 2.1s, too quick to read as thought.
   Only the last of those is a timing problem, so it was re-authored on the standard
   geometry instead. The body breathes underneath with idle's own torso squash.
-- `waiting` is the flag wave: it means Claude is asking *you* for something, so it should
-  stay the most legible clip on the panel from across a room. Its two variants are built
-  for the same job by different means — `waiting-hop` moves the *whole silhouette* off the
-  floor line, which is what peripheral vision picks up, and `waiting-semaphore` puts a
-  second flag in the other hand and sweeps both across the top half in counter-phase. All
-  three keep the same flag, so they read as one mascot doing one thing three ways.
-- **The waiting variants are weighted level at 1.0, not below the base clip** — the only
-  group where the variants do not taper. `idle` and `thinking` taper because they are on
-  screen for hours and the point of a variant there is to stop the panel becoming
-  wallpaper. `waiting` is on screen for a minute at most (the longest real wait in the
-  logs was four hours, the median under two minutes) and every clip in the group is
-  trying equally hard to be seen, so there is no "common sight" to protect.
-- **`waiting` had never once played before the variants were drawn.** Its only trigger was
-  the `Notification` hook, which fires zero times in this configuration; `AskUserQuestion`
+- **`thinking` raises the other brow.** One eye up a pixel — the left, mirroring the right
+  eye `thinking-alt` opens on — is the only expression this face can carry, and it is the
+  whole difference between the clip and `idle` standing still. It is off on the first and
+  last frames because those two are the bare `standing` anchor and the anchor contract is
+  pixel-identical, brow included.
+- **`waiting` is the question mark, and it replaced a flag wave and both its variants.**
+  It means Claude is asking *you* for something, so it has two jobs: be seen from across
+  a room, and say what it wants once it has been. The flag did only the first — `waiting`
+  waved one, `waiting-hop` waved it off the floor line, `waiting-semaphore` waved two in
+  counter-phase, and none of the three said "I asked you something". All three are
+  retired for one clip that does: a question mark swelling out of the head while an arm
+  lifts toward it. **Legibility is still the constraint** — a replacement that whispers
+  would be worse than the flag, whatever it depicts.
+- **The group is back to one clip, and that costs nothing here.** `idle` and `thinking`
+  carry variants because they are on screen for hours and the point of a variant there is
+  to stop the panel becoming wallpaper. `waiting` is on screen for a minute at most (the
+  longest real wait in the logs was four hours, the median under two minutes), which is
+  not long enough to wear out, so a second way of asking buys less than a first way that
+  asks clearly.
+- **`waiting` bounces, and the bounce keeps the floor line.** The mascot dips into a
+  crouch, springs up as the mark swells over its head, holds, and settles. The
+  silhouette travels five rows doing it and **all four feet stay welded to row 31 in
+  every one of the sixteen frames** — the rise is the torso stretching out of the
+  crouch, not the figure leaving the ground. This is the rule above satisfied by art
+  that had every excuse to break it, and it is why the clip reads as alive rather than
+  as a hop.
+- **`waiting` is the first clip to carry a shaded body outside `dancing`.** The source
+  shades its raised arm and the underside of the bounce; the shade is thin — eight
+  pixels at its peak — but it is what gives the raised arm an edge to be raised *in
+  front of*. **The source's own shade value is not shipped**, only the fact that a pixel
+  is shaded: it shades (255,109,36) to (200,91,35), a step so light the panel would
+  swallow it whole, so the import maps it to `MASCOT_DARK` — the step calibrated against
+  photographs. See [[Panel Quirks]].
+- **`waiting` satisfies the anchor contract almost for free.** The source's frame 0 *is*
+  the `standing` anchor, pixel for pixel, so the leading bookend is a hold rather than a
+  repair; only the last frame needs one, being a few pixels of the mark short. The drawn
+  flag wave it replaced had to have a half-raised frame invented at each end.
+- **`waiting` had never once played before the flag variants were drawn.** Its only
+  trigger was the `Notification` hook, which fires zero times in this configuration; `AskUserQuestion`
   is what reaches the state now. The art was fine — it was unreachable. See
   [[Claude Code Plugin]], and do not add art to a state without checking that something
   can still get to it.
@@ -384,10 +420,10 @@ same numbers.
 
 #### The wander fidgets
 
-|                                                                     |                                                                       |                                                                 |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------- |
-| ![wander-off-left-in-right](_animations/wander-off-left-in-right.gif) | ![wander-off-right-in-left](_animations/wander-off-right-in-left.gif) | ![wander-sink-rise](_animations/wander-sink-rise.gif)           |
-| **wander-off-left-in-right**<br>9f · motion 3.9s                      | **wander-off-right-in-left**<br>9f · motion 3.9s                      | **wander-sink-rise**<br>21f · motion 5.72s                      |
+|                                                                       |                                                                       |                                                       |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| ![wander-off-left-in-right](_animations/wander-off-left-in-right.gif) | ![wander-off-right-in-left](_animations/wander-off-right-in-left.gif) | ![wander-sink-rise](_animations/wander-sink-rise.gif) |
+| **wander-off-left-in-right**<br>9f · motion 3.9s                      | **wander-off-right-in-left**<br>9f · motion 3.9s                      | **wander-sink-rise**<br>21f · motion 5.72s            |
 
 Nine clips, every pairing of an exit (`sink`, `walk-off-left`, `walk-off-right`) with an
 entrance (`walk-in-left`, `walk-in-right`, `starting`) — the mascot steps out and comes
@@ -464,8 +500,11 @@ stall.
 
 ## Known gaps — the work worth doing next
 
-1. ~~**`waiting` has no variants**~~ — **closed.** `waiting-hop` and `waiting-semaphore`
-   join the wave, and the state is reachable at last (see the `standing` section above).
+1. ~~**`waiting` has no variants**~~ — **closed, then deliberately reopened and dropped.**
+   `waiting-hop` and `waiting-semaphore` joined the wave, and the state became reachable
+   at last; then all three were retired for the single question-mark clip, because saying
+   the right thing once beats saying the wrong thing three ways. `waiting` is back to one
+   clip on purpose and this is not a gap — see the `standing` section above.
 2. **No fidgets at `dozing`.** `fidget-doze` was drawn against the retired floor blob and
    went with it, so a doze fidget is a clean slot to fill.
 3. ~~The second Z is a 2×2 dot~~ — **closed, and then moot.** `sleeping` drew two Zs at
