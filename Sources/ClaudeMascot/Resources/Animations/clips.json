@@ -30,6 +30,16 @@
       "fromPose": "standing",
       "toPose": "standing"
     },
+    "done-flag": {
+      "file": "done-flag.gif",
+      "frameCount": 59,
+      "durationMs": 10160,
+      "motionMs": 10160,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "done",
+      "weight": 1.0
+    },
     "doze-to-stand": {
       "file": "doze-to-stand.gif",
       "frameCount": 14,

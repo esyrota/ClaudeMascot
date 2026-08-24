@@ -410,6 +410,38 @@ def done():
     return out
 
 
+# The other celebration, and the only hand-drawn one: he lifts a chequered flag over
+# his head and waves it. Same state, opposite idiom -- `done()` is a jump with confetti
+# thrown at the panel, this stays on the floor and works the prop.
+#
+# The flag is authored as a CHEQUERBOARD, half white squares and half near-black ones,
+# which is why it survives `_body_shade_prop_recolour()` intact: the dark squares fail
+# the `SHADE_MIN` test and come back as background, the white ones clear the chroma
+# test and come back as PROP. Nothing here needed a rule of its own -- the source is
+# the same hand and the same orange-against-black palette as `waiting-question` and the
+# three dozing clips, so it maps with the shared recolour.
+#
+# The source is authored as intro / cycle / outro: frame 0 is the standing anchor pixel
+# for pixel, frames 1 and 57 are the same crouch bookending the performance, and frames
+# 2-55 are six passes of one 9-frame wave cycle. The number of passes lives in the GIF,
+# not here -- it was prolonged from two to six in the file itself, so the clip runs
+# about ten seconds. That length is deliberate: this is the more elaborate of the two
+# done variants and cutting away from a flag wave halfway through reads as an
+# interruption, where `done()`'s jump can be left at any landing.
+#
+# Only the closing bookend is needed. The opening one would be a duplicate of frame 0
+# (PIL would merge them anyway); the last frame is the crouch, which is not a pose the
+# loop may rest on.
+DONE_FLAG_SRC = SOURCES / "done-flag.gif"
+DONE_FLAG_ANCHOR_OUT_MS = 300
+
+
+def done_flag():
+    """Done, hand-drawn: a chequered flag raised overhead and waved six times."""
+    return (imported(DONE_FLAG_SRC, _body_shade_prop_recolour)
+            + [(_standing_anchor(), DONE_FLAG_ANCHOR_OUT_MS)])
+
+
 # The mascot dozes off standing: the same silhouette as every other standing clip,
 # arms slumped four rows down onto the legs and the eyes drawn as closed lids, with a
 # one-eye peek twice a cycle. All three dozing clips are imported from hand-drawn art
@@ -1563,6 +1595,7 @@ STATES = {
     "work-look-down": work_look_down,
     "waiting": waiting,
     "done": done,
+    "done-flag": done_flag,
     "done-enter": done_enter,
     "fidget-stretch": fidget_stretch,
     "fidget-look": fidget_look,
@@ -1643,6 +1676,14 @@ CLIP_METADATA = {
         "weight": 1.0,
     },
     "done": {
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "done",
+        "weight": 1.0,
+    },
+    "done-flag": {
+        # The second clip in the group: `done()` jumps, this waves a flag. Equal
+        # weight -- neither is the "real" one, see done_flag()'s block comment.
         "loops": True,
         "pose": "standing",
         "variantGroup": "done",

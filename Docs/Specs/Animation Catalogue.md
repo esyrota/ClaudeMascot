@@ -79,12 +79,12 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 | ![waiting](_animations/waiting.gif) |
 | **waiting** · 17f · 3.22s · w 1.0   |
 
-**done** — one.
+**done** — two, and they celebrate in opposite idioms.
 
-|                                |
-| ------------------------------ |
-| ![done](_animations/done.gif)  |
-| **done** · 17f · 3.29s · w 1.0 |
+|                                |                                       |
+| ------------------------------ | ------------------------------------- |
+| ![done](_animations/done.gif)  | ![done-flag](_animations/done-flag.gif) |
+| **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0  |
 
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
@@ -115,8 +115,8 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing`, `sleeping` and `waiting` are imported; everything else above is drawn or
-  assembled in `art/generate.py`.
+- `dancing`, `sleeping`, `waiting` and `done-flag` are imported; everything else above
+  is drawn or assembled in `art/generate.py`.
 - `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
   and fills in a "..." one dot at a time, holds, then retreats the way it came. It was
   sliced out of the 36-frame thinking sheet until that cost it three things at once — the
@@ -172,6 +172,23 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   sustained — so the hand-off from entrance to loop has nothing to give away. The
   checkmark itself belongs only to `done-enter`; see "The checkmark belongs to `done`"
   under the sit edges below for why it does not also live on the way out of the chair.
+- **`done-flag` is the hand-drawn one, and it stays on the floor.** A chequered flag is
+  raised overhead and waved six times, all four feet welded to row 31 throughout — where
+  `done` leaves the ground twice and throws confetti. Equal weight: neither is the "real"
+  celebration, and the two say the same thing loudly and quietly.
+- **The flag is authored as a chequerboard**, half white squares and half near-black, and
+  that is what makes it survive the shared recolour untouched: the dark squares fail the
+  `SHADE_MIN` test and land as background, the white ones clear the chroma test and land
+  as a prop. Same hand and same palette as `waiting-question`, so it needed no rule of
+  its own.
+- **`done-flag`'s six passes live in the source GIF, not in the code.** The file is
+  authored intro / cycle / outro — frame 0 *is* the standing anchor, frames 1 and 57 are
+  the same crouch bookending the performance, and between them are six passes of one
+  9-frame wave. Prolonging it is an edit to `art/sources/done-flag.gif`; `art/generate.py`
+  only appends the closing anchor, the last frame being a crouch the loop may not rest
+  on. At ten seconds it is by far the longest loop here, deliberately: a flag wave cut
+  away from halfway reads as an interruption, where `done`'s jump can be left at any
+  landing.
 
 ### dozing
 
