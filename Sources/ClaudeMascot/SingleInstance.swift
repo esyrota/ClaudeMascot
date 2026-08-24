@@ -21,16 +21,21 @@ import os
 enum SingleInstance {
   private static let log = Logger(subsystem: "com.eugene.claudemascot", category: "instance")
 
-  /// How long to wait for a polite quit before resorting to `SIGKILL`.
-  private static let terminationTimeoutSeconds: TimeInterval = 2
-  private static let pollIntervalSeconds: TimeInterval = 0.05
-
-  /// Terminates every other running copy of this bundle and returns once
-  /// they are gone (or the timeout expires).
+  /// Terminates every other running copy of this bundle.
   ///
-  /// Call before anything claims a shared resource — the wait is the point:
-  /// it lets the old process release the panel and the hook socket before
-  /// this one reaches for them.
+  /// Call before anything claims a shared resource, so the old process's
+  /// hold on the panel and the hook socket is gone before this one reaches
+  /// for them.
+  ///
+  /// Goes straight to `forceTerminate()` rather than the polite AppleEvent
+  /// quit — no wait for a graceful departure. That is safe for the same
+  /// reasons this file already relies on elsewhere: `HookServer.start()`
+  /// unlinks a stale socket regardless of how its old owner died, and the
+  /// panel drops the BLE link the moment the process disappears. A graceful
+  /// wait would also cut into the mascot's own quit-time departure — the
+  /// new instance's launch is part of the old instance's shrinking exit
+  /// budget — and would tax every reinstall with a multi-second stall for
+  /// no benefit.
   ///
   /// Only matches copies LaunchServices knows about, i.e. ones launched as
   /// `.app` bundles. A bare `swift run` binary is invisible here and can
@@ -47,25 +52,6 @@ enum SingleInstance {
       let path = other.bundleURL?.path ?? "unknown"
       log.notice(
         "terminating duplicate instance pid \(other.processIdentifier, privacy: .public) at \(path, privacy: .public)"
-      )
-      other.terminate()
-    }
-
-    // `terminate()` is an AppleEvent quit, which lets the old instance run
-    // its willTerminate cleanup (BLE disconnect, socket unlink). It can also
-    // be refused — an unresponsive process, or Automation consent that
-    // ad-hoc-signed builds do not inherit — hence the deadline and the
-    // `forceTerminate()` below. Force is safe: `HookServer.start()` already
-    // unlinks a stale socket, and the panel drops the BLE link when the
-    // process dies.
-    let deadline = Date().addingTimeInterval(terminationTimeoutSeconds)
-    while Date() < deadline, others.contains(where: { !$0.isTerminated }) {
-      RunLoop.current.run(until: Date().addingTimeInterval(pollIntervalSeconds))
-    }
-
-    for other in others where !other.isTerminated {
-      log.notice(
-        "duplicate instance pid \(other.processIdentifier, privacy: .public) ignored quit; forcing"
       )
       other.forceTerminate()
     }

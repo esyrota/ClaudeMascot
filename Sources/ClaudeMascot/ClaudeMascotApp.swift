@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct ClaudeMascotApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @StateObject private var appModel: AppModel
 
   // `StateObject`'s wrappedValue is an autoclosure, so `AppModel()` — which
