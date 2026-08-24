@@ -23,6 +23,9 @@ import os
 ///   timings are baked into `PanelController`'s timings once, at launch,
 ///   since `PanelController` treats them as immutable
 /// - surfaces the panel's current state (derived from `SessionTracker`)
+/// - owns a `SleepWatcher` and installs `AppDelegate.onTerminate`, so the
+///   mascot walks off the panel before the Mac sleeps or the app quits — see
+///   Docs/_logs/2026-08-24. Sleep Exit/Plan.md
 @MainActor
 final class AppModel: ObservableObject {
   /// Master switch mirrored by the menu bar's "Enabled" toggle.
@@ -51,6 +54,20 @@ final class AppModel: ObservableObject {
 
   private var lastAppliedBrightness: Int?
 
+  /// Holds system sleep (via `SleepWatcher`) and app termination (via
+  /// `AppDelegate`) long enough for `departNow` to walk the mascot off the
+  /// panel first. Retained here, alongside the other observers, and stopped
+  /// from the same `willTerminateNotification` closure that already stops
+  /// `hookServer`.
+  private let sleepWatcher: SleepWatcher
+
+  /// True for the duration of a `departNow` walk-off. The 1s tick loop skips
+  /// its derive-and-tick body while this is set — without the guard it would
+  /// re-derive `.working` from `SessionTracker` every second and cancel the
+  /// walk-off mid-stride, since `desired` only stays `.off` because nothing
+  /// else is writing to it in between.
+  private var departing = false
+
   /// Always-on record of every hook event received and every panel decision
   /// made, so the choreography work can be tuned against real sessions
   /// instead of guesses. Held here because it is the one place that sees
@@ -73,6 +90,7 @@ final class AppModel: ObservableObject {
     self.tickInterval = tickInterval
     self.eventLog = EventLog()
     self.sessionTracker = SessionTracker()
+    self.sleepWatcher = SleepWatcher()
 
     // Clean up old state directory (can be deleted once no installed build
     // predates the socket).
@@ -94,6 +112,10 @@ final class AppModel: ObservableObject {
     self.panelController = PanelController(
       panel: adapter,
       resolve: { [choreographer] state, displayed in choreographer.clip(for: state, displayed: displayed) },
+      // Looks a clip up by id directly, independent of `PanelState` — `depart`'s
+      // route to `wave-off`, which no `PanelState` ever resolves to. Sourced
+      // from the same `AnimationLibrary` as `resolve` above.
+      clipByID: { [animationLibrary] id in animationLibrary.clip(id: id) },
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),
@@ -197,6 +219,17 @@ final class AppModel: ObservableObject {
         guard let self, self.enabled else { return }
         Self.log.notice("woke from system sleep; reconnecting")
         self.bleClient.reconnectNow()
+        // `desired` stayed wherever the departure (or idle escalation) left
+        // it across the sleep, so a re-derive is load-bearing, not cosmetic:
+        // a reaped session correctly derives `.off` and the panel stays dark,
+        // while a session still live derives its real state and hands off to
+        // `tick()`'s existing `attemptWake`, which powers the panel back on
+        // and replays the entrance.
+        self.sessionTracker.reap()
+        let derivedState = self.sessionTracker.derived
+        self.currentState = derivedState
+        self.panelController.handle(derivedState)
+        Task { await self.panelController.tick() }
       }
     }
 
@@ -208,7 +241,31 @@ final class AppModel: ObservableObject {
     ) { [weak self] _ in
       MainActor.assumeIsolated {
         self?.hookServer.stop()
+        self?.sleepWatcher.stop()
       }
+    }
+
+    // Walk the mascot off before the Mac sleeps: `SleepWatcher` holds sleep
+    // open just long enough for `departNow` to run, with a wave since the
+    // lid is closing gently rather than the app quitting.
+    sleepWatcher.onSleep = { [weak self] in
+      await self?.departNow(withWave: true, deadline: 8)
+    }
+    sleepWatcher.start()
+
+    // Walk the mascot off before the app quits: `AppDelegate.onTerminate`
+    // holds `applicationShouldTerminate` open just long enough for
+    // `departNow` to run, no wave since the machine itself is not going
+    // anywhere. `AppDelegate` is built by `@NSApplicationDelegateAdaptor`
+    // before `AppModel` exists, so the dependency only runs this direction —
+    // see `AppDelegate`'s doc comment. A failed cast just means there is
+    // nothing to hook into; the app must still run.
+    if let appDelegate = NSApp.delegate as? AppDelegate {
+      appDelegate.onTerminate = { [weak self] in
+        await self?.departNow(withWave: false, deadline: 2.5)
+      }
+    } else {
+      Self.log.error("NSApp.delegate is not AppDelegate; quit will not walk the mascot off")
     }
 
     if enabled {
@@ -234,6 +291,28 @@ final class AppModel: ObservableObject {
     }
   }
 
+  // MARK: - Departure
+
+  /// The one entry point both the sleep and quit paths call into, so a
+  /// walk-off requested by either always gets the same guard and the same
+  /// bookkeeping.
+  ///
+  /// Returns immediately unless the panel is both enabled and actually
+  /// connected: holding a Mac awake (or a quit pending) for up to `seconds`
+  /// to animate a panel nothing is talking to is exactly the failure this
+  /// guard exists to prevent.
+  private func departNow(withWave: Bool, deadline seconds: TimeInterval) async {
+    guard enabled, bleClient.state == .connected else {
+      Self.log.notice(
+        "departNow skipped (enabled=\(self.enabled, privacy: .public), state=\(String(describing: self.bleClient.state), privacy: .public))"
+      )
+      return
+    }
+    departing = true
+    defer { departing = false }
+    await panelController.depart(withWave: withWave, deadline: Date().timeIntervalSince1970 + seconds)
+  }
+
   // MARK: - Timer
 
   /// The repeating tick that drives `PanelController`. Lives here, not in
@@ -250,6 +329,11 @@ final class AppModel: ObservableObject {
         if self.enabled {
           self.bleClient.ensureConnecting()
         }
+        // Skipped mid-departure: `departNow` is already pumping `tick()`
+        // itself at a faster rate, and re-deriving from `SessionTracker`
+        // here would overwrite `desired` back to `.working` and cancel the
+        // walk-off mid-stride.
+        guard !self.departing else { continue }
         // Reap stale sessions and propagate any state change to the panel.
         self.sessionTracker.reap()
         let derivedState = self.sessionTracker.derived
