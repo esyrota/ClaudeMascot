@@ -74,10 +74,10 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 **waiting** — one, and it asks the question out loud.
 
-|                                      |
-| ------------------------------------ |
-| ![waiting](_animations/waiting.gif)  |
-| **waiting** · 17f · 3.22s · w 1.0    |
+|                                     |
+| ----------------------------------- |
+| ![waiting](_animations/waiting.gif) |
+| **waiting** · 17f · 3.22s · w 1.0   |
 
 **done** — one.
 
@@ -420,10 +420,10 @@ same numbers.
 
 #### The wander fidgets
 
-|                                                                     |                                                                       |                                                                 |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------- |
-| ![wander-off-left-in-right](_animations/wander-off-left-in-right.gif) | ![wander-off-right-in-left](_animations/wander-off-right-in-left.gif) | ![wander-sink-rise](_animations/wander-sink-rise.gif)           |
-| **wander-off-left-in-right**<br>9f · motion 3.9s                      | **wander-off-right-in-left**<br>9f · motion 3.9s                      | **wander-sink-rise**<br>21f · motion 5.72s                      |
+|                                                                       |                                                                       |                                                       |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| ![wander-off-left-in-right](_animations/wander-off-left-in-right.gif) | ![wander-off-right-in-left](_animations/wander-off-right-in-left.gif) | ![wander-sink-rise](_animations/wander-sink-rise.gif) |
+| **wander-off-left-in-right**<br>9f · motion 3.9s                      | **wander-off-right-in-left**<br>9f · motion 3.9s                      | **wander-sink-rise**<br>21f · motion 5.72s            |
 
 Nine clips, every pairing of an exit (`sink`, `walk-off-left`, `walk-off-right`) with an
 entrance (`walk-in-left`, `walk-in-right`, `starting`) — the mascot steps out and comes
