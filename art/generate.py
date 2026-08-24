@@ -913,6 +913,18 @@ def dancing():
     return out
 
 
+def wave_off():
+    """
+    Transition: goodbye wave with placeholder pixels, to be replaced by hand-drawn art.
+
+    **These are placeholder pixels.** The clip must eventually be a wave that starts
+    and ends on `_standing_anchor()` pixels, because that is the `standing` pose
+    contract every standing clip guarantees mechanically. `dancing()` already bookends
+    the anchor, so the contract holds as-is today.
+    """
+    return dancing()
+
+
 # art/sources/claude-claude-code-1.gif -- the mascot's own loading-animation broom
 # sweep, once imported here as the retired `sweeping` clip -- stays in art/sources as
 # reference art. Nothing here imports it any more.
@@ -1593,6 +1605,7 @@ STATES = {
     "walk-in-right": walk_in_right,
     "sink": sink,
     "off": off,
+    "wave-off": wave_off,
 }
 
 # The nine wander fidgets, added to STATES rather than written out one by one --
@@ -1813,6 +1826,17 @@ CLIP_METADATA = {
         "pose": "offBottom",
         "variantGroup": "off",
         "weight": 1.0,
+    },
+    "wave-off": {
+        "loops": False,
+        "fromPose": "standing",
+        "toPose": "standing",
+        # fidgetGroup: "away" keeps this one-shot from firing as a random idle/thinking/
+        # waiting/done fidget. No state ever requests a fidget in group "away" (it is
+        # resolved in `Choreographer.clip(for:)`'s journey switch, which returns before
+        # fidget selection), so this field is what prevents a goodbye wave from being
+        # drawn as a random idle beat. See the wander fidgets' own comment below.
+        "fidgetGroup": "away",
     },
 }
 

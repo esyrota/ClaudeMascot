@@ -364,6 +364,22 @@
       274
     ]
   },
+  "wave-off": {
+    "gif_bytes": 3615,
+    "crc32": 2298455979,
+    "outer_chunks": 1,
+    "ble_packets": 8,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      68
+    ]
+  },
   "work-coffee": {
     "gif_bytes": 1656,
     "crc32": 2692936789,
