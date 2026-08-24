@@ -111,7 +111,9 @@ final class AppModel: ObservableObject {
     )
     self.panelController = PanelController(
       panel: adapter,
-      resolve: { [choreographer] state, displayed in choreographer.clip(for: state, displayed: displayed) },
+      resolve: { [choreographer] state, displayed in
+        choreographer.clip(for: state, displayed: displayed)
+      },
       // Looks a clip up by id directly, independent of `PanelState` — `depart`'s
       // route to `wave-off`, which no `PanelState` ever resolves to. Sourced
       // from the same `AnimationLibrary` as `resolve` above.
@@ -167,7 +169,8 @@ final class AppModel: ObservableObject {
         // of this log is to see what Claude Code actually emits, including
         // everything we currently drop.
         let inputRecord = InputRecord(
-          at: Date(), event: event.event, tool: event.tool, session: event.session, mode: event.mode)
+          at: Date(), event: event.event, tool: event.tool, session: event.session, mode: event.mode
+        )
         Task { await self.eventLog.record(inputRecord) }
 
         guard self.enabled else {
@@ -310,7 +313,8 @@ final class AppModel: ObservableObject {
     }
     departing = true
     defer { departing = false }
-    await panelController.depart(withWave: withWave, deadline: Date().timeIntervalSince1970 + seconds)
+    await panelController.depart(
+      withWave: withWave, deadline: Date().timeIntervalSince1970 + seconds)
   }
 
   // MARK: - Timer

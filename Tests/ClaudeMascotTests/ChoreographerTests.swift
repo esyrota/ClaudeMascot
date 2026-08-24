@@ -20,7 +20,9 @@ private final class FakeClock {
 // MARK: - Synthetic clip builders
 
 /// A looping variant clip in `group`, at `pose`.
-private func loopClip(_ id: String, pose: Pose, group: String, weight: Double = 1.0, duration: TimeInterval = 1)
+private func loopClip(
+  _ id: String, pose: Pose, group: String, weight: Double = 1.0, duration: TimeInterval = 1
+)
   -> Clip
 {
   Clip(
@@ -29,7 +31,9 @@ private func loopClip(_ id: String, pose: Pose, group: String, weight: Double = 
 }
 
 /// A non-looping transition edge between two different poses.
-private func edgeClip(_ id: String, from: Pose, to: Pose, motion: TimeInterval = 1, duration: TimeInterval = 5)
+private func edgeClip(
+  _ id: String, from: Pose, to: Pose, motion: TimeInterval = 1, duration: TimeInterval = 5
+)
   -> Clip
 {
   Clip(
@@ -155,7 +159,8 @@ func sameInputsReturnIdenticalClipWithinAnEpoch() {
   let clock = FakeClock()
   let a = loopClip("idle-a", pose: .standing, group: "idle", weight: 1)
   let b = loopClip("idle-b", pose: .standing, group: "idle", weight: 1)
-  let choreographer = Choreographer(manifest: manifest([a, b]), clock: { clock() }, fidgetChance: 0)
+  let choreographer = Choreographer(
+    manifest: manifest([a, b]), clock: { clock() }, fidgetChance: 0)
 
   // The exact same (target, displayed, now) triple, called three times: no
   // stored state means no run of calls can see a different answer than the
@@ -270,7 +275,8 @@ func fidgetInjectedWhenDueAndAbsentFidgetsFallThroughCleanly() {
   // fidgetChance: 1 forces "due" on every epoch, isolating the "is a fidget
   // ever returned at all" behaviour from the roll itself.
   let withFidget = Choreographer(
-    manifest: manifest([idle, blink]), clock: { clock() }, rotationPeriod: rotationPeriod, fidgetChance: 1)
+    manifest: manifest([idle, blink]), clock: { clock() }, rotationPeriod: rotationPeriod,
+    fidgetChance: 1)
   let picked = withFidget.clip(for: .idle, displayed: idle)
   #expect(picked?.id == "blink")
 
@@ -338,6 +344,37 @@ func aGroupedFidgetIsNeverPickedAsAVariant() {
   for _ in 0..<8 {
     #expect(choreographer.clip(for: .idle, displayed: idle)?.id == "idle")
     clock.advance(30)
+  }
+}
+
+/// Seam guard: `wave-off` is a standing self-edge shaped exactly like an
+/// ordinary fidget, and would be drawn as one for any standing state if it
+/// ever shipped without a `fidgetGroup`. That failure is silent everywhere
+/// but hardware — a departure clip stealing a beat from `.idle`,
+/// `.thinking`, `.waiting`, or `.done` looks like a slightly odd fidget, not
+/// a bug. Selection is seeded by epoch, so a single clock value proves
+/// nothing; this sweeps several hundred to make the guard mean something.
+@Test @MainActor
+func waveOffNeverLeaksIntoAStandingFidget() {
+  let clock = FakeClock()
+  let rotationPeriod: TimeInterval = 20
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  let thinking = loopClip("thinking", pose: .standing, group: "thinking")
+  let waiting = loopClip("waiting", pose: .standing, group: "waiting")
+  let done = loopClip("done", pose: .standing, group: "done")
+  let waveOff = selfEdgeClip("wave-off", pose: .standing, fidgetGroup: "away")
+  let choreographer = Choreographer(
+    manifest: manifest([idle, thinking, waiting, done, waveOff]), clock: { clock() },
+    rotationPeriod: rotationPeriod, fidgetChance: 1)
+
+  let targets: [(PanelState, Clip)] = [
+    (.idle, idle), (.thinking, thinking), (.waiting, waiting), (.done, done),
+  ]
+  for _ in 0..<400 {
+    for (state, displayed) in targets {
+      #expect(choreographer.clip(for: state, displayed: displayed)?.id != "wave-off")
+    }
+    clock.advance(rotationPeriod)
   }
 }
 

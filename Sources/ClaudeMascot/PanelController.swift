@@ -198,7 +198,8 @@ final class PanelController: ObservableObject {
     // actually changes `desired` (not when it was already `.idle`).
     defer {
       if desired != previousDesired {
-        logDecision(target: nil, displayed: displayed?.id, action: "noop", outcome: "ok", detail: nil)
+        logDecision(
+          target: nil, displayed: displayed?.id, action: "noop", outcome: "ok", detail: nil)
       }
     }
 
@@ -293,7 +294,8 @@ final class PanelController: ObservableObject {
     if isPanelOff {
       // Nothing on screen to take off it — a departure request that arrives
       // after idle escalation (or a previous departure) already went dark.
-      logDecision(target: nil, displayed: nil, action: "depart", outcome: "already off", detail: nil)
+      logDecision(
+        target: nil, displayed: nil, action: "depart", outcome: "already off", detail: nil)
       return
     }
 
@@ -307,7 +309,8 @@ final class PanelController: ObservableObject {
         try await panel.upload(waveClip)
         displayed = waveClip
         clipStartedAt = clock()
-        logDecision(target: waveClip.id, displayed: nil, action: "upload", outcome: "ok", detail: nil)
+        logDecision(
+          target: waveClip.id, displayed: nil, action: "upload", outcome: "ok", detail: nil)
         await sleeper(waveClip.motion)
       } catch {
         Self.log.error("wave-off upload failed: \(error.localizedDescription, privacy: .public)")
@@ -442,7 +445,9 @@ final class PanelController: ObservableObject {
 
   /// The next moment `clip` (the thing currently on the panel, started at
   /// `startedAt`) reaches a seam a swap may land on.
-  private func nextBoundary(after clip: Clip, startedAt: TimeInterval, now: TimeInterval) -> TimeInterval {
+  private func nextBoundary(after clip: Clip, startedAt: TimeInterval, now: TimeInterval)
+    -> TimeInterval
+  {
     guard clip.loops else {
       // Non-looping (transition) clips hand off at `motion`, not `duration`.
       // A transition clip ends on a long dwell frame so the panel has
@@ -489,7 +494,8 @@ final class PanelController: ObservableObject {
       clipStartedAt = nil
       nextRetryAt = nil
       Self.log.notice("panel off (desired \(self.desired.rawValue, privacy: .public))")
-      logDecision(target: nil, displayed: displayedBefore, action: "powerOff", outcome: "ok", detail: nil)
+      logDecision(
+        target: nil, displayed: displayedBefore, action: "powerOff", outcome: "ok", detail: nil)
     } catch {
       Self.log.error("power off failed: \(error.localizedDescription, privacy: .public)")
       scheduleRetry()
@@ -525,7 +531,9 @@ final class PanelController: ObservableObject {
       clipStartedAt = now
       nextRetryAt = nil
       Self.log.notice("panel woke showing \(targetClip.id, privacy: .public)")
-      logDecision(target: targetClip.id, displayed: displayedBefore, action: "wake", outcome: "ok", detail: nil)
+      logDecision(
+        target: targetClip.id, displayed: displayedBefore, action: "wake", outcome: "ok",
+        detail: nil)
     } catch {
       Self.log.error("wake failed: \(error.localizedDescription, privacy: .public)")
       scheduleRetry()
@@ -543,7 +551,8 @@ final class PanelController: ObservableObject {
       clipStartedAt = clock()
       nextRetryAt = nil
       Self.log.notice("showing \(target.id, privacy: .public)")
-      logDecision(target: target.id, displayed: displayedBefore, action: "upload", outcome: "ok", detail: nil)
+      logDecision(
+        target: target.id, displayed: displayedBefore, action: "upload", outcome: "ok", detail: nil)
     } catch {
       let reason = error.localizedDescription
       Self.log.error(
@@ -563,7 +572,9 @@ final class PanelController: ObservableObject {
   /// can never delay or reorder the state machine. `DecisionRecord.at` uses
   /// real wall time rather than `clock()` because the fake clock tests inject
   /// is not wall time and would make logged timestamps meaningless.
-  private func logDecision(target: String?, displayed: String?, action: String, outcome: String, detail: String?) {
+  private func logDecision(
+    target: String?, displayed: String?, action: String, outcome: String, detail: String?
+  ) {
     guard let eventLog else { return }
     let record = DecisionRecord(
       at: Date(),

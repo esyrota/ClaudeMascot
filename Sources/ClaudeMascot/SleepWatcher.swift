@@ -117,7 +117,7 @@ final class SleepWatcher {
 /// `AppModel`.
 private func sleepCallback(
   refCon: UnsafeMutableRawPointer?,
-  service: io_service_t,
+  _: io_service_t,
   messageType: UInt32,
   messageArgument: UnsafeMutableRawPointer?
 ) {
