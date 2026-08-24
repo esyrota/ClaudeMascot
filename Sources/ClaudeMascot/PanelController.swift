@@ -97,9 +97,21 @@ final class PanelController: ObservableObject {
   /// must be side-effect-free: the second argument is `displayed` at the
   /// moment of the call, not a state the resolver should mutate or remember.
   private let resolve: (PanelState, Clip?) -> Clip?
+  /// Looks a clip up by manifest id, independent of `PanelState`. `depart`
+  /// is the only caller: `wave-off` is not something any `PanelState` ever
+  /// resolves to (there is no `.waving`), so reaching it needs a seam of its
+  /// own rather than overloading `resolve`. `nil` in every existing test,
+  /// which is how they construct unchanged.
+  private let clipByID: (String) -> Clip?
   private let timings: PanelTimings
   private let brightness: () -> Int
   private let clock: () -> TimeInterval
+  /// How `depart` waits between polling `tick()`, and how it waits out the
+  /// wave's motion. Injected like `clock`: a real `Task.sleep` would make
+  /// `depart` untestable next to the fake-clock tests everything else in
+  /// this file already uses. The default sleeps for real; tests advance the
+  /// fake clock instantly instead of actually waiting.
+  private let sleeper: (TimeInterval) async -> Void
   /// Where every decision this machine makes gets logged, for later tuning.
   /// `nil` in every existing test, which is how they construct unchanged.
   private let eventLog: EventLog?
@@ -151,16 +163,22 @@ final class PanelController: ObservableObject {
   init(
     panel: any PanelDriving,
     resolve: @escaping (PanelState, Clip?) -> Clip?,
+    clipByID: @escaping (String) -> Clip? = { _ in nil },
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
     clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
+    sleeper: @escaping (TimeInterval) async -> Void = {
+      try? await Task.sleep(for: .seconds($0))
+    },
     eventLog: EventLog? = nil
   ) {
     self.panel = panel
     self.resolve = resolve
+    self.clipByID = clipByID
     self.timings = timings
     self.brightness = brightness
     self.clock = clock
+    self.sleeper = sleeper
     self.eventLog = eventLog
     self.idleSince = clock()
     self.appearingUntil = timings.startingHold > 0 ? clock() + timings.startingHold : nil
@@ -264,6 +282,52 @@ final class PanelController: ObservableObject {
     }
 
     await driveTowards(currentTarget(now: now), now: now)
+  }
+
+  /// Takes the mascot off the panel now, rather than at the app's tick rate,
+  /// and returns once he is gone or `deadline` has passed. Used by the sleep
+  /// and quit paths, which each hold a scarce resource (system sleep, app
+  /// termination) only long enough for this to finish or time out — see
+  /// Docs/_logs/2026-08-24. Sleep Exit/Plan.md § Architecture decisions.
+  func depart(withWave: Bool, deadline: TimeInterval) async {
+    if isPanelOff {
+      // Nothing on screen to take off it — a departure request that arrives
+      // after idle escalation (or a previous departure) already went dark.
+      logDecision(target: nil, displayed: nil, action: "depart", outcome: "already off", detail: nil)
+      return
+    }
+
+    if withWave, displayed?.endPose == .standing, let waveClip = clipByID("wave-off") {
+      // Uploaded directly rather than through `driveTowards`: the lid is
+      // closing and the seam is worth less than the beat, so this is the one
+      // deliberate exception to boundary gating in the whole machine. A
+      // failed upload here is not fatal — the walk below still runs and gets
+      // him off the panel either way, which matters more than the wave did.
+      do {
+        try await panel.upload(waveClip)
+        displayed = waveClip
+        clipStartedAt = clock()
+        logDecision(target: waveClip.id, displayed: nil, action: "upload", outcome: "ok", detail: nil)
+        await sleeper(waveClip.motion)
+      } catch {
+        Self.log.error("wave-off upload failed: \(error.localizedDescription, privacy: .public)")
+        logDecision(
+          target: waveClip.id, displayed: displayed?.id, action: "upload", outcome: "failed",
+          detail: error.localizedDescription)
+      }
+    }
+
+    handle(.off)
+    while !isPanelOff, clock() < deadline {
+      await tick()
+      if !isPanelOff {
+        await sleeper(0.1)
+      }
+    }
+
+    logDecision(
+      target: nil, displayed: displayed?.id, action: "depart",
+      outcome: isPanelOff ? "left" : "deadline", detail: nil)
   }
 
   /// One boundary-gated step towards `targetState`: resolve it to a clip and
