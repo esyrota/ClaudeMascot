@@ -167,6 +167,56 @@ blend between `MASCOT` and `MASCOT_DARK` spans 20% of luma with no clean progres
 stays a texture tool. (Card B's own fit is weak — a nearly uniform card gives the aligner
 nothing to lock onto — so treat its numbers as indicative and card E's as the evidence.)
 
+## The overlay's colours, measured
+
+**Measured 2026-08-26** from four videos (`art/photos/IMG_2806–2809.mov`), panel beside an
+on-screen copy in the same frame, frames averaged. Cards `h-overlay-whites` and
+`h-overlay-ramps`.
+
+### A warm white is not warm enough to be white
+
+Every white on this panel photographs **blue**, and lowering the authored blue moves it
+but does not fix it:
+
+| authored | B/R at brightness 100 | B/R at brightness 30 |
+|---|---|---|
+| `(255,255,255)` white | 1.67 | 1.44 |
+| `(128,128,128)` half white | 1.74 | 1.52 |
+| `(255,245,200)` | 1.57 | 1.36 |
+| `(255,235,150)` | 1.45 | 1.28 |
+| `(255,225,96)` | **1.25** | **1.15** |
+
+A neutral white would sit at B/R = 1.0. Dropping authored blue from 255 to 96 buys about
+0.4 of ratio and still lands blue. The trend is smooth and roughly linear in authored
+blue, so **neutral needs blue near 40–60, and anything meant to read warm needs less
+still**. This sharpens the older "white is dim and blue" note, which came from 2px sleep
+bubbles: the effect is real, it is not bloom, and it survives at both brightnesses.
+
+**Consequence for [[Status Overlay]]:** a white marker pixel is not available. The marker
+is either a much lower blue (40–60), or `B = 0` and frankly yellow.
+
+### The fill ramp: green and amber wash out, red does not
+
+Panel RGB for a full-width 1px row, brightness 100:
+
+| authored | panel RGB | G/R | B/R | reads as |
+|---|---|---|---|---|
+| `(0,255,0)` | (130,190,137) | 1.46 | 1.05 | pale mint, not green |
+| `(255,160,0)` | (187,181,122) | 0.97 | 0.66 | pale cream, not amber |
+| `(255,0,0)` | (199,72,13) | 0.36 | 0.06 | orange-red, saturated |
+
+The panel manufactures both red and blue into a pure green, and the authored amber carries
+so much green that it lands nearly neutral. Green and amber therefore sit close together —
+both pale — while red is clearly separated. **A green→amber→red ramp authored naively does
+not give three distinct steps on this panel**; the amber needs far less green (the mixture
+table above puts file green 96 at G/R 0.68 and green 40 at 0.40).
+
+### The 1px marker is legible, which was the open question
+
+A single unlit pixel punched into a lit 1px row reads at **2.2× to 6.3×** contrast against
+the row around it, across all three ramp colours and both brightnesses. The marker design
+in [[Status Overlay]] rests on this and it holds.
+
 ## Some images will not upload at all, and it is not their size
 
 **Measured 2026-08-26, cause unknown.** A test card carrying a white swatch, three
