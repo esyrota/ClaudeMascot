@@ -6,7 +6,9 @@ ship; if it is here, the image below is the exact animation on the panel.
 
 The images are the bundled 32×32 GIFs scaled 6× with nearest-neighbour by
 `art/export_docs.py` — every pixel reproduced as a block of pixels, no frame added,
-dropped or retimed. Regenerate them whenever the art changes:
+dropped or retimed. The displayed images are rendered through `panel_preview()` and
+show the panel's predicted appearance, not the raw file bytes. Regenerate them whenever
+the art changes:
 
 ```bash
 venv/bin/python art/generate.py
