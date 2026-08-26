@@ -120,6 +120,19 @@ and 14 it comes alive.
 floor, and it has been sitting on this page as an unexplained anomaly since the beginning.
 It is also exactly what killed the encode: a green of 5 is *under the floor*.
 
+### It makes its own blue into a *green* too, not just a grey
+
+**Observed 2026-08-27** on the status rail. A fill authored `(8, 24, 0)` — blue at zero,
+red barely above the floor — photographed distinctly **cyan** on the panel. The
+manufactured blue is not a property of greys and warm mixtures alone; a green with no
+authored blue gets it as well, and at low levels it dominates, because green and the
+invented blue are then the only two channels doing anything.
+
+**Consequence for anything meant to recede.** A cool colour beside the warm mascot
+*separates* rather than sitting behind it, however dim it is — dimming a cyan does not make
+it recede, it makes it a dim cyan. [[Status Overlay]]'s rail is therefore red-dominant with
+`B = 0` at every step, including the one that used to be green.
+
 ### The panel makes its own blue
 
 Every measurement above comes from a file with **blue = 0**, and the panel returns

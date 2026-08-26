@@ -203,10 +203,10 @@ the palette later, once there is a rail on the panel to look at.
 
 | role | authored | why this value |
 |---|---|---|
-| fill, low | `(8, 24, 0)` | a muted olive-green |
-| fill, mid | `(24, 16, 0)` | a muted amber |
-| fill, high | `(24, 0, 0)` | a muted red |
-| clock marker | `(32, 28, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
+| fill, low | `(8, 0, 0)` | **almost black** — green means nothing needs attention, so it gets the dimmest lit value the panel has, on one channel |
+| fill, mid | `(16, 8, 0)` | barely there |
+| fill, high | `(24, 0, 0)` | left the brightest of the three: the one state worth interrupting for |
+| clock marker | `(16, 12, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
 
 **Darkened and desaturated 2026-08-27** after seeing the first set on the panel: authored at full
 channel values it read *louder* than the mascot, which inverts the intended reading — the rail is
