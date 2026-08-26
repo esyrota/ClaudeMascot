@@ -35,9 +35,14 @@
   by side. A second photograph to re-decide is far more expensive than three swatches in
   the first one.
 - **Blue stays out.** `panel_encode` of a zero is zero, so `B = 0` survives the transform
-  untouched — but the `MIN_COLORS` padding deliberately writes small blues, which is
-  exactly the value range the measured curve says is not free and the `B=4` anomaly says
-  is not understood. That is why chunk 5 exists.
+  untouched. **Correction to the task's premise:** `pad_palette()` no longer nudges blue —
+  it already moved to nudging *red* downward (247–254), for exactly the reason the curve
+  now confirms, and its docstring says so. So chunk 5 is not "stop using blue"; it is
+  "does the padding still do anything once colours are encoded, and do its values stay
+  distinct through the transform".
+- **Pad first, encode second.** `pad_palette()` and `body_pixel_count()` compare pixels
+  against `MASCOT` **by exact equality**. Encoding before they run would break both
+  silently. The order inside `save()` is: pad in display space, then encode, then write.
 
 ## Integration seams
 
@@ -105,11 +110,14 @@ position, written to `art/testcards/shade-test.gif`.
 **Verify:** the clip's three shade regions carry three distinct encoded values; typecheck
 the module by running it.
 
-**5 — `MIN_COLORS` decision.** Measure rather than assume: build the encoded palette for
-every clip and record how many distinct colours each carries without padding. Decide —
-keep, shrink, or drop the blue-nudge — and write the reason into [[Art Pipeline]] and
-[[Panel Quirks]]'s *Palette* section. If padding stays, it must not use blue values the
-curve says are unpredictable; nudging red on body pixels is the obvious alternative.
+**5 — `MIN_COLORS` decision.** Measure rather than assume. Two questions: (a) how many
+distinct colours does each clip carry *after* encoding and before padding, and (b) do
+`pad_palette`'s red nudges (247–254) survive the encode as distinct palette entries, or
+do some collapse onto each other? Encoding compresses the top of the range —
+`encode(255)=255`, `encode(254)≈252`, `encode(253)≈249` — so they should stay distinct at
+roughly 3× the spacing, but that is a prediction to check, not an assumption. Decide keep
+/ shrink / drop and write the reason into [[Art Pipeline]] and [[Panel Quirks]]'s
+*Palette* section.
 **Verify:** every generated GIF still lands on a ≥16-entry palette (or the decision is
 recorded with the count that justifies it).
 
