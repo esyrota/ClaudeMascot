@@ -51,15 +51,16 @@ MASCOT = (255, 68, 0)
 
 # The shade used where the mascot turns away from the viewer: `MASCOT` scaled
 # uniformly, which holds hue and saturation and moves only value -- what a shadow
-# is. SHADE_SCALE is now a DISPLAY-space ratio: `panel_encode()` handles the panel's
-# curve at the write path (see `save()`), so the bisection history that picked 0.60
-# against raw panel photographs is superseded by that curve, and this value is
-# pending a fresh photograph to confirm it still reads once encoded.
+# is. SHADE_SCALE = 0.85 is a DISPLAY-space ratio: it reproduces roughly the shade
+# the panel has been showing all along. The value is provisional until the chunk-6
+# photograph picks between 0.85, 0.75 and 0.65. `panel_encode()` handles the panel's
+# curve at the write path (see `save()`), so this value is arithmetic rather than
+# bisection against panel photographs.
 #
 # Still true and still useful: red is what makes a shade read as dirty and green is
 # what makes it read as visible at all, so the usable window sits between "red falls
 # off a cliff" and "too pale to see." Turn this one number if the step looks wrong.
-SHADE_SCALE = 0.60
+SHADE_SCALE = 0.85
 MASCOT_DARK = tuple(round(c * SHADE_SCALE) for c in MASCOT)
 
 EYE = (0, 0, 0)
