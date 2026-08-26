@@ -251,6 +251,77 @@ def card_g_body() -> Image.Image:
     return im
 
 
+# Card H: status overlay colours and markers.
+OVERLAY_WHITE = (255, 255, 255)
+OVERLAY_WARM_WHITES = [
+    (255, 245, 200),    # barely warm — most blue
+    (255, 235, 150),    # warmer
+    (255, 225, 96),     # warmest still readable as white
+]
+OVERLAY_RAMP = [
+    (0, 255, 0),        # green
+    (255, 160, 0),      # amber
+    (255, 0, 0),        # red
+]
+
+
+def card_h_overlay() -> Image.Image:
+    """Characterisation card for the status overlay: white reference, warm-white
+    candidates for the clock marker, ramp colours as 1px rows, and marker cases.
+
+    The card shows in separate bands: a solid white swatch (to verify white
+    reads as white), three warm-white candidates for the clock marker,
+    progressively warmer in hue; the three ramp colours (green, amber, red)
+    each drawn as a full-width 1px row; and each ramp row paired with a version
+    showing an unlit pixel punched into the middle. Below, a demonstration of
+    a warm-white pixel on black background (the clock marker case).
+    """
+    im = _blank()
+    px = im.load()
+
+    # Band 1: solid white swatch (rows 0–5)
+    _fill(im, 0, 0, 31, 5, OVERLAY_WHITE)
+
+    # Band 2: three warm-white candidates (rows 7–11, separated by row 6 black)
+    for col, rgb in enumerate(OVERLAY_WARM_WHITES):
+        x_start = col * 11
+        x_end = min(x_start + 10, 31)
+        _fill(im, x_start, 7, x_end, 11, rgb)
+
+    # Band 3: green 1px ramp (row 13), then green with middle pixel unlit (row 14)
+    for x in range(SIZE):
+        px[x, 13] = OVERLAY_RAMP[0]
+    for x in range(SIZE):
+        if x == 16:
+            px[x, 14] = (0, 0, 0)  # single unlit pixel in the middle
+        else:
+            px[x, 14] = OVERLAY_RAMP[0]
+
+    # Band 4: amber 1px ramp (row 16), then amber with middle pixel unlit (row 17)
+    for x in range(SIZE):
+        px[x, 16] = OVERLAY_RAMP[1]
+    for x in range(SIZE):
+        if x == 16:
+            px[x, 17] = (0, 0, 0)
+        else:
+            px[x, 17] = OVERLAY_RAMP[1]
+
+    # Band 5: red 1px ramp (row 19), then red with middle pixel unlit (row 20)
+    for x in range(SIZE):
+        px[x, 19] = OVERLAY_RAMP[2]
+    for x in range(SIZE):
+        if x == 16:
+            px[x, 20] = (0, 0, 0)
+        else:
+            px[x, 20] = OVERLAY_RAMP[2]
+
+    # Band 6: marker demonstration — warm-white pixel on black (rows 22–27, centre)
+    _fill(im, 6, 22, 25, 27, (0, 0, 0))  # black background
+    px[16, 24] = OVERLAY_WARM_WHITES[0]  # single warm-white marker pixel in centre
+
+    return im
+
+
 CARDS = [
     ("a-ramps", card_a_ramps, "per-channel transfer curve (R, G, B, grey; dark → bright)"),
     ("b-halftones", card_b_halftones, "1px and 2px dithers against the solids they average to"),
@@ -259,7 +330,20 @@ CARDS = [
     ("e-gamma", card_e_gamma, "gamma-encoded ladders above naive ones — the model's falsification test"),
     ("f-mixture", card_f_mixture, "a green sweep beside a saturated red — where a small channel starts to register"),
     ("g-body", card_g_body, "candidate body colours against the brand salmon — pick MASCOT from a photograph"),
+    ("h-overlay", card_h_overlay, "status overlay: white, warm-white for clock, ramp colours as 1px rows, and markers"),
 ]
+
+
+def _check_card_h_channel_floor() -> None:
+    """Assertion: no colour on card H uses a channel in 1–7 (the measured floor
+    where small channels contribute nothing). All channels must be 0 or 8+."""
+    all_colours = [OVERLAY_WHITE] + OVERLAY_WARM_WHITES + OVERLAY_RAMP + [(0, 0, 0)]
+    for rgb in all_colours:
+        for channel in rgb:
+            if 1 <= channel <= 7:
+                raise AssertionError(
+                    f"card_h_overlay: colour {rgb} has channel {channel} in floor range 1–7"
+                )
 
 
 def save_gif(im: Image.Image, path: Path) -> None:
@@ -310,6 +394,7 @@ def reference_html(path: Path) -> None:
 
 
 def main() -> None:
+    _check_card_h_channel_floor()
     OUT.mkdir(exist_ok=True)
     for name, build, _ in CARDS:
         path = OUT / f"{name}.gif"
