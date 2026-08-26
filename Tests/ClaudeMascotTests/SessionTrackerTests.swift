@@ -293,7 +293,8 @@ func stopMidToolNeverBecomesDone() {
 }
 
 @MainActor
-@Test("a Stop after real work derives done past settleAfter, and idle past settleAfter + doneCountsFor")
+@Test(
+  "a Stop after real work derives done past settleAfter, and idle past settleAfter + doneCountsFor")
 func stopAfterRealWorkEarnsDoneThenExpires() {
   let clock = FakeClock()
   let tracker = SessionTracker(clock: clock.callAsFunction, doneCountsFor: 30, settleAfter: 5)
@@ -367,7 +368,9 @@ func sessionEndFollowedByToolUseNeverGoesOff() {
 }
 
 @MainActor
-@Test("a SessionEnd with nothing following derives off once past settleAfter, and reap empties the tracker")
+@Test(
+  "a SessionEnd with nothing following derives off once past settleAfter, and reap empties the tracker"
+)
 func sessionEndAloneSettlesToOffAndReaps() {
   let clock = FakeClock()
   let tracker = SessionTracker(clock: clock.callAsFunction, settleAfter: 5)

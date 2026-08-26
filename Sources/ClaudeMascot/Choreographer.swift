@@ -121,7 +121,9 @@ final class Choreographer {
     // a fresh arrival, or the entrance would replay forever and a fidget
     // would look like a re-entrance. `done-enter` is the celebration chunk 9
     // authors; most groups have none yet, so this falls through cleanly.
-    let justArrived = displayed.map { $0.variantGroup != nil ? $0.variantGroup != group : isRealTransition($0) } ?? true
+    let justArrived =
+      displayed.map { $0.variantGroup != nil ? $0.variantGroup != group : isRealTransition($0) }
+      ?? true
     if justArrived {
       if let enterClip = manifest["\(group)-enter"], !enterClip.loops {
         return enterClip
@@ -133,7 +135,9 @@ final class Choreographer {
     // the entrance/variant settle first), and never for `.off`, which has
     // no body on the panel to move.
     if target != .off, let displayed, !isRealTransition(displayed) {
-      if fidgetDue(group: group, now: now), let fidget = selectFidget(group: group, pose: targetPose, now: now) {
+      if fidgetDue(group: group, now: now),
+        let fidget = selectFidget(group: group, pose: targetPose, now: now)
+      {
         return fidget
       }
     }

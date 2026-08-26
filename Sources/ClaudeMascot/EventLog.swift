@@ -12,12 +12,12 @@ struct InputRecord: Codable, Sendable {
 /// One logged panel decision.
 struct DecisionRecord: Codable, Sendable {
   let at: Date
-  let desired: String       // PanelState.rawValue
-  let target: String?       // what the machine resolved to show, if any
-  let displayed: String?    // what was on the panel before this decision
-  let action: String        // "upload" | "powerOff" | "wake" | "noop"
-  let outcome: String       // "ok" | "failed" | "skipped"
-  let detail: String?       // error text or a short reason; nil when uninteresting
+  let desired: String  // PanelState.rawValue
+  let target: String?  // what the machine resolved to show, if any
+  let displayed: String?  // what was on the panel before this decision
+  let action: String  // "upload" | "powerOff" | "wake" | "noop"
+  let outcome: String  // "ok" | "failed" | "skipped"
+  let detail: String?  // error text or a short reason; nil when uninteresting
 }
 
 /// Always-on JSONL logging of hook input and panel decisions, so the
