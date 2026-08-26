@@ -43,30 +43,27 @@ enum UsageRail {
   /// A cool colour beside a warm mascot separates rather than recedes, which
   /// is the opposite of what a background layer should do.
   ///
-  /// **Aiming at neutral, by authoring no blue at all.** Authoring a grey is
-  /// the worst available move here — [[Panel Quirks]] photographs `(64,64,64)`
-  /// as `(70,91,193)` and `(134,134,134)` as `(76,96,205)`, both plainly blue.
-  /// The panel invents blue roughly in proportion to total drive, so the route
-  /// to a neutral is `B = 0` plus enough red and green to balance what it
-  /// adds; the R:G ratio here is about 1.22:1, red-leaning to counter a blue
-  /// that arrives on its own.
+  /// **Settled here after trying darker and trying neutral, and preferring
+  /// this.** Two later attempts are recorded in [[Panel Quirks]] rather than in
+  /// the values: taking `fillLow` to `(8,0,0)` made the rail brown, and chasing
+  /// a neutral by raising red and green to balance the panel's invented blue
+  /// made it brighter than a background layer should be. Dim and neutral are
+  /// mutually exclusive here, so this set accepts a slight cool cast at the
+  /// bottom of the range in exchange for staying faint. Good enough beat both
+  /// corrections.
   ///
-  /// **This is why the steps differ in brightness rather than hue.** Dim and
-  /// neutral are mutually exclusive on this panel: at low drive the invented
-  /// blue outweighs the authored channels and the pixel goes cyan whatever its
-  /// hue was meant to be — observed at `(16,12,0)`, a warm colour with no blue,
-  /// which photographed cyan. So `fillLow` cannot be both almost-black and
-  /// neutral. If it must be invisible, the honest move is to stop drawing it. Blue stays 0 throughout
-  /// (blue beside a saturated warm channel is the measured magenta failure)
-  /// and no channel lands in 1-7 (the mixture floor).
-  static let fillLow = RGB(r: 20, g: 16, b: 0)
-  static let fillMid = RGB(r: 32, g: 26, b: 0)
-  static let fillHigh = RGB(r: 48, g: 39, b: 0)
+  /// If this ever needs to be genuinely invisible when usage is low, the move
+  /// is structural, not chromatic: stop drawing `fillLow` at all. There is no
+  /// authored value on this panel that renders as a faint neutral.
+
+  static let fillLow = RGB(r: 8, g: 24, b: 0)
+  static let fillMid = RGB(r: 24, g: 16, b: 0)
+  static let fillHigh = RGB(r: 24, g: 0, b: 0)
   /// A warm yellow, deliberately not a white: every white measured on this
   /// panel comes back blue (B/R 1.15–1.74), and a blue marker beside a
   /// saturated fill is the documented magenta failure. `B = 0` sidesteps
   /// both. Do not "improve" this toward white.
-  static let marker = RGB(r: 40, g: 33, b: 0)
+  static let marker = RGB(r: 32, g: 28, b: 0)
 
   /// Renders the 5-hour usage rail into row 0, or `nil` when there is
   /// nothing to draw.

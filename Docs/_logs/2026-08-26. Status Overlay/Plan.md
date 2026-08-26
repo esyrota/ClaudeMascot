@@ -203,10 +203,10 @@ the palette later, once there is a rail on the panel to look at.
 
 | role | authored | why this value |
 |---|---|---|
-| fill, low | `(8, 0, 0)` | **almost black** — green means nothing needs attention, so it gets the dimmest lit value the panel has, on one channel |
-| fill, mid | `(16, 8, 0)` | barely there |
-| fill, high | `(24, 0, 0)` | left the brightest of the three: the one state worth interrupting for |
-| clock marker | `(16, 12, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
+| fill, low | `(8, 24, 0)` | faint, slightly cool — green means nothing needs attention |
+| fill, mid | `(24, 16, 0)` | barely there |
+| fill, high | `(24, 0, 0)` | the brightest of the three: the one state worth interrupting for |
+| clock marker | `(32, 28, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
 
 **Darkened and desaturated 2026-08-27** after seeing the first set on the panel: authored at full
 channel values it read *louder* than the mascot, which inverts the intended reading — the rail is
@@ -290,3 +290,21 @@ edge, and that a `done-flag` celebration crossing row 0 self-corrects.
 - **Labels.** The mechanism is built so labelled bars are possible; none is drawn here.
 - **White balance.** Greys still render blue; `LAPTOP_GREY` ships that way.
 - **The single-pixel graffiti write.** Dropped, not deferred — see [[Task]].
+
+## Where the colours landed
+
+Four rounds of looking at the panel, ending one step back from the furthest point:
+
+| round | change | verdict |
+|---|---|---|
+| 1 | full channel values | louder than the mascot |
+| 2 | darkened and desaturated | better |
+| 3 | taken to the channel floor | **kept** |
+| 4 | `fillLow` to `(8,0,0)`, all red-dominant | read brown |
+| 5 | raised R and G to chase a neutral | brighter than a background wants |
+
+Round 3 is what ships. Rounds 4 and 5 were not wasted — they produced the two
+[[Panel Quirks]] findings that say why no further tuning would have helped: the panel invents
+blue in proportion to drive, so **dim and neutral are mutually exclusive**, and a grey is the
+worst thing to author against that. Getting a genuinely invisible low state is structural —
+stop drawing it — not a colour choice.
