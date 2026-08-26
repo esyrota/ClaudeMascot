@@ -14,14 +14,25 @@ enum UsageRail {
   /// gamma, or any other curve to these values** — that curve corrects
   /// brightness, not hue, and applying it here is what once rendered the
   /// mascot pure red. These four go to the panel byte-for-byte.
-  static let fillLow = RGB(r: 0, g: 255, b: 0)
-  static let fillMid = RGB(r: 255, g: 110, b: 0)
-  static let fillHigh = RGB(r: 255, g: 0, b: 0)
+
+  /// **Darkened and desaturated 2026-08-27, from looking at the panel.** The
+  /// first set was authored at full channel values and read louder than the
+  /// mascot, which inverts the intended reading — the rail is background, the
+  /// mascot is the subject. Every value now sits low on the panel's response
+  /// curve, which is where its steep region is: [[Panel Quirks]] measures an
+  /// authored 8 at 42% of full brightness and everything from 96 up within 20%
+  /// of maximum, so dropping from 255 to ~56 buys real dimming where dropping
+  /// from 255 to 160 would have bought almost none. Blue stays 0 throughout
+  /// (blue beside a saturated warm channel is the measured magenta failure)
+  /// and no channel lands in 1-7 (the mixture floor).
+  static let fillLow = RGB(r: 16, g: 56, b: 0)
+  static let fillMid = RGB(r: 56, g: 28, b: 0)
+  static let fillHigh = RGB(r: 56, g: 0, b: 0)
   /// A warm yellow, deliberately not a white: every white measured on this
   /// panel comes back blue (B/R 1.15–1.74), and a blue marker beside a
   /// saturated fill is the documented magenta failure. `B = 0` sidesteps
   /// both. Do not "improve" this toward white.
-  static let marker = RGB(r: 255, g: 230, b: 0)
+  static let marker = RGB(r: 64, g: 56, b: 0)
 
   /// Renders the 5-hour usage rail into row 0, or `nil` when there is
   /// nothing to draw.

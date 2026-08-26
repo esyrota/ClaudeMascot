@@ -203,10 +203,17 @@ the palette later, once there is a rail on the panel to look at.
 
 | role | authored | why this value |
 |---|---|---|
-| fill, low | `(0, 255, 0)` | reads pale mint, not green — accepted; it is clearly distinct from the other two |
-| fill, mid | `(255, 110, 0)` | the measured `(255,160,0)` came out nearly neutral at G/R 0.97; the mixture table puts file green ~96–110 near G/R 0.68, which should read as a real amber |
-| fill, high | `(255, 0, 0)` | measured (199,72,13), the one authored colour that survived unchanged |
-| clock marker | `(255, 230, 0)` | **a warm yellow, not a white.** Every white measured blue (B/R 1.15–1.74) and blue near the fill risks the magenta failure, so the marker takes `B = 0` and is frankly yellow rather than a white that isn't one |
+| fill, low | `(16, 56, 0)` | a muted olive-green |
+| fill, mid | `(56, 28, 0)` | a muted amber |
+| fill, high | `(56, 0, 0)` | a muted red |
+| clock marker | `(64, 56, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
+
+**Darkened and desaturated 2026-08-27** after seeing the first set on the panel: authored at full
+channel values it read *louder* than the mascot, which inverts the intended reading — the rail is
+background, the mascot is the subject. The new values sit low on the panel's response curve,
+which is the only place real dimming is available: an authored 8 already reaches 42% of full
+brightness and everything from 96 up lands within 20% of maximum, so 255 → 56 buys a genuine drop
+where 255 → 160 would have bought almost nothing.
 
 Every value clears the 1–7 channel floor. **Known imperfect:** low and mid may still sit closer
 together on the panel than a traffic-light ramp wants, and the marker is yellow where the
@@ -248,7 +255,17 @@ a changed key defers to the boundary like any other swap and logs the deferral.
 **Verify:** `PanelControllerTests` — a changed overlay key mid-loop re-uploads at the seam and
 not before; an unchanged key never uploads; power-off clears both halves of the pair.
 
-**10 — First run, Settings, and the final gates.** A second, independently declinable offer to
+**10 — Wiring it up in `AppModel`.** Added at execution time: chunks 6–9 each landed their half
+of a seam with a `nil`-defaulting provider, so the feature currently builds, tests green, and
+draws nothing. `AppModel` is the only place that owns everything at once, and it must: load the
+cached `UsageSnapshot` at launch; observe `HookServer.lastUsage` and persist each new one; render
+`UsageRail` against the current clock; hand the resulting `Overlay?` to `PanelAdapter` and its
+`key` to `PanelController`. Keep the rendering in one place so the adapter and the controller can
+never disagree about what is on the panel.
+**Verify:** the two providers are fed from one source; a snapshot arriving over the socket
+produces a non-nil overlay; no overlay is produced with no data. Full build, medium risk.
+
+**11 — First run, Settings, and the final gates.** A second, independently declinable offer to
 install the statusline wrapper beside the existing plugin offer, and a Settings row showing
 wrapper status with Install / Uninstall, probed the way `PluginInstaller` probes the plugin. **It
 must preserve the user's existing statusline command**, not replace it, and must never write to
@@ -258,7 +275,7 @@ tree: `swift-format format -ir`, `swift-format lint`, `swift build` warning-free
 **Verify:** install/uninstall round-trips a fixture settings file with an existing statusline
 command intact; all gates clean; `git status` shows exactly the expected set.
 
-**11 — HARDWARE GATE. The rail on the panel.** Rebuild and reinstall the app, then look at it:
+**12 — HARDWARE GATE. The rail on the panel.** Rebuild and reinstall the app, then look at it:
 rail visible under a mascot at both brightnesses, **on video**. Check the marker against the fill
 edge, and that a `done-flag` celebration crossing row 0 self-corrects.
 **Verify:** the rail reads correctly on the panel, or a feedback round is opened.
