@@ -1,7 +1,7 @@
 {
   "dancing": {
     "gif_bytes": 3615,
-    "crc32": 2298455979,
+    "crc32": 3195307857,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -17,7 +17,7 @@
   },
   "done": {
     "gif_bytes": 3457,
-    "crc32": 1197498864,
+    "crc32": 503090583,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -32,7 +32,7 @@
   },
   "done-enter": {
     "gif_bytes": 3007,
-    "crc32": 1355617138,
+    "crc32": 777436215,
     "outer_chunks": 1,
     "ble_packets": 6,
     "packet_lengths": [
@@ -46,7 +46,7 @@
   },
   "done-flag": {
     "gif_bytes": 12799,
-    "crc32": 1373919922,
+    "crc32": 1064513406,
     "outer_chunks": 4,
     "ble_packets": 29,
     "packet_lengths": [
@@ -83,7 +83,7 @@
   },
   "doze-to-stand": {
     "gif_bytes": 2709,
-    "crc32": 792513192,
+    "crc32": 3285229548,
     "outer_chunks": 1,
     "ble_packets": 6,
     "packet_lengths": [
@@ -97,7 +97,7 @@
   },
   "fidget-look": {
     "gif_bytes": 963,
-    "crc32": 2007997383,
+    "crc32": 1818006303,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -107,7 +107,7 @@
   },
   "fidget-stretch": {
     "gif_bytes": 1349,
-    "crc32": 820269325,
+    "crc32": 2753816748,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -118,7 +118,7 @@
   },
   "idle": {
     "gif_bytes": 1333,
-    "crc32": 3208500142,
+    "crc32": 2522110967,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -138,7 +138,7 @@
   },
   "sink": {
     "gif_bytes": 777,
-    "crc32": 221423213,
+    "crc32": 1066819653,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -148,7 +148,7 @@
   },
   "sit-to-stand": {
     "gif_bytes": 640,
-    "crc32": 3142487182,
+    "crc32": 694311946,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -158,7 +158,7 @@
   },
   "sleeping": {
     "gif_bytes": 3880,
-    "crc32": 445925748,
+    "crc32": 3189630929,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -174,7 +174,7 @@
   },
   "stand-to-doze": {
     "gif_bytes": 969,
-    "crc32": 3965972910,
+    "crc32": 1681825394,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -184,7 +184,7 @@
   },
   "stand-to-sit": {
     "gif_bytes": 640,
-    "crc32": 3486087419,
+    "crc32": 1577004196,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -194,7 +194,7 @@
   },
   "starting": {
     "gif_bytes": 3077,
-    "crc32": 535968147,
+    "crc32": 928573335,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -209,7 +209,7 @@
   },
   "thinking": {
     "gif_bytes": 967,
-    "crc32": 1129559788,
+    "crc32": 1605759111,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -219,7 +219,7 @@
   },
   "thinking-alt": {
     "gif_bytes": 2863,
-    "crc32": 1644720748,
+    "crc32": 3261242566,
     "outer_chunks": 1,
     "ble_packets": 6,
     "packet_lengths": [
@@ -233,7 +233,7 @@
   },
   "waiting": {
     "gif_bytes": 3556,
-    "crc32": 3154128094,
+    "crc32": 400952407,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -249,7 +249,7 @@
   },
   "walk-in-left": {
     "gif_bytes": 813,
-    "crc32": 3612225958,
+    "crc32": 3357808809,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -259,7 +259,7 @@
   },
   "walk-in-right": {
     "gif_bytes": 813,
-    "crc32": 492197105,
+    "crc32": 37518846,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -269,7 +269,7 @@
   },
   "walk-off-left": {
     "gif_bytes": 813,
-    "crc32": 103740083,
+    "crc32": 3759447133,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -279,7 +279,7 @@
   },
   "walk-off-right": {
     "gif_bytes": 813,
-    "crc32": 3465482266,
+    "crc32": 682983156,
     "outer_chunks": 1,
     "ble_packets": 2,
     "packet_lengths": [
@@ -289,7 +289,7 @@
   },
   "wander-off-left-in-left": {
     "gif_bytes": 1507,
-    "crc32": 2142791651,
+    "crc32": 2859956867,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -300,7 +300,7 @@
   },
   "wander-off-left-in-right": {
     "gif_bytes": 1507,
-    "crc32": 3047162548,
+    "crc32": 1617895380,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -311,7 +311,7 @@
   },
   "wander-off-left-rise": {
     "gif_bytes": 3857,
-    "crc32": 2052633401,
+    "crc32": 1715540901,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -327,7 +327,7 @@
   },
   "wander-off-right-in-left": {
     "gif_bytes": 1507,
-    "crc32": 2661712880,
+    "crc32": 1265213072,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -338,7 +338,7 @@
   },
   "wander-off-right-in-right": {
     "gif_bytes": 1507,
-    "crc32": 1421797031,
+    "crc32": 2171730887,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -349,7 +349,7 @@
   },
   "wander-off-right-rise": {
     "gif_bytes": 3857,
-    "crc32": 4155804425,
+    "crc32": 3953994645,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -365,7 +365,7 @@
   },
   "wander-sink-in-left": {
     "gif_bytes": 1471,
-    "crc32": 3062686680,
+    "crc32": 3111470104,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -376,7 +376,7 @@
   },
   "wander-sink-in-right": {
     "gif_bytes": 1471,
-    "crc32": 2090108559,
+    "crc32": 1936531791,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
@@ -387,7 +387,7 @@
   },
   "wander-sink-rise": {
     "gif_bytes": 3821,
-    "crc32": 3302397760,
+    "crc32": 3692492359,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -403,7 +403,7 @@
   },
   "wave-off": {
     "gif_bytes": 3615,
-    "crc32": 2298455979,
+    "crc32": 3195307857,
     "outer_chunks": 1,
     "ble_packets": 8,
     "packet_lengths": [
@@ -419,7 +419,7 @@
   },
   "work-coffee": {
     "gif_bytes": 9681,
-    "crc32": 1278663594,
+    "crc32": 681460725,
     "outer_chunks": 3,
     "ble_packets": 21,
     "packet_lengths": [
@@ -448,7 +448,7 @@
   },
   "work-idea": {
     "gif_bytes": 1610,
-    "crc32": 3130206488,
+    "crc32": 161188538,
     "outer_chunks": 1,
     "ble_packets": 4,
     "packet_lengths": [
@@ -460,7 +460,7 @@
   },
   "work-look": {
     "gif_bytes": 3402,
-    "crc32": 1662368230,
+    "crc32": 1419564236,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -475,7 +475,7 @@
   },
   "work-look-down": {
     "gif_bytes": 3386,
-    "crc32": 3555372972,
+    "crc32": 1918613742,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -490,7 +490,7 @@
   },
   "work-think": {
     "gif_bytes": 3099,
-    "crc32": 2583543539,
+    "crc32": 650178181,
     "outer_chunks": 1,
     "ble_packets": 7,
     "packet_lengths": [
@@ -505,7 +505,7 @@
   },
   "working": {
     "gif_bytes": 5655,
-    "crc32": 4142688578,
+    "crc32": 4258865936,
     "outer_chunks": 2,
     "ble_packets": 13,
     "packet_lengths": [
@@ -526,7 +526,7 @@
   },
   "workout": {
     "gif_bytes": 1414,
-    "crc32": 731507910,
+    "crc32": 3774468162,
     "outer_chunks": 1,
     "ble_packets": 3,
     "packet_lengths": [
