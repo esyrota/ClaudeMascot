@@ -35,6 +35,10 @@ enum HookServerError: Error, Equatable {
 @MainActor
 final class HookServer: ObservableObject {
   @Published private(set) var lastEvent: HookEvent?
+  /// The latest usage reading from `statusline-wrapper.sh`, decoded from a
+  /// `Usage` line on the same socket. Kept separate from `lastEvent` so a
+  /// `Usage` line can never be mistaken for a hook event or vice versa.
+  @Published private(set) var lastUsage: UsageSnapshot?
 
   /// A line longer than this without a newline is dropped without being
   /// decoded, so a malformed or hostile writer cannot grow the app's memory
@@ -184,8 +188,8 @@ final class HookServer: ObservableObject {
 
     if let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
       let line = buffer[buffer.startIndex..<newlineIndex]
-      if line.count <= Self.maxLineBytes, let event = HookEvent.decode(line: Data(line)) {
-        lastEvent = event
+      if line.count <= Self.maxLineBytes {
+        dispatchLine(Data(line))
       }
       closeConnection(fd)
       return
@@ -197,6 +201,26 @@ final class HookServer: ObservableObject {
     }
 
     connectionBuffers[fd] = buffer
+  }
+
+  /// Decides which of the two message kinds `line` is and publishes the
+  /// result, or drops it silently if it decodes as neither. The `event` key
+  /// is peeked via `JSONSerialization` rather than `HookEvent.decode`
+  /// itself, because `HookEvent`'s required `event` field means a `Usage`
+  /// line (`{"event":"Usage",...}`) would otherwise decode as a valid, if
+  /// useless, hook event instead of being routed to `UsageSnapshot`.
+  private func dispatchLine(_ line: Data) {
+    guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+      let kind = object["event"] as? String
+    else { return }
+
+    if kind == "Usage" {
+      if let usage = UsageSnapshot.decode(line: line, now: Date()) {
+        lastUsage = usage
+      }
+    } else if let event = HookEvent.decode(line: line) {
+      lastEvent = event
+    }
   }
 
   private func closeConnection(_ fd: Int32) {

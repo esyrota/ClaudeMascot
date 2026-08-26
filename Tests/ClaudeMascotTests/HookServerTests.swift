@@ -164,3 +164,41 @@ func twoEventsInSequenceBothArrive() async throws {
     #expect(server.lastEvent?.event == "Stop")
   }
 }
+
+@Test @MainActor
+func usageLineDecodesToLastUsageAndNotLastEvent() async throws {
+  try await withRunningServer { server, socketURL in
+    SocketClient.send(
+      "{\"event\":\"Usage\",\"usedPercent\":37,\"resetsAt\":\"2026-08-26T20:00:00Z\"}\n",
+      to: socketURL.path)
+    await waitUntil { server.lastUsage != nil }
+    #expect(server.lastUsage?.usedPercent == 37)
+    #expect(server.lastEvent == nil)
+  }
+}
+
+@Test @MainActor
+func hookEventLineDoesNotProduceUsageSnapshot() async throws {
+  try await withRunningServer { server, socketURL in
+    SocketClient.send("{\"event\":\"Stop\"}\n", to: socketURL.path)
+    await waitUntil { server.lastEvent != nil }
+    #expect(server.lastEvent?.event == "Stop")
+    #expect(server.lastUsage == nil)
+  }
+}
+
+@Test @MainActor
+func usageThenHookEventBothArriveOnTheirOwnProperty() async throws {
+  try await withRunningServer { server, socketURL in
+    SocketClient.send(
+      "{\"event\":\"Usage\",\"usedPercent\":50,\"resetsAt\":\"2026-08-26T20:00:00Z\"}\n",
+      to: socketURL.path)
+    await waitUntil { server.lastUsage != nil }
+
+    SocketClient.send("{\"event\":\"Notification\"}\n", to: socketURL.path)
+    await waitUntil { server.lastEvent != nil }
+
+    #expect(server.lastUsage?.usedPercent == 50)
+    #expect(server.lastEvent?.event == "Notification")
+  }
+}
