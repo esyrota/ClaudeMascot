@@ -21,18 +21,25 @@ enum UsageRail {
   /// mascot is the subject. Every value now sits low on the panel's response
   /// curve, which is where its steep region is: [[Panel Quirks]] measures an
   /// authored 8 at 42% of full brightness and everything from 96 up within 20%
-  /// of maximum, so dropping from 255 to ~56 buys real dimming where dropping
-  /// from 255 to 160 would have bought almost none. Blue stays 0 throughout
+  /// of maximum, so dropping from 255 to the twenties buys real dimming
+  /// where dropping from 255 to 160 would have bought almost none.
+  ///
+  /// **These sit on the floor, and there is nowhere lower to go.** No channel
+  /// may land in 1-7 — beside a saturated channel anything under about 8
+  /// contributes nothing, the measured effect that made `B = 4`
+  /// indistinguishable from `B = 0` for years. An authored 8 still reaches
+  /// roughly 40% of full brightness, so "barely visible" is the dimmest state
+  /// this panel has: below it a pixel does not fade, it goes out. Blue stays 0 throughout
   /// (blue beside a saturated warm channel is the measured magenta failure)
   /// and no channel lands in 1-7 (the mixture floor).
-  static let fillLow = RGB(r: 16, g: 56, b: 0)
-  static let fillMid = RGB(r: 56, g: 28, b: 0)
-  static let fillHigh = RGB(r: 56, g: 0, b: 0)
+  static let fillLow = RGB(r: 8, g: 24, b: 0)
+  static let fillMid = RGB(r: 24, g: 16, b: 0)
+  static let fillHigh = RGB(r: 24, g: 0, b: 0)
   /// A warm yellow, deliberately not a white: every white measured on this
   /// panel comes back blue (B/R 1.15–1.74), and a blue marker beside a
   /// saturated fill is the documented magenta failure. `B = 0` sidesteps
   /// both. Do not "improve" this toward white.
-  static let marker = RGB(r: 64, g: 56, b: 0)
+  static let marker = RGB(r: 32, g: 28, b: 0)
 
   /// Renders the 5-hour usage rail into row 0, or `nil` when there is
   /// nothing to draw.

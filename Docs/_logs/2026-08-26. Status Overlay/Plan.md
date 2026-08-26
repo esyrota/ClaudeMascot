@@ -203,17 +203,20 @@ the palette later, once there is a rail on the panel to look at.
 
 | role | authored | why this value |
 |---|---|---|
-| fill, low | `(16, 56, 0)` | a muted olive-green |
-| fill, mid | `(56, 28, 0)` | a muted amber |
-| fill, high | `(56, 0, 0)` | a muted red |
-| clock marker | `(64, 56, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
+| fill, low | `(8, 24, 0)` | a muted olive-green |
+| fill, mid | `(24, 16, 0)` | a muted amber |
+| fill, high | `(24, 0, 0)` | a muted red |
+| clock marker | `(32, 28, 0)` | **a warm yellow, not a white** — every white measured blue (B/R 1.15–1.74), and blue near the fill risks the magenta failure. Kept the brightest thing on the rail so it stays findable |
 
 **Darkened and desaturated 2026-08-27** after seeing the first set on the panel: authored at full
 channel values it read *louder* than the mascot, which inverts the intended reading — the rail is
 background, the mascot is the subject. The new values sit low on the panel's response curve,
 which is the only place real dimming is available: an authored 8 already reaches 42% of full
-brightness and everything from 96 up lands within 20% of maximum, so 255 → 56 buys a genuine drop
-where 255 → 160 would have bought almost nothing.
+brightness and everything from 96 up lands within 20% of maximum, so 255 → the twenties buys a genuine drop where 255 → 160
+would have bought almost nothing. **Taken to the floor on 2026-08-27** at Eugene's call — barely
+visible reads better than legible here, because the rail is background. These values sit on the
+1–7 channel floor and cannot go lower: an authored 8 is still ~40% of full brightness, and below
+it a pixel does not dim, it goes out.
 
 Every value clears the 1–7 channel floor. **Known imperfect:** low and mid may still sit closer
 together on the panel than a traffic-light ramp wants, and the marker is yellow where the
