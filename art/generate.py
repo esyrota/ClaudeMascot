@@ -29,7 +29,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from panel_colour import panel_encode
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
@@ -46,8 +45,16 @@ SIZE = 32
 # recolour then flattened the imported art down to it, which is why the seated
 # pose read redder in the catalogue than in the source it came from.
 #
-# (255,95,0) is the typing art's own body with blue dropped to 0. Blue stays 0:
-# see [[Panel Quirks]] -- a near-black channel is never free here.
+# (255,64,0) is not authored, it is MEASURED. Card g-body put eight candidate
+# greens on the panel beside the brand swatch on a screen, in one frame: green 60
+# came back at G/R 0.514 and green 68 at 0.551 against the target's 0.533, so the
+# match interpolates to 64. The constant this file shipped for months, (255,68,0),
+# was very nearly right -- for the panel. It was wrong for the FILES, which is
+# what the catalogue and the sources are compared against.
+#
+# The panel returns B/R ~0.5 from a file whose blue is 0: it manufactures the
+# salmon's blue itself. Put blue 24 in the file and B/R passes 0.8 and the body
+# goes magenta -- THAT is the pink this project chased for weeks. Blue stays 0.
 #
 # The blue channel is 0 because a near-black channel value is never free on this
 # panel -- the same effect that makes near-black greys in empty space light up as a
@@ -58,7 +65,7 @@ SIZE = 32
 # not the ~27% ("a quarter") it looks like authored -- see [[Panel Quirks]] for the
 # measured curve. `panel_encode()` now corrects for this at the write path (see
 # `save()`), so MASCOT is authored here in ordinary display terms.
-MASCOT = (255, 95, 0)
+MASCOT = (255, 64, 0)
 
 # The shade used where the mascot turns away from the viewer: `MASCOT` scaled
 # uniformly, which holds hue and saturation and moves only value -- what a shadow
@@ -71,7 +78,7 @@ MASCOT = (255, 95, 0)
 # Still true and still useful: red is what makes a shade read as dirty and green is
 # what makes it read as visible at all, so the usable window sits between "red falls
 # off a cliff" and "too pale to see." Turn this one number if the step looks wrong.
-SHADE_SCALE = 0.85
+SHADE_SCALE = 0.60
 MASCOT_DARK = tuple(round(c * SHADE_SCALE) for c in MASCOT)
 
 EYE = (0, 0, 0)
@@ -1909,22 +1916,6 @@ def body_pixel_count(im: Image.Image) -> int:
     return sum(1 for y in range(SIZE) for x in range(SIZE) if px[x, y] == MASCOT)
 
 
-def encode_frame(im: Image.Image) -> Image.Image:
-    """Map a display-space frame to the panel values that will show it.
-
-    Every colour in this file above is authored in ordinary display terms; this is
-    the single point where they become the values the panel needs to *show* those
-    colours -- see `panel_colour.panel_encode()`. A frame carries at most a
-    handful of distinct colours, so the lookup is built once per frame from
-    `getcolors()` rather than running every one of the 1024 pixels through the
-    power function individually.
-    """
-    lut = {colour: panel_encode(colour) for _, colour in im.getcolors(maxcolors=1 << 20)}
-    out = im.copy()
-    out.putdata([lut[p] for p in im.getdata()])
-    return out
-
-
 def save(name: str, frames) -> Path:
     path = OUT / f"{name}.gif"
     # Pad first, encode second -- load-bearing, do not flip. `pad_palette()` and
@@ -1933,7 +1924,7 @@ def save(name: str, frames) -> Path:
     # before either function ever sees a `MASCOT` pixel to match, so the padding
     # would silently stop happening and the palette assertion in `main()` below
     # would report the wrong count.
-    images = [encode_frame(pad_palette(im)) for im, _ in frames]
+    images = [pad_palette(im) for im, _ in frames]
     images[0].save(
         path,
         save_all=True,

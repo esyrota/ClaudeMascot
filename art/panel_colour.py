@@ -1,4 +1,20 @@
-"""The panel's tone curve, measured 2026-08-26 against an on-screen reference
+"""The panel's tone curve, measured 2026-08-26.
+
+**Not applied to the art.** The curve describes BRIGHTNESS faithfully and breaks
+HUE, and the art is nothing but hue: encoding MASCOT drove its green to 5 and the
+mascot rendered pure red on the panel. Card g-body then measured the mixture case
+directly -- a small green beside a saturated red -- and put the body at green 64,
+where the curve predicted 22. So `generate.py` authors file values chosen from
+photographs, and these functions exist for reasoning and for previews, not as a
+transform in the pipeline.
+
+The tone result stands on its own: card e-gamma showed encoded ladders stepping
+evenly where naive ones bunch, at two brightnesses. Use it for anything that is a
+brightness ramp -- a progress bar, a fade -- and never for choosing a colour.
+
+Original measurement follows.
+
+The panel's tone curve, measured 2026-08-26 against an on-screen reference
 in the same photograph.
 
 The panel spends most of its range in the bottom few code values: an authored

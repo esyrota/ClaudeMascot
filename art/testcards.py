@@ -220,6 +220,37 @@ def card_f_mixture() -> Image.Image:
     return im
 
 
+BODY_GREENS = [30, 45, 60, 68, 80, 95, 110, 130]
+BRAND = (216, 112, 80)   # the Claude loading art's own body -- the target appearance
+
+
+def card_g_body() -> Image.Image:
+    """Which file colour *shows* as the brand salmon on the panel?
+
+    Measured 2026-08-26 from one frame carrying both: the panel body then held
+    (255,14,0) and photographed at G/R 0.173, while the brand salmon on the
+    screen beside it sat at 0.555. The panel roughly triples a small green, so
+    the file needs less green than the target -- but the single-channel tone
+    curve over-corrects badly, driving green to 14 where something near 68 is
+    wanted. That curve was fitted on ramps and greys and never described a small
+    channel sitting beside a saturated one.
+
+    So this card stops modelling and asks the panel directly:
+
+        rows  0-15  red 255, green 30 -> 130, blue 0
+        rows 16-31  the same greens with blue 24, in case the salmon's own blue
+                    is part of what makes it read as salmon rather than as amber
+
+    Photograph it beside the brand swatch and pick the band that matches. That
+    band is MASCOT.
+    """
+    im = _blank()
+    for col, g in enumerate(BODY_GREENS):
+        _fill(im, col * 4, 0, col * 4 + 3, 15, (255, g, 0))
+        _fill(im, col * 4, 16, col * 4 + 3, 31, (255, g, 24))
+    return im
+
+
 CARDS = [
     ("a-ramps", card_a_ramps, "per-channel transfer curve (R, G, B, grey; dark → bright)"),
     ("b-halftones", card_b_halftones, "1px and 2px dithers against the solids they average to"),
@@ -227,6 +258,7 @@ CARDS = [
     ("d-hues", card_d_hues, "saturated hue sweep, and the colours Panel Quirks claims"),
     ("e-gamma", card_e_gamma, "gamma-encoded ladders above naive ones — the model's falsification test"),
     ("f-mixture", card_f_mixture, "a green sweep beside a saturated red — where a small channel starts to register"),
+    ("g-body", card_g_body, "candidate body colours against the brand salmon — pick MASCOT from a photograph"),
 ]
 
 
