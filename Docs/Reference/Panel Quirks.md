@@ -3,7 +3,19 @@
 Undocumented behaviour of the 32×32 iDotMatrix panel. Every entry here was found by
 a wrong guess first — the lesson at the bottom is the important part.
 
-## Colour: the panel's tone curve is three times a display's
+## Colour: two regimes, and the curve only covers one
+
+**A channel's behaviour depends on what sits beside it.** Swept on its own, or against
+equal partners in a grey, a channel follows the tone curve below. Sitting small beside a
+saturated one — which is what every colour in the art actually is — it follows the
+mixture measurements further down, and the two disagree badly. Encoding the art through
+the tone curve drove the body's green to 5 and the mascot rendered **pure red**. That is
+the single most expensive mistake on this page, and it was made *after* the curve had been
+properly validated, because it was validated on the wrong regime.
+
+Use the tone curve for brightness ramps. Choose colours from the mixture table.
+
+## The tone curve: three times a display's
 
 **Measured 2026-08-26**, from five test cards photographed beside an on-screen copy of
 themselves (`art/testcards.py` → `art/read_panel_photo.py`; the procedure is in
@@ -22,12 +34,16 @@ Fitting `photographed = max · (v/255)^k`:
 already reaches 42% of full brightness; from `96` up, everything lands within 20% of
 maximum. The exponent ratio is ≈ 3.
 
-### The consequence: author through a gamma
+### What it is good for
 
-    panel_value = 255 · (display_value / 255) ^ 2.96      # art/testcards.py: panel_encode()
+    panel_value = 255 · (display_value / 255) ^ 2.96      # art/panel_colour.py: panel_encode()
 
-**This has been tested against a prediction it did not already fit**, which is the bar
-this page's own lesson demands. `e-gamma.gif` puts encoded ladders above naive ones;
+**Brightness ramps only — never a colour.** A progress bar's fill, a fade, a shade ladder
+where every channel moves together: those are what this describes, and it describes them
+well.
+
+**It was tested against a prediction it did not already fit**, which is the bar this
+page's own lesson demands. `e-gamma.gif` puts encoded ladders above naive ones;
 photographed at two brightnesses, the encoded ladders come out even (deviation from a
 linear ramp 0.02–0.07) and the naive ones bunched (0.13–0.20), and at low brightness the
 naive grey ladder collapses to a 51-luma span where the encoded one keeps 115. The curve
@@ -35,9 +51,9 @@ also reproduces, arithmetically, the three `SHADE_SCALE` photographs that were p
 bisected by hand: ×0.85 is a 5% tonal step (invisible), ×0.60 is 16% (subtle), ×0.35 is
 30% (visible, muddy).
 
-**The shipped art does not do this yet.** `generate.py` still authors raw values and
-`SHADE_SCALE` is still the bisected 0.60. Encoding the palette is a pipeline change that
-has not been made — see [[Recheck the Panel Colour Rule]] → next steps.
+**The art does not use it, and must not.** `generate.py` authors file values chosen from
+photographs. `panel_encode()` was applied at the write path for exactly one evening; the
+panel's verdict was a red mascot.
 
 ### Blue is over-driven, and that is not the camera
 
@@ -75,6 +91,58 @@ survive. A *dim* colour cannot be authored on this panel — a thing is lit or i
 the red *inside* white photographs 131 — consistent with the panel limiting total current
 when all three sub-LEDs are lit. A per-channel curve will not predict mixed colours until
 that is measured.
+
+## Mixtures: the floor, and where the colours actually came from
+
+**This is the table to choose a colour from.** Measured 2026-08-26 from two videos
+(`f-mixture` and `g-body`), panel beside an on-screen target in the same frame. Red and
+blue are held fixed and green is swept; the numbers are what the panel *shows*, as ratios
+so exposure cancels.
+
+| file green | at red 255 → G/R | at red 158 → G/R |
+|---|---|---|
+| 0 | 0.011 | 0.062 |
+| 4 | 0.013 | 0.088 |
+| 8 | 0.035 | 0.182 |
+| 14 | 0.141 | 0.287 |
+| 20 | 0.214 | 0.364 |
+| 27 | 0.295 | 0.462 |
+| 40 | 0.400 | 0.564 |
+| 96 | 0.679 | 0.919 |
+
+### There is a floor, and it explains the `B = 4` anomaly
+
+Below about **8**, a channel beside a saturated one contributes nothing: green 0 and green
+4 are indistinguishable (0.011 against 0.013 — that is red bleed, not green). Between 8
+and 14 it comes alive.
+
+**So `B = 0` versus `B = 4` photographing identically was never about blue.** It is this
+floor, and it has been sitting on this page as an unexplained anomaly since the beginning.
+It is also exactly what killed the encode: a green of 5 is *under the floor*.
+
+### The panel makes its own blue
+
+Every measurement above comes from a file with **blue = 0**, and the panel returns
+B/R ≈ 0.5 at the body's level. It manufactures the salmon's blue itself. Put blue 24 in the
+file and B/R passes 0.8 and the body goes **magenta** — that is the pink this project
+chased for weeks, now reproducible on demand. **Blue stays 0**, and finally for a measured
+reason rather than a superstition.
+
+### The body colour
+
+`MASCOT = (255,64,0)`, interpolated from the row above against the Claude loading-art
+body (`(216,112,80)`, G/R 0.533) shown on a screen in the same frame: green 60 returned
+0.514, green 68 returned 0.551. The `(255,68,0)` this project shipped for months was very
+nearly right *for the panel* — and wrong for the files, which is what the catalogue and the
+hand-drawn sources are compared against.
+
+### A uniform shade holds its hue — checked, not assumed
+
+The panel's hue response moves with level: the same file green reads greener at red 158
+than at red 255. That could have meant a uniform `MASCOT_DARK = MASCOT × SHADE_SCALE`
+drifts in hue as it darkens. Measured within one video, it does not: the body lands at
+G/R 0.520 and its ×0.60 shade at 0.549. The two effects cancel, which is why scaling every
+channel by one number is the right way to shade here.
 
 ## 1px features are legible; dithering is texture, not tone
 

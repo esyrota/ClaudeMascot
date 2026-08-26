@@ -85,14 +85,20 @@ Two consequences worth knowing before editing a state:
 
 ## Style rules
 
-- Colours are authored as ordinary display colours; `panel_encode()` converts them at the
-  point pixels become file bytes. `MASCOT` stays written as `(255,68,0)`; what reaches the
-  GIF is roughly `(255,5,0)`. See [[Panel Quirks]] for the measured tone curve.
+- **Colours are file values chosen from photographs, not converted by a formula.**
+  `MASCOT = (255,64,0)` was measured against the brand swatch on the panel; see
+  [[Panel Quirks]] → Mixtures. `panel_encode()` exists for brightness ramps and previews
+  and is **never** applied to the art: applied once, it drove the body's green to 5 —
+  under the panel's mixture floor — and the mascot rendered pure red.
+- **No channel below 8.** Beside a saturated channel, anything under about 8 contributes
+  nothing at all. This is the same floor that made `B = 4` indistinguishable from `B = 0`.
 - **The import thresholds are deliberately exempt** — `SHADED_BODY_MIN`, `BODY_MIN`,
   `SHADE_MIN`, `TYPING_BODY_MIN`, `TYPING_LOGO_MIN`, `TYPING_DARK`, `TYPING_CHROMA_MIN`
   compare against pixels in the hand-drawn *sources*, which never pass through the panel.
   Encoding them would silently reclassify the seated pose.
-- `SHADE_SCALE` is now a display-space ratio, and its value is pending a photograph.
+- `SHADE_SCALE` (0.60) is a ratio on the **file's** values. Scaling every channel by one
+  number holds the hue as it darkens — measured, not assumed: the body reads at G/R 0.520
+  and its shade at 0.549 in the same frame.
 - Warm colours still end in `B = 0`, and the `B = 0` vs `B = 4` anomaly is still
   unexplained — the encode does not resolve it.
 - One shading constant, `MASCOT_DARK`, which is `MASCOT` scaled by `SHADE_SCALE`. Uniform

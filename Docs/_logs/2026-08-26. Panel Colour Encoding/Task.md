@@ -1,5 +1,12 @@
 # Panel Colour Encoding
 
+> **Outcome, 2026-08-26: the encode was withdrawn and the colours were measured instead.**
+> The tone curve is real but describes brightness, not hue; applied to the art it drove the
+> body's green under the panel's mixture floor and the mascot rendered pure red. What the
+> run actually produced is better than what it set out to do — see [[Analysis]]. The
+> decisions below are kept as written, with the ones that did not survive marked.
+
+
 Author the art in ordinary display colours and let the pipeline convert them to what the
 panel needs, so the mascot on the panel looks like the mascot in the preview.
 
@@ -25,13 +32,17 @@ encoded one keeps 115.
 
 ## Decisions reached
 
-- **`panel_encode()` moves into `art/generate.py`** and every authored colour goes through
+- ~~**`panel_encode()` moves into `art/generate.py`**~~ — **withdrawn.** It lives in
+  `art/panel_colour.py` for brightness ramps and previews, and never touches the art.
+- ~~original decision:~~ **`panel_encode()` moves into `art/generate.py`** and every authored colour goes through
   it: `panel_value = 255 · (display_value/255) ^ 2.96`. A working implementation and the
   constant already exist in `art/testcards.py`.
 - **Colours are authored in display terms from now on.** `MASCOT` stays `(255,68,0)` as
   *written*; what reaches the GIF is roughly `(255,5,0)`. The previews will look alarming
   and the panel will look right — that inversion is the whole point.
-- **`SHADE_SCALE` is chosen from a photograph, not restated.** It stops being a
+- **`SHADE_SCALE` stays 0.60 on file values** — a photograph showed a uniform scale holds
+  its hue as it darkens (body G/R 0.520, shade 0.549), which had never been checked.
+- ~~original decision:~~ **`SHADE_SCALE` is chosen from a photograph, not restated.** It stops being a
   panel-value ratio and becomes a display-space one, which changes what the number means:
   today's 0.60 is ≈0.85 in display terms. Three candidates (0.85, 0.75, 0.65) ship in the
   verification clip and the winner is picked from the video. This is now a choice between

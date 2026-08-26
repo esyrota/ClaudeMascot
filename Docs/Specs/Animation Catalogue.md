@@ -6,8 +6,9 @@ ship; if it is here, the image below is the exact animation on the panel.
 
 The images are the bundled 32×32 GIFs scaled 6× with nearest-neighbour by
 `art/export_docs.py` — every pixel reproduced as a block of pixels, no frame added,
-dropped or retimed. The displayed images are rendered through `panel_preview()` and
-show the panel's predicted appearance, not the raw file bytes. Regenerate them whenever
+dropped or retimed. The images are the file's own bytes. They are **not** what the panel
+shows: it renders this palette warmer, turning the body's `(255,64,0)` into the brand
+salmon — see [[Panel Quirks]] → Mixtures for the measured mapping. Regenerate them whenever
 the art changes:
 
 ```bash

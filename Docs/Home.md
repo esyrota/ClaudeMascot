@@ -62,7 +62,8 @@ Each one cost a wrong diagnosis to find.
 | Catalogue images | `art/export_docs.py` | working — 6× previews for [[Animation Catalogue]] |
 | Python daemon | `legacy/` | **retired and non-functional** |
 | Colour test card | `art/testcard.py` | diagnostic, keep |
-| Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — five cards, the on-screen reference, and the photo/video reader that measured the panel's tone curve |
+| Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — seven cards, the on-screen reference, and the photo/video reader (averages video frames; the panel is scan-driven) |
+| Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
 | Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
 
 Installation is now a single step: build and run the app. It offers to install the
@@ -79,6 +80,10 @@ plugin on first launch, and the repo is no longer a marketplace.
 - `_logs/2026-08-17. Working State Rework/` — `sitting` rebuilt on hand-authored typing
   art, its edges and five fidget beats; `done` debounced and earned. Its [[Analysis]]
   records the check that passed while the art was broken.
+- `_logs/2026-08-26. Panel Colour Encoding/` — the tone curve applied to the art, and
+  **withdrawn** when the panel showed a red mascot. Its [[Analysis]] records a plan built
+  on a case its own risk list called unmeasured. What survived: `MASCOT` measured at
+  `(255,64,0)`, the pink solved, and the `B = 4` anomaly explained as a mixture floor.
 - `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
   against an on-screen reference in the same frame, and the colour rules rewritten around
   it. See its [[Findings]] for the evidence, the method, and the alignment error that
