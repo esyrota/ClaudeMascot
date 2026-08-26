@@ -28,6 +28,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from panel_colour import PANEL_GAMMA, panel_encode
+
 OUT = Path(__file__).parent / "testcards"
 SIZE = 32
 
@@ -164,18 +166,6 @@ def card_d_hues() -> Image.Image:
     for col, (_, rgb) in enumerate(CLAIMED):
         _fill(im, col * 4, 16, col * 4 + 3, 31, rgb)
     return im
-
-
-# Measured 2026-08-26 from IMG_2777: the panel's tone curve is roughly three
-# times more compressive than a display's under the same camera (exponent 0.24
-# against 0.71). PANEL_GAMMA is the ratio; card E exists to falsify it.
-PANEL_GAMMA = 2.96
-
-
-def panel_encode(rgb, gamma: float = PANEL_GAMMA):
-    """Map a colour authored in ordinary display terms to the value the panel
-    needs to *show* that colour. Pure hypothesis until card E is photographed."""
-    return tuple(round(255 * (c / 255) ** gamma) for c in rgb)
 
 
 def card_e_gamma() -> Image.Image:

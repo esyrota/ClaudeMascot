@@ -61,6 +61,16 @@ green becomes 5.
 **`B = 0` versus `B = 4` still photographs identically**, which the curve does *not*
 predict — at k = 0.11 a blue of 4 should be plainly visible. Unresolved. Keep `B = 0`.
 
+**This anomaly now has teeth.** Encoding pushes small channels into exactly that range:
+`MASCOT`'s green of 68 becomes 5, and a shaded body's green lands at 1–3. If green
+behaves like that blue 4 did — present in the file, absent on the panel — an encoded body
+renders pure red instead of orange. Nothing measured so far settles it, so the encode's
+hardware gate has to look for it specifically.
+
+**The bottom eighth of the range is unreachable.** Every display value 0–31 encodes to
+panel `0`, and above 32 the round trip is exact to within 1: 159 of 256 levels per channel
+survive. A *dim* colour cannot be authored on this panel — a thing is lit or it is not.
+
 **Mixtures do not follow the per-channel fit.** Pure red at 255 photographs R = 232, but
 the red *inside* white photographs 131 — consistent with the panel limiting total current
 when all three sub-LEDs are lit. A per-channel curve will not predict mixed colours until
