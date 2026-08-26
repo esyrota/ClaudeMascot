@@ -118,12 +118,15 @@ A second, independent input, unconnected to the nine hook events above:
 is the only place they already surface. A small wrapper script sits in front of the
 user's own statusline command and tees the numbers it needs to the same socket.
 
-It reads Claude Code's statusline JSON from stdin once, extracts
-`rate_limits.five_hour.used_percentage` and `resets_at`, and writes one line to
+It reads Claude Code's statusline JSON from stdin once. The payload carries four rate
+limit periods nested under `rate_limits`: `five_hour`, `seven_day`, `seven_day_sonnet`,
+and `seven_day_opus`, each with identical field names. The wrapper extracts
+`rate_limits.five_hour.used_percentage` and `rate_limits.five_hour.resets_at`
+(epoch seconds, not an ISO 8601 string), and writes one line to
 `~/Library/Application Support/ClaudeMascot/hook.sock`:
 
 ```json
-{"event":"Usage","usedPercent":…,"resetsAt":…}
+{"event":"Usage","usedPercent":42.5,"resetsAt":1756270800}
 ```
 
 The same privacy rule that keeps `tool_input` off the wire above applies here: the

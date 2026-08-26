@@ -17,14 +17,17 @@ PAYLOAD=$(cat 2>/dev/null)
 # Claude Code, a payload shape change, no active window) — that is normal,
 # not an error. Matched by key name only, same limitation relay.sh accepts:
 # this assumes an unpretty-printed (single-line) JSON payload.
-USED=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"used_percentage":\([0-9.]*\).*/\1/p' 2>/dev/null)
-RESETS=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"resets_at":"\([^"]*\)".*/\1/p' 2>/dev/null)
+# Scope extraction to five_hour object first to avoid matching the wrong
+# period from rate_limits' four nested objects (five_hour, seven_day, etc.).
+FIVE=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"five_hour":{\([^}]*\)}.*/\1/p' 2>/dev/null)
+USED=$(printf '%s' "$FIVE" | sed -n 's/.*"used_percentage":\([0-9.]*\).*/\1/p' 2>/dev/null)
+RESETS=$(printf '%s' "$FIVE" | sed -n 's/.*"resets_at":\([0-9]*\).*/\1/p' 2>/dev/null)
 
 # The wrapper extracts, it never forwards the raw payload — same privacy
 # rule as relay.sh: cwd, model, cost and the transcript path never cross
 # the socket.
 if [ -n "$USED" ] && [ -n "$RESETS" ]; then
-  OUT="{\"event\":\"Usage\",\"usedPercent\":${USED},\"resetsAt\":\"${RESETS}\"}"
+  OUT="{\"event\":\"Usage\",\"usedPercent\":${USED},\"resetsAt\":${RESETS}}"
   if command -v nc >/dev/null 2>&1; then
     printf '%s\n' "$OUT" | nc -U -w 1 "$SOCK" 2>/dev/null || true
   fi

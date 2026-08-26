@@ -11,7 +11,7 @@ private func makeLine(_ json: String) -> Data {
 func decodesWellFormedUsageLine() {
   let now = Date()
   let line = makeLine(
-    "{\"event\":\"Usage\",\"usedPercent\":42.5,\"resetsAt\":\"2026-08-26T20:00:00Z\"}")
+    "{\"event\":\"Usage\",\"usedPercent\":42.5,\"resetsAt\":1700000000}")
   let snapshot = UsageSnapshot.decode(line: line, now: now)
   #expect(snapshot?.usedPercent == 42.5)
   #expect(snapshot?.receivedAt == now)
@@ -26,7 +26,7 @@ func malformedUsageLineDecodesToNil() {
 @Test
 func wrongEventKindDecodesToNil() {
   let line = makeLine(
-    "{\"event\":\"Stop\",\"usedPercent\":10,\"resetsAt\":\"2026-08-26T20:00:00Z\"}")
+    "{\"event\":\"Stop\",\"usedPercent\":10,\"resetsAt\":1700000000}")
   #expect(UsageSnapshot.decode(line: line, now: Date()) == nil)
 }
 
@@ -74,5 +74,41 @@ func cacheRoundTripPreservesValues() {
 func cacheLoadReturnsNilWhenFileMissing() {
   let fileURL = FileManager.default.temporaryDirectory
     .appendingPathComponent("usage-cache-missing-\(UUID().uuidString).json")
+  #expect(UsageSnapshotCache.load(from: fileURL) == nil)
+}
+
+@Test
+func decodesWireWithEpochSeconds() {
+  let now = Date()
+  let resetsAtEpoch = 1_756_270_800
+  let line = makeLine(
+    "{\"event\":\"Usage\",\"usedPercent\":55.25,\"resetsAt\":\(resetsAtEpoch)}")
+  let snapshot = UsageSnapshot.decode(line: line, now: now)
+  #expect(snapshot?.usedPercent == 55.25)
+  #expect(snapshot?.receivedAt == now)
+  #expect(snapshot?.resetsAt == Date(timeIntervalSince1970: TimeInterval(resetsAtEpoch)))
+}
+
+@Test
+func decodesWireWithRealisticPayloadStructure() {
+  let now = Date()
+  let fiveHourResets = 1_756_270_800
+  let fiveHourUsed = 42.5
+  let line = makeLine(
+    "{\"event\":\"Usage\",\"usedPercent\":\(fiveHourUsed),\"resetsAt\":\(fiveHourResets)}")
+  let snapshot = UsageSnapshot.decode(line: line, now: now)
+  #expect(snapshot?.usedPercent == fiveHourUsed)
+  #expect(snapshot?.resetsAt == Date(timeIntervalSince1970: TimeInterval(fiveHourResets)))
+}
+
+@Test
+func cacheGracefullyHandlesFormatChange() {
+  let fileURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent("usage-cache-format-change-\(UUID().uuidString).json")
+  defer { try? FileManager.default.removeItem(at: fileURL) }
+
+  let invalidJSON = "{\"event\":\"Changed\",\"usedPercent\":10}".data(using: .utf8)!
+  try? invalidJSON.write(to: fileURL, options: .atomic)
+
   #expect(UsageSnapshotCache.load(from: fileURL) == nil)
 }

@@ -169,7 +169,7 @@ func twoEventsInSequenceBothArrive() async throws {
 func usageLineDecodesToLastUsageAndNotLastEvent() async throws {
   try await withRunningServer { server, socketURL in
     SocketClient.send(
-      "{\"event\":\"Usage\",\"usedPercent\":37,\"resetsAt\":\"2026-08-26T20:00:00Z\"}\n",
+      "{\"event\":\"Usage\",\"usedPercent\":37,\"resetsAt\":1756270800}\n",
       to: socketURL.path)
     await waitUntil { server.lastUsage != nil }
     #expect(server.lastUsage?.usedPercent == 37)
@@ -191,7 +191,7 @@ func hookEventLineDoesNotProduceUsageSnapshot() async throws {
 func usageThenHookEventBothArriveOnTheirOwnProperty() async throws {
   try await withRunningServer { server, socketURL in
     SocketClient.send(
-      "{\"event\":\"Usage\",\"usedPercent\":50,\"resetsAt\":\"2026-08-26T20:00:00Z\"}\n",
+      "{\"event\":\"Usage\",\"usedPercent\":50,\"resetsAt\":1756270800}\n",
       to: socketURL.path)
     await waitUntil { server.lastUsage != nil }
 

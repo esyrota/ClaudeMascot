@@ -142,7 +142,7 @@ func usageLineOverSocketProducesNonNilOverlay() async throws {
   }
 
   SocketClient.send(
-    "{\"event\":\"Usage\",\"usedPercent\":37,\"resetsAt\":\"2100-01-01T00:00:00Z\"}\n",
+    "{\"event\":\"Usage\",\"usedPercent\":37,\"resetsAt\":4100000000}\n",
     to: socketURL.path)
   await waitUntil { model.currentUsage != nil }
 
@@ -167,7 +167,7 @@ func overlayKeyMatchesTheOverlayItDescribes() async throws {
   }
 
   SocketClient.send(
-    "{\"event\":\"Usage\",\"usedPercent\":63,\"resetsAt\":\"2100-01-01T00:00:00Z\"}\n",
+    "{\"event\":\"Usage\",\"usedPercent\":63,\"resetsAt\":4100000000}\n",
     to: socketURL.path)
   await waitUntil { model.currentUsage != nil }
 
@@ -205,7 +205,7 @@ func newUsageSnapshotIsPersistedToTheCache() async throws {
   }
 
   SocketClient.send(
-    "{\"event\":\"Usage\",\"usedPercent\":12,\"resetsAt\":\"2100-01-01T00:00:00Z\"}\n",
+    "{\"event\":\"Usage\",\"usedPercent\":12,\"resetsAt\":4100000000}\n",
     to: socketURL.path)
   await waitUntil { model.currentUsage != nil }
   await waitUntil { UsageSnapshotCache.load(from: cacheURL) != nil }

@@ -11,6 +11,8 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
   /// How far through the 5-hour window usage has burned, 0...100.
   let usedPercent: Double
   /// When the window resets, per Claude Code's `rate_limits.five_hour`.
+  /// Epoch seconds (Unix timestamp) because the statusline payload schema
+  /// carries it as a bare number, not an ISO 8601 string.
   let resetsAt: Date
   /// When this snapshot was decoded — the anchor `elapsedFraction` measures
   /// the wall clock against, and what makes a cached snapshot age visibly
@@ -28,6 +30,20 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
     let event: String
     let usedPercent: Double
     let resetsAt: Date
+
+    enum CodingKeys: String, CodingKey {
+      case event
+      case usedPercent
+      case resetsAt
+    }
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      self.event = try container.decode(String.self, forKey: .event)
+      self.usedPercent = try container.decode(Double.self, forKey: .usedPercent)
+      let timestamp = try container.decode(TimeInterval.self, forKey: .resetsAt)
+      self.resetsAt = Date(timeIntervalSince1970: timestamp)
+    }
   }
 
   /// Decodes one `{"event":"Usage",...}` line; `nil` if malformed, missing
@@ -35,7 +51,6 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
   /// `receivedAt`, never something read off the wire.
   static func decode(line: Data, now: Date) -> UsageSnapshot? {
     let decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .iso8601
     guard let wire = try? decoder.decode(Wire.self, from: line), wire.event == "Usage" else {
       return nil
     }
