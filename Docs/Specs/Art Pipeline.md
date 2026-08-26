@@ -102,8 +102,9 @@ Two consequences worth knowing before editing a state:
   downward (247–254) on body pixels — never blue. `pad_palette()` carries the reason:
   red at 255 sits where the panel's response is flat, so the nudge is genuinely
   invisible, while a blue of 1–8 is the brightest relative change the panel can be
-  handed. Whether the padding is still needed once colours are encoded is an open
-  question — see [[Panel Quirks]] § Palette.
+  handed. Measured against the shipped, encoded GIFs: still needed (every clip's
+  sparsest dense frame lands on exactly 9, never more) and still working (no two
+  nudges' encoded values collapse) — see [[Panel Quirks]] § Palette for the counts.
 
 ## Importing the hand-drawn states
 

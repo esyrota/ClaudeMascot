@@ -116,9 +116,29 @@ This was never cleanly separated from the colour-value effect above — the garb
 case had *both* a 4-entry palette and a sub-255 body colour. So it is kept as cheap
 insurance: `MIN_COLORS = 9`, forcing a 16-entry palette.
 
-**How to pad invisibly:** nudge the blue channel of a few body pixels by 1–8. Do NOT
+**How to pad invisibly:** nudge **red** downward on a few body pixels (247–254) — red at
+255 sits where the panel's response is flat, so the step is genuinely invisible, while a
+blue of 1–8 is the brightest relative change this panel can be handed. (This line used to
+say *blue, upward*; `pad_palette()` moved off blue long ago and the page had not caught
+up.) Do NOT
 write near-black greys into empty space — an early version did, and those LEDs are
 genuinely lit on the panel, showing up as a grey gradient streak in the corner.
+
+**Re-measured after colour encoding (2026-08-26):** encoding changes the arithmetic in
+both directions — it compresses the nudges together at the top of the range, and it
+collapses everything below display 32 to panel 0 — so the padding's survival was
+re-checked rather than assumed. Scanning every shipped, encoded GIF in
+`Sources/ClaudeMascot/Resources/Animations/` for its sparsest non-trivial frame:
+every one of them lands on exactly 9 colours, never more — `pad_palette()` is still
+the thing keeping them at the floor, not a formality. The plainest clips (`idle`,
+`thinking`, `waiting`, …) carry only 2 real colours (background black + body) and use
+7 of the 8 available nudges to get there; the richer ones (`work-coffee`,
+`work-look`, `sit-to-stand`, …) already have 5 real colours (black, body, a grey
+shadow, a shaded body tone, a white highlight) and only need 4 nudges. In neither
+case do any nudges collapse: the encoded sequence for red bumped down from 255 is
+`255, 252, 249, 246, 243, 240, 238, 235, …` — eight distinct values before any
+repeat risk, more than any shipped clip currently uses. Decision: **padding still
+needed and still working** — `pad_palette()` and `MIN_COLORS` are unchanged.
 
 ## Diagnosing colour problems
 
