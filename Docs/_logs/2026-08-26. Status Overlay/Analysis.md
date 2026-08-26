@@ -80,6 +80,29 @@ pre-assembled `Chunk N - Context.md` for anything touching a large file.
 | Total tokens (chunks + orchestrator) | ~1.6M |
 | Wall clock, session start → PR | 5h50m (incl. a ~2h pause) |
 
+## Feedback round: the colours (post-delivery)
+
+Four rounds of looking at the panel, all inline rather than chunked — each was a change to four
+constants, where a cold subagent would have cost more than the edit.
+
+| round | change | verdict |
+|---|---|---|
+| 1 | darkened and desaturated from full channel values | better |
+| 2 | taken to the channel floor | **kept** |
+| 3 | `fillLow` to `(8,0,0)`, all red-dominant | read brown |
+| 4 | raised R and G to chase a neutral | brighter than a background wants |
+
+Reverted to round 2 at Eugene's call. Rounds 3 and 4 were not wasted: they produced the two
+[[Panel Quirks]] findings that explain why no further tuning would have helped — the panel invents
+blue in proportion to total drive, so a green *or* a dim warm colour with `B = 0` photographs
+cyan, and **dim and neutral are mutually exclusive**. A genuinely invisible low state is
+structural (stop drawing it), not chromatic.
+
+**The lesson worth keeping:** three of the four rounds were spent proposing colours from
+first principles when the project already has a method for choosing them — put candidates on a
+card, shoot one video, read them back. That method chose `MASCOT`. It would have settled this in
+one round instead of four.
+
 ## One-line verdict
 
 The mechanism is built and measured, the rail is the least interesting thing riding on it — and
