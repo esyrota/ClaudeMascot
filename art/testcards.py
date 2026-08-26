@@ -253,6 +253,11 @@ def card_g_body() -> Image.Image:
 
 # Card H: status overlay colours and markers.
 OVERLAY_WHITE = (255, 255, 255)
+# Half-value white, to see whether a dimmer white drifts less blue than a full one --
+# and, incidentally, the 9th colour on the card. `save_gif` does not pad the palette the
+# way the shipped art does, and an 8-entry palette sat right on the boundary [[Panel
+# Quirks]] flags as the garbling risk; a 9th entry forces 16 and removes the doubt.
+OVERLAY_WHITE_HALF = (128, 128, 128)
 OVERLAY_WARM_WHITES = [
     (255, 245, 200),    # barely warm — most blue
     (255, 235, 150),    # warmer
@@ -279,14 +284,21 @@ def card_h_overlay() -> Image.Image:
     im = _blank()
     px = im.load()
 
-    # Band 1: solid white swatch (rows 0–5)
-    _fill(im, 0, 0, 31, 5, OVERLAY_WHITE)
+    # Bands 1-2 are deliberately SMALL. The first version filled rows 0-5 and 7-11
+    # edge to edge, which put 192 pixels at full white on the panel -- twice the
+    # all-three-channels count of any card that had ever been shot here -- and the
+    # panel brown-out reset on upload rather than displaying it. White is the
+    # expensive colour: it lights all three sub-LEDs per pixel, which is the same
+    # current limiting [[Panel Quirks]] already records inside white (red at 255
+    # reads 232 alone, but 131 inside a white). A swatch only has to be big enough
+    # to average over; it does not have to be a stripe.
+    _fill(im, 2, 1, 9, 4, OVERLAY_WHITE)          # 8x4 white reference
+    _fill(im, 13, 1, 20, 4, OVERLAY_WHITE_HALF)   # the same white at half value
 
-    # Band 2: three warm-white candidates (rows 7–11, separated by row 6 black)
+    # Band 2: three warm-white candidates, 6x4 each (rows 7-10)
     for col, rgb in enumerate(OVERLAY_WARM_WHITES):
-        x_start = col * 11
-        x_end = min(x_start + 10, 31)
-        _fill(im, x_start, 7, x_end, 11, rgb)
+        x_start = 2 + col * 8
+        _fill(im, x_start, 7, x_start + 5, 10, rgb)
 
     # Band 3: green 1px ramp (row 13), then green with middle pixel unlit (row 14)
     for x in range(SIZE):
@@ -337,7 +349,7 @@ CARDS = [
 def _check_card_h_channel_floor() -> None:
     """Assertion: no colour on card H uses a channel in 1–7 (the measured floor
     where small channels contribute nothing). All channels must be 0 or 8+."""
-    all_colours = [OVERLAY_WHITE] + OVERLAY_WARM_WHITES + OVERLAY_RAMP + [(0, 0, 0)]
+    all_colours = [OVERLAY_WHITE, OVERLAY_WHITE_HALF] + OVERLAY_WARM_WHITES + OVERLAY_RAMP + [(0, 0, 0)]
     for rgb in all_colours:
         for channel in rgb:
             if 1 <= channel <= 7:
