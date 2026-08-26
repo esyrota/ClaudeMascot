@@ -26,6 +26,27 @@ import os
 /// - owns a `SleepWatcher` and installs `AppDelegate.onTerminate`, so the
 ///   mascot walks off the panel before the Mac sleeps or the app quits — see
 ///   Docs/_logs/2026-08-24. Sleep Exit/Plan.md
+/// Mutable slot shared by reference between `PanelAdapter`'s
+/// `overlayProvider` and `PanelController`'s `overlayKey`, both of which are
+/// built inside `AppModel.init` before `self` exists — the second while
+/// assigning `self.panelController` itself, which Swift's two-phase
+/// initialization forbids capturing `self` for. Both closures read this one
+/// box through `renderCurrentOverlay(_:)`, so the adapter's overlay and the
+/// controller's key can never describe two different renderings — see
+/// `Docs/_logs/2026-08-26. Status Overlay/Plan.md`, chunk 10.
+private final class UsageBox {
+  var snapshot: UsageSnapshot?
+}
+
+/// The one rendering of `box.snapshot`. A free function rather than a method
+/// so it needs no `self`, and can be called from closures built before
+/// `AppModel` finishes initializing. `AppModel.currentOverlay` calls this
+/// same function, so all three call sites — the adapter, the controller,
+/// and anything inspecting `AppModel` directly — agree by construction.
+private func renderCurrentOverlay(_ box: UsageBox) -> Overlay? {
+  UsageRail.render(box.snapshot, at: Date())
+}
+
 @MainActor
 final class AppModel: ObservableObject {
   /// Master switch mirrored by the menu bar's "Enabled" toggle.
@@ -79,19 +100,51 @@ final class AppModel: ObservableObject {
   /// decision logging.
   private let eventLog: EventLog
 
+  // MARK: - Usage rail
+
+  /// Backing storage for `currentUsage`, held as its own reference (rather
+  /// than a plain stored property) so the `overlayProvider`/`overlayKey`
+  /// closures built in `init` can share it without capturing `self` — see
+  /// `UsageBox`'s doc comment above.
+  private let usageBox = UsageBox()
+
+  /// Where the usage snapshot is loaded from at launch and saved to on every
+  /// new one. Defaults to `UsageSnapshotCache.defaultFileURL`; overridable
+  /// so tests can point it at a temp directory instead of the real
+  /// `~/Library/Application Support/ClaudeMascot`.
+  private let usageCacheURL: URL
+
+  /// Latest usage snapshot: loaded from `UsageSnapshotCache` at launch, then
+  /// kept current by the `hookServer.$lastUsage` subscription in `init`,
+  /// which also persists each new one back to the cache.
+  private(set) var currentUsage: UsageSnapshot? {
+    get { usageBox.snapshot }
+    set { usageBox.snapshot = newValue }
+  }
+
+  /// The one rendering of `currentUsage`, fed to both `PanelAdapter`'s
+  /// `overlayProvider` and `PanelController`'s `overlayKey` (via the same
+  /// `renderCurrentOverlay` this calls) so the two can never disagree about
+  /// what is on the panel.
+  var currentOverlay: Overlay? {
+    renderCurrentOverlay(usageBox)
+  }
+
   init(
     settings: AppSettings = AppSettings(),
     bleClient: BLEClient = BLEClient(),
     animationLibrary: AnimationLibrary = AnimationLibrary(),
     hookServer: HookServer = HookServer(),
     pluginInstaller: PluginInstaller = PluginInstaller(),
-    tickInterval: Duration = .seconds(1)
+    tickInterval: Duration = .seconds(1),
+    usageCacheURL: URL = UsageSnapshotCache.defaultFileURL
   ) {
     self.settings = settings
     self.bleClient = bleClient
     self.hookServer = hookServer
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
+    self.usageCacheURL = usageCacheURL
     self.eventLog = EventLog()
     self.sessionTracker = SessionTracker()
     self.sleepWatcher = SleepWatcher()
@@ -103,7 +156,11 @@ final class AppModel: ObservableObject {
         .appendingPathComponent(".idotmatrix")
     )
 
-    let adapter = PanelAdapter(library: animationLibrary, ble: bleClient)
+    let usageBox = self.usageBox
+    let adapter = PanelAdapter(
+      library: animationLibrary, ble: bleClient,
+      overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) }
+    )
     // Walks the pose graph instead of looking states up 1:1. Built from
     // whatever manifest the library loaded (an empty one when none did, so
     // resolution simply returns `nil` everywhere rather than crashing).
@@ -131,8 +188,14 @@ final class AppModel: ObservableObject {
         startingHold: animationLibrary.clip(id: "starting")?.motion ?? 0
       ),
       brightness: { settings.brightness },
-      eventLog: eventLog
+      eventLog: eventLog,
+      overlayKey: { [usageBox] in renderCurrentOverlay(usageBox)?.key }
     )
+
+    // Load the cached snapshot so a rail survives an app restart instead of
+    // showing nothing until the wrapper's next line; the `$lastUsage`
+    // subscription below takes over from here.
+    self.currentUsage = UsageSnapshotCache.load(from: usageCacheURL)
 
     self.enabled = settings.autoConnect
 
@@ -211,6 +274,19 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    // Subscribe to usage snapshots and persist each new one, so the rail
+    // survives the next app restart. Independent of `enabled`/panel state:
+    // this tracks Claude Code's usage window, not whether the panel is
+    // currently being driven.
+    hookServer.$lastUsage
+      .dropFirst()
+      .sink { [weak self] usage in
+        guard let self, let usage else { return }
+        self.currentUsage = usage
+        UsageSnapshotCache.save(usage, to: self.usageCacheURL)
+      }
+      .store(in: &cancellables)
+
     // Start the hook server.
     do {
       try hookServer.start()
@@ -272,7 +348,15 @@ final class AppModel: ObservableObject {
     // before `AppModel` exists, so the dependency only runs this direction —
     // see `AppDelegate`'s doc comment. A failed cast just means there is
     // nothing to hook into; the app must still run.
-    if let appDelegate = NSApp.delegate as? AppDelegate {
+    // `NSApplication.shared` rather than the raw `NSApp` global: `NSApp` is
+    // an implicitly-unwrapped optional that stays nil until something has
+    // asked for `.shared` (normally `NSApplicationMain`), and is still nil
+    // in a bare `swift test` process — dereferencing it there crashed every
+    // test that so much as constructed an `AppModel`. `.shared` lazily
+    // creates the (delegate-less, in that process) application instead, so
+    // the cast below just falls through to the same "nothing to hook into"
+    // branch it already had.
+    if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
       appDelegate.onTerminate = { [weak self] in
         await self?.departNow(withWave: false, deadline: 2.5)
       }
