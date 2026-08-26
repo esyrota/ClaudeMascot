@@ -115,6 +115,13 @@ final class PanelController: ObservableObject {
   /// Where every decision this machine makes gets logged, for later tuning.
   /// `nil` in every existing test, which is how they construct unchanged.
   private let eventLog: EventLog?
+  /// The key of whatever overlay is currently meant to sit behind the
+  /// mascot, independent of what is actually on the panel right now. `nil`
+  /// means "no overlay" — the default, and the state every existing test
+  /// runs in. Injected as a closure rather than a stored `Overlay` (or a
+  /// reach for `UsageRail` directly) so this machine keeps not knowing what
+  /// an overlay contains, only that it has an identity worth comparing.
+  private let overlayKey: () -> Int?
 
   /// The latest state requested via `handle(_:)`. What the machine is
   /// trying to show, before idle escalation or the done hold reshape it
@@ -140,6 +147,15 @@ final class PanelController: ObservableObject {
   /// exactly when `displayed` is `nil` — both are cleared together on power
   /// off and set together on a successful upload.
   private var clipStartedAt: TimeInterval?
+
+  /// The overlay key that was on the panel the last time `displayed` was
+  /// uploaded. Part of the same invariant as `displayed` and
+  /// `clipStartedAt` — now a triple, not a pair: all three are `nil`
+  /// together, set together on a successful upload, and cleared together on
+  /// power-off and in `invalidateDisplay()`. What "already showing the
+  /// target" means now depends on this alongside the clip id, since a
+  /// changed overlay behind an unchanged clip is a different picture.
+  private var displayedOverlayKey: Int?
 
   /// When the entrance animation currently playing is due to finish. `nil`
   /// whenever the mascot is not appearing, including once the hold has
@@ -170,7 +186,8 @@ final class PanelController: ObservableObject {
     sleeper: @escaping (TimeInterval) async -> Void = {
       try? await Task.sleep(for: .seconds($0))
     },
-    eventLog: EventLog? = nil
+    eventLog: EventLog? = nil,
+    overlayKey: @escaping () -> Int? = { nil }
   ) {
     self.panel = panel
     self.resolve = resolve
@@ -180,6 +197,7 @@ final class PanelController: ObservableObject {
     self.clock = clock
     self.sleeper = sleeper
     self.eventLog = eventLog
+    self.overlayKey = overlayKey
     self.idleSince = clock()
     self.appearingUntil = timings.startingHold > 0 ? clock() + timings.startingHold : nil
   }
@@ -309,6 +327,7 @@ final class PanelController: ObservableObject {
         try await panel.upload(waveClip)
         displayed = waveClip
         clipStartedAt = clock()
+        displayedOverlayKey = overlayKey()
         logDecision(
           target: waveClip.id, displayed: nil, action: "upload", outcome: "ok", detail: nil)
         await sleeper(waveClip.motion)
@@ -356,31 +375,39 @@ final class PanelController: ObservableObject {
       return
     }
 
+    let currentOverlayKey = overlayKey()
+
     guard let currentlyDisplayed = displayed, let clipStartedAt else {
       // Nothing showing (first upload ever, or right after a power-off):
       // there is no loop to respect, so upload immediately. This is also
       // how power transitions bypass boundary gating entirely — `displayed`
       // is always `nil` coming out of `attemptPowerOff`, so the wake path's
       // own upload (in `attemptWake`) lands here too, unconditionally.
-      await attemptUpload(targetClip)
+      await attemptUpload(targetClip, overlayKey: currentOverlayKey)
       return
     }
 
-    if currentlyDisplayed.id == targetClip.id {
-      // Already showing the target: nothing to do.
+    if currentlyDisplayed.id == targetClip.id && displayedOverlayKey == currentOverlayKey {
+      // Already showing the target with the same overlay behind it: nothing
+      // to do.
       return
     }
 
     let boundary = nextBoundary(after: currentlyDisplayed, startedAt: clipStartedAt, now: now)
     if now >= boundary {
-      await attemptUpload(targetClip)
+      await attemptUpload(targetClip, overlayKey: currentOverlayKey)
     } else {
       // Deferred: the swap is legitimate but has to wait for the currently
       // playing clip to reach a seam. Logged so the deferral is visible in
       // the decision trace, not just its eventual (or never-seen) effect.
+      // Same rule whether the swap is a changed clip, a changed overlay key,
+      // or both — restarting a loop mid-cycle for a rail update alone would
+      // break the anchor contract just as badly as it would for a clip.
       logDecision(
         target: targetClip.id, displayed: currentlyDisplayed.id, action: "noop", outcome: "skipped",
-        detail: "deferred to boundary at \(boundary)")
+        detail:
+          "deferred to boundary at \(boundary), overlayKey \(currentOverlayKey?.description ?? "nil")"
+      )
     }
   }
 
@@ -492,6 +519,7 @@ final class PanelController: ObservableObject {
       isPanelOff = true
       displayed = nil
       clipStartedAt = nil
+      displayedOverlayKey = nil
       nextRetryAt = nil
       Self.log.notice("panel off (desired \(self.desired.rawValue, privacy: .public))")
       logDecision(
@@ -529,6 +557,7 @@ final class PanelController: ObservableObject {
       isPanelOff = false
       displayed = targetClip
       clipStartedAt = now
+      displayedOverlayKey = overlayKey()
       nextRetryAt = nil
       Self.log.notice("panel woke showing \(targetClip.id, privacy: .public)")
       logDecision(
@@ -549,23 +578,26 @@ final class PanelController: ObservableObject {
   /// The caller is the diagnostics path in `AppModel`: a test card is written
   /// straight to `BLEClient`, behind this machine's back, so afterwards
   /// `displayed` is a claim about a mascot that is no longer on screen.
-  /// Clearing `clipStartedAt` alongside it keeps the pair's invariant — both
-  /// are `nil` together or set together.
+  /// Clearing `clipStartedAt` and `displayedOverlayKey` alongside it keeps
+  /// the triple's invariant — all three are `nil` together or set together.
   func invalidateDisplay() {
     displayed = nil
     clipStartedAt = nil
+    displayedOverlayKey = nil
   }
 
-  private func attemptUpload(_ target: Clip) async {
+  private func attemptUpload(_ target: Clip, overlayKey: Int?) async {
     let displayedBefore = displayed?.id
     do {
       try await panel.upload(target)
       displayed = target
       clipStartedAt = clock()
+      displayedOverlayKey = overlayKey
       nextRetryAt = nil
       Self.log.notice("showing \(target.id, privacy: .public)")
       logDecision(
-        target: target.id, displayed: displayedBefore, action: "upload", outcome: "ok", detail: nil)
+        target: target.id, displayed: displayedBefore, action: "upload", outcome: "ok",
+        detail: "overlayKey \(overlayKey?.description ?? "nil")")
     } catch {
       let reason = error.localizedDescription
       Self.log.error(
