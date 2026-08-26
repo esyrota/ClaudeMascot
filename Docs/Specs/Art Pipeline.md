@@ -28,7 +28,7 @@ see [[Animation Catalogue]]'s `sitting` section for why.
 | `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |
 | `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
 | `art/read_panel_photo.py` | Reads a photographed card back into numbers — warps the lit area to a 32×32 grid and reports per-patch values. Check the landmark line it prints before believing anything |
-| `art/testcards.py` | The five characterisation cards (ramps, halftones, thin features, hues) plus `reference.html`, the on-screen half of the measurement — see [[Recheck the Panel Colour Rule]] |
+| `art/testcards.py` | The characterisation cards — ramps, halftones, thin features, hues, gamma, mixture, body colour, and the two overlay cards — plus `reference.html`, the on-screen half of the measurement. The overlay pair is two cards because the combined one would not upload; see [[Panel Quirks]] |
 
 `Animations/custom/<state>.gif` takes priority over `Animations/<state>.gif`, so re-running
 the generator never clobbers hand-imported art. Resolution order, including the user's

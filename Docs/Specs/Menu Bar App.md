@@ -58,7 +58,7 @@ The user must restart Claude Code after installation so the hooks load.
 - **Plugin** — install status is probed from `~/.claude/plugins/installed_plugins.json` at `PluginInstaller.init` and each time the Settings window appears, with Install or Uninstall buttons matching the probed state, plus a re-register prompt when the app has moved since install
 - **Statusline wrapper** — its own status row beside Plugin, probed the same way, with its own Install / Uninstall; installing or uninstalling it never touches the plugin's state
 
-The pane is a grouped `Form` with four sections: General, Panel, Device, and Plugin.
+The pane is a grouped `Form` with five sections: General, Panel, Device, Plugin, and Statusline.
 
 Defaults live in `Settings.swift` (`@AppStorage`); the idle timings are read once at launch because `PanelController` treats its timings as immutable.
 
@@ -254,6 +254,7 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 | `AppDelegate.swift` | `applicationShouldTerminate` → `.terminateLater`; the one API Cmd-Q, logout, restart and shutdown all route through |
 | `Settings.swift` | `@AppStorage`, plus `SMAppService` for the login item |
 | `PluginInstaller.swift` | First-run marketplace + plugin install |
+| `StatuslineInstaller.swift` | Installs the statusline wrapper by wrapping the user's existing command; refuses an unfamiliar `statusLine` shape rather than guessing |
 
 **The timer lives in `AppModel`, never in `PanelController`.** The state machine is deliberately timer-free and driven by explicit `tick()` calls, which is what makes it unit-testable against a fake clock.
 
