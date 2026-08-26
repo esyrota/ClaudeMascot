@@ -194,12 +194,39 @@ def card_e_gamma() -> Image.Image:
     return im
 
 
+GREEN_SWEEP = [0, 4, 8, 14, 20, 27, 40, 96]
+
+
+def card_f_mixture() -> Image.Image:
+    """Where does a small green start to register *beside* a saturated red?
+
+    The tone curve was fitted on single-channel ramps and greys, and it predicts
+    that `MASCOT`'s green of 68 should be authored as 5. On the panel that body
+    rendered pure red — so a channel of 5 beside a red of 255 contributes
+    nothing, exactly the way the unexplained `B = 4` did. The curve never
+    described mixtures; this card measures them.
+
+        rows  0-15  red 255, green sweeping 0 -> 96
+        rows 16-31  red 158 (a shaded body), the same greens
+
+    Two answers from one video: the green at which the band stops reading as red
+    and starts reading as orange, and whether that threshold moves with the red
+    it sits beside. Whatever that green is, it is what `MASCOT` should carry.
+    """
+    im = _blank()
+    for col, g in enumerate(GREEN_SWEEP):
+        _fill(im, col * 4, 0, col * 4 + 3, 15, (255, g, 0))
+        _fill(im, col * 4, 16, col * 4 + 3, 31, (158, g, 0))
+    return im
+
+
 CARDS = [
     ("a-ramps", card_a_ramps, "per-channel transfer curve (R, G, B, grey; dark → bright)"),
     ("b-halftones", card_b_halftones, "1px and 2px dithers against the solids they average to"),
     ("c-thin", card_c_thin, "1px lines, isolated pixels vs 2x2 and 2x4 blocks (bloom)"),
     ("d-hues", card_d_hues, "saturated hue sweep, and the colours Panel Quirks claims"),
     ("e-gamma", card_e_gamma, "gamma-encoded ladders above naive ones — the model's falsification test"),
+    ("f-mixture", card_f_mixture, "a green sweep beside a saturated red — where a small channel starts to register"),
 ]
 
 

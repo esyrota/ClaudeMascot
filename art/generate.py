@@ -36,7 +36,18 @@ OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 SOURCES = Path(__file__).resolve().parent / "sources"
 SIZE = 32
 
-# The one mascot colour: a deep burnt orange.
+# The one mascot colour, taken from the hand-drawn sources rather than invented.
+#
+# Every source is more orange than the (255,68,0) this file shipped for months:
+# the user's own typing art is (255,95,5) at G/R 0.37, appear.gif is (254,114,39)
+# at 0.45, and the brand loading art is (216,112,80) at 0.52. Ours sat at 0.27 --
+# redder than all of them -- because it was picked under the old "brightest
+# channel must be 255" rule plus B = 0, not because anyone chose that hue. The
+# recolour then flattened the imported art down to it, which is why the seated
+# pose read redder in the catalogue than in the source it came from.
+#
+# (255,95,0) is the typing art's own body with blue dropped to 0. Blue stays 0:
+# see [[Panel Quirks]] -- a near-black channel is never free here.
 #
 # The blue channel is 0 because a near-black channel value is never free on this
 # panel -- the same effect that makes near-black greys in empty space light up as a
@@ -47,7 +58,7 @@ SIZE = 32
 # not the ~27% ("a quarter") it looks like authored -- see [[Panel Quirks]] for the
 # measured curve. `panel_encode()` now corrects for this at the write path (see
 # `save()`), so MASCOT is authored here in ordinary display terms.
-MASCOT = (255, 68, 0)
+MASCOT = (255, 95, 0)
 
 # The shade used where the mascot turns away from the viewer: `MASCOT` scaled
 # uniformly, which holds hue and saturation and moves only value -- what a shadow
