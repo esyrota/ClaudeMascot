@@ -167,6 +167,37 @@ blend between `MASCOT` and `MASCOT_DARK` spans 20% of luma with no clean progres
 stays a texture tool. (Card B's own fit is weak — a nearly uniform card gives the aligner
 nothing to lock onto — so treat its numbers as indicative and card E's as the evidence.)
 
+## Some images will not upload at all, and it is not their size
+
+**Measured 2026-08-26, cause unknown.** A test card carrying a white swatch, three
+warm-white candidates and three 1px colour ramps would not transfer: the panel dropped
+the BLE connection about a second into the upload and reset, then reconnected, every
+time. `PanelController` logged `BLEError error 2` on the write; the app was healthy
+either side of it, and an unrelated card uploaded normally seconds later.
+
+Bisecting the card found no guilty band. Each third uploaded on its own, and **all three
+pairs uploaded**; only all three together failed. But the obvious cumulative explanations
+are contradicted by cards that have always worked:
+
+| card | lit pixels | sum of channels | uploads |
+|---|---|---|---|
+| the combined overlay card | 325 | 141k | **no** |
+| `c-thin` | 436 | 140k | yes |
+| `shade-test` | 600 | 121k | yes |
+| `b-halftones` | 928 | 246k | yes |
+| `g-body` | 1024 | 352k | yes |
+
+So it is neither lit-pixel count nor total current: cards with three times the load go up
+fine. The failing file was also structurally indistinguishable from `c-thin` — same
+GIF89a, same 32×32 canvas, same 16-entry global palette with 8 real colours, same LZW
+minimum code size, same single merged frame, and 267 bytes against `c-thin`'s 343.
+
+**The workaround is to split the card in two**, which is why the overlay cards are
+`h-overlay-whites` and `h-overlay-ramps` rather than one card. That is a workaround, not a
+diagnosis. **If a new card ever refuses to upload, split it before suspecting anything
+else** — and do not reach for the brightness or the colour values, which is where two
+wrong guesses went first.
+
 ## The panel is scan-driven: measure from video, not stills
 
 A 1.4s clip of a static card, measured against the monitor in the same frame:

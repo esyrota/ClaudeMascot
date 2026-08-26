@@ -252,6 +252,7 @@ def card_g_body() -> Image.Image:
 
 
 # Card H: status overlay colours and markers.
+BLACK = (0, 0, 0)
 OVERLAY_WHITE = (255, 255, 255)
 # Half-value white, to see whether a dimmer white drifts less blue than a full one --
 # and, incidentally, the 9th colour on the card. `save_gif` does not pad the palette the
@@ -270,67 +271,43 @@ OVERLAY_RAMP = [
 ]
 
 
-def card_h_overlay() -> Image.Image:
-    """Characterisation card for the status overlay: white reference, warm-white
-    candidates for the clock marker, ramp colours as 1px rows, and marker cases.
+def card_h_overlay_whites() -> Image.Image:
+    """Overlay card, part 1 of 2: white reference and the clock-marker candidates.
 
-    The card shows in separate bands: a solid white swatch (to verify white
-    reads as white), three warm-white candidates for the clock marker,
-    progressively warmer in hue; the three ramp colours (green, amber, red)
-    each drawn as a full-width 1px row; and each ramp row paired with a version
-    showing an unlit pixel punched into the middle. Below, a demonstration of
-    a warm-white pixel on black background (the clock marker case).
+    Split from a single card because the combined version **would not upload**: the
+    panel dropped the BLE connection mid-transfer and reset, every time, while each
+    half went up cleanly on its own. The cause is not understood and is not amount --
+    `shade-test` (600 lit pixels), `c-thin` (436) and `g-body` (1024, and nearly three
+    times the total channel sum) all upload fine, where the combined card failed at
+    325 lit pixels. See [[Panel Quirks]]; the split is a workaround, not a diagnosis.
     """
     im = _blank()
-    px = im.load()
-
-    # Bands 1-2 are deliberately SMALL. The first version filled rows 0-5 and 7-11
-    # edge to edge, which put 192 pixels at full white on the panel -- twice the
-    # all-three-channels count of any card that had ever been shot here -- and the
-    # panel brown-out reset on upload rather than displaying it. White is the
-    # expensive colour: it lights all three sub-LEDs per pixel, which is the same
-    # current limiting [[Panel Quirks]] already records inside white (red at 255
-    # reads 232 alone, but 131 inside a white). A swatch only has to be big enough
-    # to average over; it does not have to be a stripe.
     _fill(im, 2, 1, 9, 4, OVERLAY_WHITE)          # 8x4 white reference
     _fill(im, 13, 1, 20, 4, OVERLAY_WHITE_HALF)   # the same white at half value
-
-    # Band 2: three warm-white candidates, 6x4 each (rows 7-10)
     for col, rgb in enumerate(OVERLAY_WARM_WHITES):
         x_start = 2 + col * 8
         _fill(im, x_start, 7, x_start + 5, 10, rgb)
+    # The marker as the rail draws it: one lit pixel, alone, on unlit background.
+    _fill(im, 6, 22, 25, 27, BLACK)
+    px = im.load()
+    px[16, 24] = OVERLAY_WARM_WHITES[0]
+    return im
 
-    # Band 3: green 1px ramp (row 13), then green with middle pixel unlit (row 14)
-    for x in range(SIZE):
-        px[x, 13] = OVERLAY_RAMP[0]
-    for x in range(SIZE):
-        if x == 16:
-            px[x, 14] = (0, 0, 0)  # single unlit pixel in the middle
-        else:
-            px[x, 14] = OVERLAY_RAMP[0]
 
-    # Band 4: amber 1px ramp (row 16), then amber with middle pixel unlit (row 17)
-    for x in range(SIZE):
-        px[x, 16] = OVERLAY_RAMP[1]
-    for x in range(SIZE):
-        if x == 16:
-            px[x, 17] = (0, 0, 0)
-        else:
-            px[x, 17] = OVERLAY_RAMP[1]
+def card_h_overlay_ramps() -> Image.Image:
+    """Overlay card, part 2 of 2: the three fill colours as 1px rows, each paired
+    with a copy carrying a single unlit pixel at column 16.
 
-    # Band 5: red 1px ramp (row 19), then red with middle pixel unlit (row 20)
-    for x in range(SIZE):
-        px[x, 19] = OVERLAY_RAMP[2]
-    for x in range(SIZE):
-        if x == 16:
-            px[x, 20] = (0, 0, 0)
-        else:
-            px[x, 20] = OVERLAY_RAMP[2]
-
-    # Band 6: marker demonstration — warm-white pixel on black (rows 22–27, centre)
-    _fill(im, 6, 22, 25, 27, (0, 0, 0))  # black background
-    px[16, 24] = OVERLAY_WARM_WHITES[0]  # single warm-white marker pixel in centre
-
+    The pairing is the measurement: the rail's clock marker is one unlit pixel inside
+    a lit 1px row, and whether that reads at all is the assumption the marker design
+    rests on. A 2px hole would measure a case the rail never draws.
+    """
+    im = _blank()
+    px = im.load()
+    for row, (lit_y, holed_y) in enumerate([(13, 14), (16, 17), (19, 20)]):
+        for x in range(SIZE):
+            px[x, lit_y] = OVERLAY_RAMP[row]
+            px[x, holed_y] = BLACK if x == 16 else OVERLAY_RAMP[row]
     return im
 
 
@@ -342,7 +319,8 @@ CARDS = [
     ("e-gamma", card_e_gamma, "gamma-encoded ladders above naive ones — the model's falsification test"),
     ("f-mixture", card_f_mixture, "a green sweep beside a saturated red — where a small channel starts to register"),
     ("g-body", card_g_body, "candidate body colours against the brand salmon — pick MASCOT from a photograph"),
-    ("h-overlay", card_h_overlay, "status overlay: white, warm-white for clock, ramp colours as 1px rows, and markers"),
+    ("h-overlay-whites", card_h_overlay_whites, "status overlay 1/2: white reference, warm-white clock-marker candidates, lone marker pixel"),
+    ("h-overlay-ramps", card_h_overlay_ramps, "status overlay 2/2: fill colours as 1px rows, each with a 1px unlit marker"),
 ]
 
 
