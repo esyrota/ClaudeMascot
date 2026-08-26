@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 2
 estimated_tools: 8
 estimated_tokens: 35000
-estimated_risk: 'low'
+estimated_risk: low
+actual_tokens: 132000
+actual_tools: 29
+actual_time: 4
+outcome: success
 ---
 
 # Chunk 2 — Card H: white and the ramp candidates

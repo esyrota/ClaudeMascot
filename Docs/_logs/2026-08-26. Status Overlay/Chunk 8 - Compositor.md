@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 7
 estimated_tools: 14
 estimated_tokens: 80000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 109000
+actual_tools: 22
+actual_time: 5
+outcome: success
 ---
 
 # Chunk 8 — The compositor and the seam

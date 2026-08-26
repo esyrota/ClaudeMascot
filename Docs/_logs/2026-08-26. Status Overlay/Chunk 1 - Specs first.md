@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 5
 estimated_tools: 10
 estimated_tokens: 70000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 128000
+actual_tools: 23
+actual_time: 7
+outcome: success
 ---
 
 # Chunk 1 — Specs first

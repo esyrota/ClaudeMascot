@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 6
 estimated_tools: 12
 estimated_tokens: 70000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 149000
+actual_tools: 60
+actual_time: 14
+outcome: success
 ---
 
 # Chunk 10 — Wiring it up in `AppModel`

@@ -1,9 +1,13 @@
 ---
-model: 'Haiku'
+model: Haiku
 estimated_time: 4
 estimated_tools: 12
 estimated_tokens: 45000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 74000
+actual_tools: 45
+actual_time: 5
+outcome: success
 ---
 
 # Chunk 12 — `resets_at` is epoch seconds, and the fields are nested

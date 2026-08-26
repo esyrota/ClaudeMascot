@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 8
 estimated_tools: 14
 estimated_tokens: 90000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 169000
+actual_tools: 51
+actual_time: 18
+outcome: success
 ---
 
 # Chunk 4 — The GIF encoder

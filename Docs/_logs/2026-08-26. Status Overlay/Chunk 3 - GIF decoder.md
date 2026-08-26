@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 6
 estimated_tools: 12
 estimated_tokens: 70000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 208000
+actual_tools: 45
+actual_time: 11
+outcome: success
 ---
 
 # Chunk 3 — The GIF decoder

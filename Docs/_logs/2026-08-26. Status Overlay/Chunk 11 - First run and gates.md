@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 8
 estimated_tools: 18
 estimated_tokens: 85000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 115000
+actual_tools: 35
+actual_time: 7
+outcome: success
 ---
 
 # Chunk 11 — First run, Settings, and the final gates

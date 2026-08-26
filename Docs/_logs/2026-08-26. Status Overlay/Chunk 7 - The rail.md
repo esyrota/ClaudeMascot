@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 6
 estimated_tools: 12
 estimated_tokens: 75000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 68000
+actual_tools: 14
+actual_time: 2
+outcome: success
 ---
 
 # Chunk 7 — The rail

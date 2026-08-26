@@ -1,9 +1,13 @@
 ---
-model: 'Sonnet'
+model: Sonnet
 estimated_time: 6
 estimated_tools: 12
 estimated_tokens: 70000
-estimated_risk: 'medium'
+estimated_risk: medium
+actual_tokens: 114000
+actual_tools: 39
+actual_time: 7
+outcome: success
 ---
 
 # Chunk 9 — The refresh rule
