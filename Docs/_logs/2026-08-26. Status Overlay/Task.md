@@ -61,10 +61,17 @@ card goes.
   patched. Decode clip → composite over the overlay → encode → existing BLE path unchanged.
 - **Our own GIF writer, not ImageIO**, for exact palette control (the panel's palette and
   colour rules are unforgiving) and byte-stability under the golden-fixture discipline.
-  **It must do inter-frame diffs**: `done-flag` is 12.8KB across 59 frames (~217 B/frame)
-  because PIL emits bounding-box diffs with a transparent index; a full-frame encoder would
-  3–4× that and turn every clip swap into a multi-second upload. This is the largest
-  implementation risk in the task.
+  **Corrected at planning — the inter-frame-diff risk is not real.** Every shipped GIF is
+  *already* full-frame: all 59 of `done-flag`'s tiles are `(0,0,32,32)`, no frame carries a
+  transparent index, and the file still lands at 217 B/frame. That 217 B **is** the
+  full-frame cost of a 32×32 at this palette size, not a diff'd one. A plain full-frame LZW
+  writer therefore matches PIL's sizes by construction, and decoding needs no disposal or
+  compositing logic because no frame is partial. The largest stated risk in this task was a
+  misreading of the art.
+- **No overlay means byte-identical passthrough.** With no widget to composite, the app
+  uploads the bundled GIF's bytes untouched, exactly as it does today. The compositor and
+  encoder engage only when a widget is actually on screen, so the common path keeps its
+  golden-fixture guarantee and a user without the statusline wrapper runs today's code.
 - **The rail is row 0**: fill from the left for usage, plus one contrasting pixel marking
   the clock's position in the window, so "am I burning faster than it resets" is answerable
   at a glance. Colour ramp authored through `panel_encode()` — unencoded, the green→amber→red
@@ -87,20 +94,36 @@ card goes.
   encoder and refresh rule are the hard part regardless; exactly one thing rides on them at
   first.
 
+- **The rail's layout is settled by [[Wireframe]]**, candidate C, with one correction: the
+  marker inverts in **value**, not in hue. Lit-always disappears against a bright fill;
+  unlit-always disappears against the unlit background, which is exactly the low-usage state the
+  marker exists for. So it is unlit inside the fill and warm white outside it, and it wins the
+  collision when its column is the fill edge. The wireframe's cyan-on-red is a placeholder and a
+  trap — cool colours beside a saturated red are the one thing this panel is worst at.
+- **The knockout halo is on by default.** Without it the mascot's ears fuse with a red-bucket
+  fill: `MASCOT` and the ramp's red end are hue neighbours. Only nine clips reach rows 0–1, so
+  it is nearly free.
+
 ## Out of scope for the first build
 
 A second widget of any kind (the 7-day window, context usage, session count). The
 reserved-region budget — at most rows 0–1, one widget per row, everything else is the
 mascot's stage — is a rule to write down, not to fill.
 
-## Open before implementation
+## Settled 2026-08-26, at planning
 
-- **The graffiti experiment, first.** The iDotMatrix protocol has a single-pixel write. If
-  it composites over a playing GIF, the encoder is unnecessary and the rail becomes 32 tiny
-  writes. Almost certainly it switches the panel out of GIF mode instead — but it is twenty
-  minutes against several days, so it goes first.
-- **What the rail shows with no data** (statusline not installed, or no session ever run).
-  Hiding it is the obvious answer and needs confirming.
+- **The graffiti experiment is dropped, not deferred.** The single-pixel write was only
+  ever a way to avoid building the compositor, and the compositor is wanted regardless:
+  the rail is the *trivial* first widget, and what follows it is several bars each
+  carrying a label. Thirty-two pixel writes cannot draw a label, and a mechanism that
+  only works for one widget is not the mechanism this task is for. Build the layer stack.
+- **With no data the rail is hidden entirely** — no row reserved, no outline, no
+  placeholder. The mascot keeps the full 32×32 canvas exactly as it does today, so a user
+  who never installs the statusline wrapper sees no change at all and nothing can regress
+  for them.
+- **The white/marker colour is measured before the rail is drawn**, not after: a solid
+  white swatch card goes into `art/testcards.py` and is shot in the same hardware round
+  that the ramp colours are chosen from. See the open item above.
 
 ## Specs
 

@@ -1,0 +1,77 @@
+{
+  "nodes": [
+    {
+      "id": "img-a",
+      "type": "file",
+      "file": "_logs/2026-08-26. Status Overlay/wireframe-a.svg",
+      "x": -80,
+      "y": 0,
+      "width": 1160,
+      "height": 1832
+    },
+    {
+      "id": "rat-a",
+      "type": "text",
+      "x": 1120,
+      "y": 0,
+      "width": 620,
+      "height": 720,
+      "text": "## Candidate A -- Lit contrast pixel over the fill\n\n**What it is.** The marker column always gets a fixed, dedicated colour (a warm-white placeholder here), drawn on top of whatever is already in row 0 -- fill or unlit background. No branching on position.\n\n**What it costs.** One extra colour that must stay legible against *both* an unlit background and every ramp bucket it can land on (green, amber, red). That is three separate contrast checks against one fixed colour, and the amber bucket is the tight one -- amber and warm-white sit close in the panel's actual rendering. If the fixed colour is chosen to survive amber, it may look washed-out against unlit black at low usage.\n\n**When it fails.** Right at the moment usage crosses into the same hue family as the marker (unlikely with warm ramp colours, but not zero -- see State 2, red fill against a warm-white marker: it reads, but with less margin than State 1's green). Also the simplest to implement and to reason about -- one rule, no fill-boundary lookup needed at all, since the marker always draws last regardless of what's beneath.\n\n**Verdict signal.** Simplicity is real; it just pushes all the contrast risk onto a single colour choice that has to work everywhere."
+    },
+    {
+      "id": "img-b",
+      "type": "file",
+      "file": "_logs/2026-08-26. Status Overlay/wireframe-b.svg",
+      "x": -80,
+      "y": 1900,
+      "width": 1160,
+      "height": 1832
+    },
+    {
+      "id": "rat-b",
+      "type": "text",
+      "x": 1120,
+      "y": 1900,
+      "width": 620,
+      "height": 760,
+      "text": "## Candidate B -- Unlit gap punched through the fill\n\n**What it is.** The marker column is forced unlit (off), overwriting the fill colour at that column. Reads as a dark notch cut into the bar.\n\n**What it costs.** Nothing extra to render *when inside the fill* -- one column skipped rather than drawn, which is cheaper than Candidate A's extra draw. The notch is unambiguous there: State 2 shows a clean dark gap inside the red bar, easy to spot at 1px.\n\n**When it fails.** State 1 is the real problem, visible directly in the wireframe: when the marker sits ahead of the fill (over already-unlit background), \"rendering it unlit\" is a no-op -- there is nothing to see. The dotted box in State 1 is a wireframe annotation only; the real panel would show *nothing* at that column. That is the common case early in a 5-hour window (little used, clock already partway through) -- exactly when the marker matters most for answering \"am I burning faster than the reset.\" This candidate is silent exactly when it needs to speak.\n\n**Verdict signal.** Elegant when the marker is inside the fill, broken when it is not. Since both cases are common and neither is rare, this is disqualifying rather than a tradeoff."
+    },
+    {
+      "id": "img-c",
+      "type": "file",
+      "file": "_logs/2026-08-26. Status Overlay/wireframe-c.svg",
+      "x": -80,
+      "y": 3800,
+      "width": 1160,
+      "height": 1832
+    },
+    {
+      "id": "rat-c",
+      "type": "text",
+      "x": 1120,
+      "y": 3800,
+      "width": 620,
+      "height": 780,
+      "text": "## Candidate C -- Local colour inversion\n\n**What it is.** The marker's rendering depends on what it sits on: over the fill, it inverts against the ramp colour (shown here as a placeholder cyan/teal); over unlit background, it inverts to a lit warm-white -- effectively Candidate A's marker, but only used in the outside-fill case. Two colours, chosen by one boolean (is this column inside the fill or not).\n\n**What it costs.** The renderer already knows the fill-boundary vs marker-column relationship (it has to, to draw the fill at all), so the extra branch is cheap. The real cost is two colours to validate against the panel's quirks instead of one, and a second failure surface: the inverted-against-fill colour must clear the \"no channel in 1-7\" floor and the blue-stays-0 rule same as everything else.\n\n**When it fails.** The edge case named in the brief: when the marker column and the fill's edge coincide (marker == cols_lit), which colour applies is genuinely ambiguous -- is that column \"inside\" or \"outside\"? Needs an explicit tie-break rule (e.g. inside wins) or the marker will flicker between its two colours as usage ticks across that exact column.\n\n**Verdict signal.** Solves Candidate B's blind spot and gives every case a guaranteed-contrasting colour, at the price of one more measured colour and one off-by-one decision to pin down."
+    },
+    {
+      "id": "specs",
+      "type": "text",
+      "x": -80,
+      "y": 5760,
+      "width": 700,
+      "height": 260,
+      "text": "## Relevant specs\n\n- [[Panel Quirks]] -- the 1-7 mixture floor, blue-stays-0 in warm colours, and the fact that dim colours (0-31) don't render at all. Every colour choice above is provisional against this page.\n- [[BLE Protocol]] -- where the overlay's compositing (row 0, knockout halo, re-upload-on-quantised-change) would need to be described once implemented.\n- [[Menu Bar App]] -- where `rate_limits.five_hour.used_percentage` and the wall-clock position are read from, on the host side."
+    },
+    {
+      "id": "recommendation",
+      "type": "text",
+      "x": 700,
+      "y": 5760,
+      "width": 1040,
+      "height": 320,
+      "text": "## Recommendation\n\n**Candidate C -- local colour inversion.**\n\nCandidate B is eliminated by its own wireframe: it renders nothing when the marker is ahead of the fill, which is a normal, frequent state (low usage, clock partway through the window) rather than an edge case -- exactly when the user most wants the \"burning faster than reset\" signal. Candidate A is workable but asks one fixed colour to hold contrast against an unlit background *and* against all three ramp buckets simultaneously, with the least margin at the amber bucket where warm-white and amber sit closest in the panel's actual output. Candidate C isolates that risk into two colours, each responsible for contrast against only one background (fill or unlit), which is a smaller and more honest measurement problem to hand to the panel-quirks pass. Its one open cost -- the marker-on-the-fill-edge tie-break -- is a one-line rule (inside wins), not a design flaw. Before implementing: measure both of Candidate C's marker colours against the panel per [[Panel Quirks]], and confirm the tie-break with whoever writes the rendering code."
+    }
+  ],
+  "edges": []
+}
