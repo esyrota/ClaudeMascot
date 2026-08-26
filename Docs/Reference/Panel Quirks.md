@@ -128,6 +128,14 @@ file and B/R passes 0.8 and the body goes **magenta** — that is the pink this 
 chased for weeks, now reproducible on demand. **Blue stays 0**, and finally for a measured
 reason rather than a superstition.
 
+### White is dim and blue
+
+`PROP = (255,255,255)` photographed `(63,66,82)` — R/B 0.77 where the screen's white in the
+same frame sits near 1.0, and dark with it. The reading comes from 2px sleep bubbles, so
+bloom and feature size are mixed in and it is indicative rather than measured; a solid
+white swatch has not been shot. **Anything that depends on white reading as white — an
+overlay marker, a highlight — should measure it first.** A warm white is the likely fix.
+
 ### The body colour
 
 `MASCOT = (255,64,0)`, interpolated from the row above against the Claude loading-art
