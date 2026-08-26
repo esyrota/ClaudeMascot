@@ -7,3 +7,5 @@ art/preview.png
 art/**/*_preview.png
 .obsidian/
 __pycache__/
+art/photos/
+art/testcards/reference.html

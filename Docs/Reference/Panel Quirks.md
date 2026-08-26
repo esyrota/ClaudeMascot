@@ -3,66 +3,98 @@
 Undocumented behaviour of the 32×32 iDotMatrix panel. Every entry here was found by
 a wrong guess first — the lesson at the bottom is the important part.
 
-## Colour: keep BLUE out of warm colours
+## Colour: the panel's tone curve is three times a display's
 
-**The panel lifts low channel values enormously, and hardest of all on blue.** A
-channel near zero does not come back near zero — it comes back well up the range. This
-is the single effect behind every colour surprise on this page.
+**Measured 2026-08-26**, from five test cards photographed beside an on-screen copy of
+themselves (`art/testcards.py` → `art/read_panel_photo.py`; the procedure is in
+[[Recheck the Panel Colour Rule]]). Everything in this section is a panel-versus-screen
+comparison *within a single frame*, so the camera's exposure, white balance and tone curve
+applied to both halves equally and cancel out of the comparison.
 
-The reference photo is `Docs/Reference/_photos/panel-work-idea.jpg` (2026-08-18): the
-`work-idea` clip on the panel, shot in even room light. Earlier photos were taken in a
-too-dark or too-bright room and the phone's auto-exposure invented colours that sent two
-separate diagnoses the wrong way — **use this one**, and re-shoot it in the same
-conditions when the palette changes.
+Fitting `photographed = max · (v/255)^k`:
 
-| Authored | On panel (from the reference photo) |
-|---|---|
-| `MASCOT` `(255,68,4)` **and** `(255,68,0)` | **pink / salmon**, not orange — *both*, identically |
-| `MASCOT_DARK` was `(255,24,0)` | vivid saturated **red**, reading as a different colour rather than a shadow |
-| `LAPTOP_GREY = (134,134,134)` | **blue** |
-| `PROP = (255,255,255)` | white, faintly blue |
+| | R | G | B | grey |
+|---|---|---|---|---|
+| **panel** | 0.27 | 0.26 | **0.11** | 0.24 |
+| **screen, same frame** | 0.79 | 0.71 | 0.64 | 0.71 |
 
-**The pink is not explained.** It was briefly attributed to that blue 4 — the same
-phenomenon as the "near-black greys light up as a grey streak" note under *Palette* below
-— and `MASCOT` was changed to `(255,68,0)` on that basis. The panel photographs it exactly
-as pink as before. So a `(255,68,0)` body reads pink on this panel and nobody knows why:
-candidates are the panel's own response curve, LED bloom, or the camera, and only the
-channel sweep in [[Recheck the Panel Colour Rule]] will separate them. **Do not build on
-a theory of the pink until that is done.** `B = 0` is kept anyway — a near-black channel
-is never free here — but on the streak evidence, not on this.
+**The panel spends most of its range in the bottom few code values.** An authored `8`
+already reaches 42% of full brightness; from `96` up, everything lands within 20% of
+maximum. The exponent ratio is ≈ 3.
 
-**The old rule on this page was "the brightest channel must be 255."** That is a proxy,
-and it held only because saturated colours happen to carry very little blue. Read as a
-rule about blue instead, it also explains the two data points the old rule could not:
-`(221,119,91)` and `(216,112,80)` went blue-violet because their B of 80-91 was lifted
-past their red; `(24,14,10)` came back saturated blue for the same reason at the bottom
-of the range; and a plain grey goes blue because all three channels start equal and blue
-wins the lift. Those observations are now consistent rather than contradictory.
+### The consequence: author through a gamma
 
-**Consequences for the art:**
+    panel_value = 255 · (display_value / 255) ^ 2.96      # art/testcards.py: panel_encode()
 
-- **Warm colours end in `B = 0`.** Cheap insurance against the near-black lift, not a
-  proven fix for anything.
-- **Darkening by scaling channels is fine, as long as blue stays 0.** `MASCOT_DARK` is
-  `MASCOT` × `SHADE_SCALE`, and it is a shadow rather than a hue shift because value is
-  the only thing that moves. Under the old rule this was forbidden;
-  under this one it is the correct way to shade. (`(200,80,0)` would have been fine too —
-  what would *not* be fine is `(200,80,60)`.)
-- **Differences compress at the dark end — enormously.** This is the strongest practical
-  finding here. A shade authored at the reference art's own ×0.852 was **invisible** on
-  the panel; the step has to be roughly a third to read at all. Green is what carries the
-  visible difference for a warm colour, and red is what turns a shade muddy once it falls
-  far enough to stop reading as the same material. That makes the usable window narrow:
-  **×0.85 vanishes, ×0.35 reads but looks dirty, ×0.60 is the shipped compromise.**
-  Whatever the preview shows, expect to author roughly twice the step you want.
-- **Greys cannot be trusted at all.** `LAPTOP_GREY` is shipped knowing it renders blue —
-  at the user's direction, and it reads fine as a laptop.
+**This has been tested against a prediction it did not already fit**, which is the bar
+this page's own lesson demands. `e-gamma.gif` puts encoded ladders above naive ones;
+photographed at two brightnesses, the encoded ladders come out even (deviation from a
+linear ramp 0.02–0.07) and the naive ones bunched (0.13–0.20), and at low brightness the
+naive grey ladder collapses to a 51-luma span where the encoded one keeps 115. The curve
+also reproduces, arithmetically, the three `SHADE_SCALE` photographs that were previously
+bisected by hand: ×0.85 is a 5% tonal step (invisible), ×0.60 is 16% (subtle), ×0.35 is
+30% (visible, muddy).
 
-The mechanism is still unknown, and this is an empirical rule fitted to the observations
-above, not a proven model — treat it as such. A saturated test card sweeping one channel
-at a time (`art/testcard.py` is the starting point) would turn it into a real transfer
-curve, and that is what the docs-as-reference task in `Docs/_tasks/` needs before it can
-preview true panel colour.
+**The shipped art does not do this yet.** `generate.py` still authors raw values and
+`SHADE_SCALE` is still the bisected 0.60. Encoding the palette is a pipeline change that
+has not been made — see [[Recheck the Panel Colour Rule]] → next steps.
+
+### Blue is over-driven, and that is not the camera
+
+| authored | on the panel | on the screen beside it |
+|---|---|---|
+| `(134,134,134)` | `(76,96,205)` — **blue** | `(158,158,168)` — neutral |
+| `(64,64,64)` | `(70,91,193)` — **blue** | `(102,100,103)` — neutral |
+| `(255,255,255)` | `(131,157,240)` — **blue** | `(231,226,212)` — neutral |
+| `(255,68,0)` | `(202,111,68)` — salmon | `(225,72,18)` — orange |
+| `(255,68,4)` | `(194,105,73)` — salmon | `(228,70,18)` — orange |
+
+The panel's white point measures R/B = 0.55 against the screen's 1.09, and blue's exponent
+(0.11) is the steepest of the three — it saturates almost at once. **"Greys cannot be
+trusted" is now a measurement, not a warning**, and it is two effects compounding: blue is
+both stronger at full scale and far quicker to get there.
+
+**The pink is explained.** `MASCOT`'s green of 68 is not a quarter of full green here; the
+curve puts it at roughly 72%. Red at 100% with green at 72% is not orange. Encoded, that
+green becomes 5.
+
+**`B = 0` versus `B = 4` still photographs identically**, which the curve does *not*
+predict — at k = 0.11 a blue of 4 should be plainly visible. Unresolved. Keep `B = 0`.
+
+**Mixtures do not follow the per-channel fit.** Pure red at 255 photographs R = 232, but
+the red *inside* white photographs 131 — consistent with the panel limiting total current
+when all three sub-LEDs are lit. A per-channel curve will not predict mixed colours until
+that is measured.
+
+## 1px features are legible; dithering is texture, not tone
+
+Card C, every colour, averaged along the row: a lit 1px line against the unlit row beside
+it reads at **4.2× (red) to 13.7× (amber)** contrast, with the gap rows at luma 7–22. The
+panel resolves single rows cleanly and does not smear them, so a 1px overlay rail is a
+real option.
+
+Card B says what dithering is good for. A 1px `MASCOT`/black checker lands at 67% of solid
+`MASCOT` — a genuine intermediate level — but it reads as a visible checkerboard at this
+pitch, not as a blend. A checker of two *close* tones is invisible, and the eight-step
+blend between `MASCOT` and `MASCOT_DARK` spans 20% of luma with no clean progression.
+**So half-tones come from encoding the values correctly, not from dithering**; dithering
+stays a texture tool. (Card B's own fit is weak — a nearly uniform card gives the aligner
+nothing to lock onto — so treat its numbers as indicative and card E's as the evidence.)
+
+## The panel is scan-driven: measure from video, not stills
+
+A 1.4s clip of a static card, measured against the monitor in the same frame:
+
+| | panel | screen (control) |
+|---|---|---|
+| per-pixel temporal variation | **9.5%** of level | 2.9% |
+| moving horizontal banding | **7.2%** (worst frame 50 luma) | 3.5% |
+| whole-patch level | 0.36% | 0.82% |
+
+The eye integrates and sees nothing; a camera catches one arbitrary phase of the scan, and
+a still can therefore be wrong about an individual row by tens of luma. The whole-patch
+level is rock steady, so **averaging fixes it**: `art/read_panel_photo.py` accepts a video
+and averages every frame. Shoot a couple of seconds of video rather than a photo.
 
 ## Palette: keep it comfortably large
 
@@ -80,15 +112,37 @@ genuinely lit on the panel, showing up as a grey gradient streak in the corner.
 
 ## Diagnosing colour problems
 
-`mascot/testcard.py` sends four saturated quadrants (red / green / blue / white,
+`art/testcard.py` sends four saturated quadrants (red / green / blue / white,
 white bottom-right as the orientation anchor). One photo settles what a dozen
-theories cannot.
+theories cannot. `art/testcards.py` goes further — five cards that measure the
+transfer curve, halftone retention, 1px legibility, the hue sweep, and whether the
+gamma model above survives a prediction; the procedure is in
+[[Recheck the Panel Colour Rule]]. Read them back with `art/read_panel_photo.py`,
+and **believe its landmark line before its numbers** — an alignment that was off by one
+cell once inverted a whole reading and looked entirely plausible doing it.
+
+**Nothing in this repo can send them by itself.** The Python daemon that used to
+is retired, so a card reaches the panel only through the app: menu bar →
+**Send Test Image…**, which holds it until **Resume Mascot** (see [[Menu Bar App]]).
+
+**Put the reference in the same frame.** The phone's own processing — Smart HDR,
+auto white balance, Photographic Styles — is not defeatable by settings alone, and
+two wrong diagnoses came from trusting its absolute colour. It does not have to be:
+open `art/testcards/reference.html` on the Mac, hold the panel beside the screen,
+and photograph both at once. Whatever the camera does to the panel it does to the
+reference, so the *relative* reading survives. On the phone, also: Smart HDR off,
+Photographic Style Standard, and press-and-hold for AE/AF Lock before shooting.
 
 **Room light matters more than anything.** Two wrong diagnoses came from photos shot in
 a too-dark or too-bright room, where the phone's auto-exposure and white balance
 manufactured colours that were not on the panel. Even room light, no direct lamp on the
-panel, and the shot is trustworthy — that is how the reference photo above was taken.
-Photographing the panel and a monitor in the same frame is still the strongest check.
+panel, and the shot is trustworthy. Photographing the panel and a monitor in the same
+frame is not merely "the strongest check" any more — it is the method, and it is what
+turned every claim on this page from an assertion into a measurement.
+
+**Record the brightness.** Everything above was shot at two settings (30 and 100) because
+the first round was shot at one nobody wrote down, and the tone curve's shape does move
+with it: the naive grey ladder spans 121 luma at 100 and 51 at 30.
 
 ## The lesson
 
@@ -97,3 +151,8 @@ R/B channel swap (which made it worse), palette size alone, and "the brightest c
 must be 255", which survived longest because it is *almost* right for the wrong reason.
 Send a saturated test card **first**, then theorise. And check the room light before
 believing a photo at all.
+
+The 2026-08-26 round is what the lesson looks like applied: the reference in the frame
+made the comparison camera-proof, the landmark check caught an alignment that had quietly
+inverted a reading, and the model was only written down here after a card built to
+falsify it failed to.

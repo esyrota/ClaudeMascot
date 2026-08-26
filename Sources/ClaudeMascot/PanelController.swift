@@ -543,6 +543,19 @@ final class PanelController: ObservableObject {
     }
   }
 
+  /// Forgets what is on the panel, so the next `tick()` uploads afresh
+  /// instead of holding a clip it believes is already showing.
+  ///
+  /// The caller is the diagnostics path in `AppModel`: a test card is written
+  /// straight to `BLEClient`, behind this machine's back, so afterwards
+  /// `displayed` is a claim about a mascot that is no longer on screen.
+  /// Clearing `clipStartedAt` alongside it keeps the pair's invariant — both
+  /// are `nil` together or set together.
+  func invalidateDisplay() {
+    displayed = nil
+    clipStartedAt = nil
+  }
+
   private func attemptUpload(_ target: Clip) async {
     let displayedBefore = displayed?.id
     do {
