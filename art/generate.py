@@ -29,60 +29,55 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "Sources" / "ClaudeMascot" / "Resources" / "Animations"
 SOURCES = Path(__file__).resolve().parent / "sources"
 SIZE = 32
 
-# The one mascot colour: a deep burnt orange.
+# The one mascot colour, taken from the hand-drawn sources rather than invented.
+#
+# Every source is more orange than the (255,68,0) this file shipped for months:
+# the user's own typing art is (255,95,5) at G/R 0.37, appear.gif is (254,114,39)
+# at 0.45, and the brand loading art is (216,112,80) at 0.52. Ours sat at 0.27 --
+# redder than all of them -- because it was picked under the old "brightest
+# channel must be 255" rule plus B = 0, not because anyone chose that hue. The
+# recolour then flattened the imported art down to it, which is why the seated
+# pose read redder in the catalogue than in the source it came from.
+#
+# (255,64,0) is not authored, it is MEASURED. Card g-body put eight candidate
+# greens on the panel beside the brand swatch on a screen, in one frame: green 60
+# came back at G/R 0.514 and green 68 at 0.551 against the target's 0.533, so the
+# match interpolates to 64. The constant this file shipped for months, (255,68,0),
+# was very nearly right -- for the panel. It was wrong for the FILES, which is
+# what the catalogue and the sources are compared against.
+#
+# The panel returns B/R ~0.5 from a file whose blue is 0: it manufactures the
+# salmon's blue itself. Put blue 24 in the file and B/R passes 0.8 and the body
+# goes magenta -- THAT is the pink this project chased for weeks. Blue stays 0.
 #
 # The blue channel is 0 because a near-black channel value is never free on this
 # panel -- the same effect that makes near-black greys in empty space light up as a
-# visible streak. That is worth keeping. It is NOT, however, why the body photographs
-# pink: dropping B from 4 to 0 changed nothing visible. The pink is still unexplained
-# and needs the channel sweep in [[Recheck the Panel Colour Rule]]; see
-# [[Panel Quirks]] for what is actually established.
-MASCOT = (255, 68, 0)
+# visible streak. That is worth keeping.
+#
+# The pink was never a blue problem: it was green. Written straight to the panel, a
+# green of 68 sits at ~72% of full brightness under the panel's compressive response,
+# not the ~27% ("a quarter") it looks like authored -- see [[Panel Quirks]] for the
+# measured curve. `panel_encode()` now corrects for this at the write path (see
+# `save()`), so MASCOT is authored here in ordinary display terms.
+MASCOT = (255, 64, 0)
 
-# The shade used where the mascot turns away from the viewer.
+# The shade used where the mascot turns away from the viewer: `MASCOT` scaled
+# uniformly, which holds hue and saturation and moves only value -- what a shadow
+# is. SHADE_SCALE = 0.85 is a DISPLAY-space ratio: it reproduces roughly the shade
+# the panel has been showing all along. The value is provisional until the chunk-6
+# photograph picks between 0.85, 0.75 and 0.65. `panel_encode()` handles the panel's
+# curve at the write path (see `save()`), so this value is arithmetic rather than
+# bisection against panel photographs.
 #
-# It is `MASCOT` scaled uniformly, and uniform scaling is exactly the point: it
-# preserves hue and saturation and moves ONLY value, which is what a shadow is.
-# The reference art the user pointed at -- the sweep in
-# art/sources/claude-claude-code-1.gif, whose body (216,112,80) shades to
-# (184,104,72) -- confirms the SHAPE of the step: hue +3 degrees, saturation -0.02,
-# value x0.852. Hue and saturation hold; only value moves.
-#
-# Its SIZE does not transfer, though. Shipping the reference's own 0.852 made the
-# shade invisible on the panel -- see SHADE_SCALE below.
-#
-# The old (255,24,0) did the opposite. Pinned at 255 it could not change value at
-# all (V stayed 1.000), so the entire step landed on hue instead -- -10 degrees,
-# which on the panel read as a vivid, over-saturated red stripe next to the body
-# rather than a shadow on it. That pinning came from the "brightest channel must be
-# 255" rule on [[Panel Quirks]], which turned out to be a proxy rather than the real
-# constraint -- dropping below 255 is demonstrably fine here, and the shade this file
-# ships is the evidence. What the real constraint IS remains open; see the channel
-# sweep in [[Recheck the Panel Colour Rule]].
-#
-# THE PANEL COMPRESSES THE DARK END FAR HARDER THAN THE PREVIEW SUGGESTS, so this
-# is well below the reference's 0.852. Found by bisection against photographs of the
-# real panel, not by theory -- three of them:
-#
-#   x0.85   the reference art's own faithful step: INVISIBLE on the panel
-#   x0.35   green back at the old (255,24,0) shade's ratio: visible, but muddy --
-#           "it feels dirty", and it does: red falls to 89 and the shadow stops
-#           reading as the same material as the body
-#   x0.60   between the two, and where it sits now
-#
-# Red is what makes it dirty and green is what makes it visible, which is why the
-# usable window is narrow: red near saturation barely moves until it suddenly falls
-# off, and green moves the whole time. Scaling uniformly keeps hue at 16 degrees and
-# spends the step on value, which is what a shadow is -- the old (255,24,0) held red
-# at 255, could not change value at all, and so read as a vivid red stripe instead.
-#
-# Turn this one number if the step is still wrong. Lower is darker and dirtier,
-# higher is cleaner and fainter.
+# Still true and still useful: red is what makes a shade read as dirty and green is
+# what makes it read as visible at all, so the usable window sits between "red falls
+# off a cliff" and "too pale to see." Turn this one number if the step looks wrong.
 SHADE_SCALE = 0.60
 MASCOT_DARK = tuple(round(c * SHADE_SCALE) for c in MASCOT)
 
@@ -100,7 +95,9 @@ CONFETTI = [
 
 # The panel's decoder garbled the one case that also had a 4-entry palette. I was
 # never able to separate palette size from the colour-value effect, so keep the
-# palette comfortably large with near-black padding pixels (LEDs barely lit).
+# palette comfortably large -- padded, when a frame falls short, by nudging body
+# pixels' red down a few values rather than by adding near-black pixels; see
+# `pad_palette()`.
 MIN_COLORS = 9
 
 # GEOMETRY SOURCE: art/sources/appear.gif, resting pose (its last frame).
@@ -466,6 +463,8 @@ SLEEP_FRAME_MS = 500
 # from the measured gap rather than by feel: across all four sources every shaded
 # pixel has a value of 200 or less and every lit one 230 or more, so this sits in the
 # middle of a 30-wide hole with nothing in it.
+# Compares against pixels in the hand-drawn source, never against panel bytes -- exempt
+# from `panel_encode()`.
 SHADED_BODY_MIN = 215
 
 
@@ -879,6 +878,8 @@ def coalesce(frames):
 # and a body family at 246-255 -- with nothing in between, so a threshold on the
 # brightest channel maps them exactly.
 APPEAR_SRC = SOURCES / "appear.gif"
+# Both thresholds compare against appear.gif's own hand-drawn pixels, never against
+# panel bytes -- exempt from `panel_encode()`.
 SHADE_MIN, BODY_MIN = 64, 180
 # The panel holds the last frame of a GIF for its own duration before looping. Giving
 # that frame a long dwell means a late hand-off (tick granularity, or a BLE retry)
@@ -1112,8 +1113,12 @@ WORK_TYPING_LOOK_DOWN_SRC = SOURCES / "work-typing-look-down.gif"
 # than authored, because this tone is carrying silhouette rather than shading here
 # (it is what tells you which arm is which) and because the panel compresses
 # differences at the dark end. See [[Panel Quirks]].
+# Compares against the hand-drawn typing source's pixels, never panel bytes -- exempt
+# from `panel_encode()`.
 TYPING_DARK, TYPING_BODY_MIN = 40, 252
+# Same exemption: compares against the hand-drawn source, never panel bytes.
 TYPING_CHROMA_MIN = 64
+# Same exemption: compares against the hand-drawn source, never panel bytes.
 TYPING_LOGO_MIN = 200
 
 # Eye columns in the imported art, measured off `_sitting_anchor()` the same way
@@ -1913,6 +1918,12 @@ def body_pixel_count(im: Image.Image) -> int:
 
 def save(name: str, frames) -> Path:
     path = OUT / f"{name}.gif"
+    # Pad first, encode second -- load-bearing, do not flip. `pad_palette()` and
+    # `body_pixel_count()` compare pixels to `MASCOT` with `==`, which is a
+    # display-space colour; encoding first would map every pixel to its panel value
+    # before either function ever sees a `MASCOT` pixel to match, so the padding
+    # would silently stop happening and the palette assertion in `main()` below
+    # would report the wrong count.
     images = [pad_palette(im) for im, _ in frames]
     images[0].save(
         path,

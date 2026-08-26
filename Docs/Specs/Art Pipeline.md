@@ -27,6 +27,8 @@ see [[Animation Catalogue]]'s `sitting` section for why.
 | `art/export_docs.py` | Regenerates the 6× images in [[Animation Catalogue]] from the bundled GIFs, so the page cannot drift from what ships |
 | `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |
 | `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
+| `art/read_panel_photo.py` | Reads a photographed card back into numbers — warps the lit area to a 32×32 grid and reports per-patch values. Check the landmark line it prints before believing anything |
+| `art/testcards.py` | The five characterisation cards (ramps, halftones, thin features, hues) plus `reference.html`, the on-screen half of the measurement — see [[Recheck the Panel Colour Rule]] |
 
 `Animations/custom/<state>.gif` takes priority over `Animations/<state>.gif`, so re-running
 the generator never clobbers hand-imported art. Resolution order, including the user's
@@ -83,33 +85,32 @@ Two consequences worth knowing before editing a state:
 
 ## Style rules
 
-- One flat colour for every mascot pixel — `MASCOT = (255, 68, 0)`. The blue channel is
-  `0` as cheap insurance against the panel's near-black lift. Note it photographs **pink**
-  on the panel, and did so identically when it carried `B = 4` — that is unexplained and
-  waiting on [[Recheck the Panel Colour Rule]].
-- One shading constant, `MASCOT_DARK`, which is `MASCOT` scaled by `SHADE_SCALE = 0.60`.
-  Uniform scaling holds hue and saturation and moves only value, which is what a shadow
-  is. The reference art (the sweep in `claude-claude-code-1.gif`, body `(216,112,80)`
-  shading to `(184,104,72)` — hue +3°, saturation −0.02, value ×0.852) confirms that
-  *shape*, but not the size: shipping its own ×0.852 made the shade **invisible** on the
-  panel, which compresses the dark end far harder than any preview shows. The scale is set
-  from panel photographs instead, by bisection: ×0.85 vanishes, ×0.35 reads but goes muddy,
-  ×0.60 sits between. Green is what makes a shade visible and red is what makes it dirty,
-  so the usable window is narrow. See [[Panel Quirks]].
-
-  It used to be `(255, 24, 0)`, pinned at 255 on the old "brightest channel must be 255"
-  rule. Pinned there it could not change value at all, so the whole step landed on hue
-  (−10°) and read on the panel as a vivid red stripe beside the body rather than a shadow
-  on it. [[Panel Quirks]] has why the pinning was the wrong constraint. `MASCOT_SHADE`,
-  a second softer shade that existed for the same reason, is deleted — a scale factor
-  covers it.
-    (`(216,112,80)` → `(184,104,72)`) and is unused now that the sweep is retired outright
-    — see [[Animation Catalogue]]'s `sitting` section. Left defined rather than deleted,
-    the way the sweep's own source stays in `art/sources` as reference.
+- **Colours are file values chosen from photographs, not converted by a formula.**
+  `MASCOT = (255,64,0)` was measured against the brand swatch on the panel; see
+  [[Panel Quirks]] → Mixtures. `panel_encode()` exists for brightness ramps and previews
+  and is **never** applied to the art: applied once, it drove the body's green to 5 —
+  under the panel's mixture floor — and the mascot rendered pure red.
+- **No channel below 8.** Beside a saturated channel, anything under about 8 contributes
+  nothing at all. This is the same floor that made `B = 4` indistinguishable from `B = 0`.
+- **The import thresholds are deliberately exempt** — `SHADED_BODY_MIN`, `BODY_MIN`,
+  `SHADE_MIN`, `TYPING_BODY_MIN`, `TYPING_LOGO_MIN`, `TYPING_DARK`, `TYPING_CHROMA_MIN`
+  compare against pixels in the hand-drawn *sources*, which never pass through the panel.
+  Encoding them would silently reclassify the seated pose.
+- `SHADE_SCALE` (0.60) is a ratio on the **file's** values. Scaling every channel by one
+  number holds the hue as it darkens — measured, not assumed: the body reads at G/R 0.520
+  and its shade at 0.549 in the same frame.
+- Warm colours still end in `B = 0`, and the `B = 0` vs `B = 4` anomaly is still
+  unexplained — the encode does not resolve it.
+- One shading constant, `MASCOT_DARK`, which is `MASCOT` scaled by `SHADE_SCALE`. Uniform
+  scaling holds hue and saturation and moves only value, which is what a shadow is.
 - Pure black eyes, no floor, no highlight or shade bands
-- Max channel must stay at 255 — see [[Panel Quirks]] before changing the colour
-- ≥ `MIN_COLORS` (9) distinct colours per frame, padded invisibly via blue-channel
-  nudges on body pixels
+- ≥ `MIN_COLORS` (9) distinct colours per frame, padded invisibly by nudging **red**
+  downward (247–254) on body pixels — never blue. `pad_palette()` carries the reason:
+  red at 255 sits where the panel's response is flat, so the nudge is genuinely
+  invisible, while a blue of 1–8 is the brightest relative change the panel can be
+  handed. Measured against the shipped, encoded GIFs: still needed (every clip's
+  sparsest dense frame lands on exactly 9, never more) and still working (no two
+  nudges' encoded values collapse) — see [[Panel Quirks]] § Palette for the counts.
 
 ## Importing the hand-drawn states
 

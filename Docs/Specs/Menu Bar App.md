@@ -135,8 +135,27 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
 - Status icon near the clock, reflecting state at a glance: distinct look for disconnected / connected-idle / active.
 - Menu items:
   - **Enabled** — checkbox, master switch. Off means: leave the panel alone, ignore state changes, disconnect.
+  - **Send Test Image…** — pick a 32×32 GIF and hold it on the panel (see below).
+  - **Resume Mascot** — shown only while a test image is held.
   - **Options…** — opens Settings.
   - **Quit**.
+
+### Holding a diagnostic image
+
+The colour work in [[Panel Quirks]] needs arbitrary images on the panel, and since the
+Python daemon was retired **nothing else can put one there** — BLE belongs to the app
+alone. `AppModel.sendDiagnosticImage(at:)` uploads a chosen GIF's bytes straight through
+`BLEClient`, bypassing the choreographer entirely.
+
+While an image is held, the state machine is frozen exactly the way `departing` freezes
+it: hooks are still received, logged and applied to `SessionTracker`, but nothing is
+uploaded, so a session starting mid-measurement cannot overwrite the card. Brightness is
+deliberately *not* frozen — it stays live on the Settings slider, because the same card
+has to be shot at more than one brightness.
+
+Resuming calls `PanelController.invalidateDisplay()`, which forgets what is on the panel
+so the next tick uploads afresh rather than assuming the mascot is still standing where
+the card is.
 - Menu also surfaces current state and connection status as a disabled row — makes "is it working?" answerable without opening logs.
 
 ## Architecture

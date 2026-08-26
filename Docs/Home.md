@@ -62,6 +62,9 @@ Each one cost a wrong diagnosis to find.
 | Catalogue images | `art/export_docs.py` | working — 6× previews for [[Animation Catalogue]] |
 | Python daemon | `legacy/` | **retired and non-functional** |
 | Colour test card | `art/testcard.py` | diagnostic, keep |
+| Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — seven cards, the on-screen reference, and the photo/video reader (averages video frames; the panel is scan-driven) |
+| Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
+| Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
 
 Installation is now a single step: build and run the app. It offers to install the
 plugin on first launch, and the repo is no longer a marketplace.
@@ -77,6 +80,14 @@ plugin on first launch, and the repo is no longer a marketplace.
 - `_logs/2026-08-17. Working State Rework/` — `sitting` rebuilt on hand-authored typing
   art, its edges and five fidget beats; `done` debounced and earned. Its [[Analysis]]
   records the check that passed while the art was broken.
+- `_logs/2026-08-26. Panel Colour Encoding/` — the tone curve applied to the art, and
+  **withdrawn** when the panel showed a red mascot. Its [[Analysis]] records a plan built
+  on a case its own risk list called unmeasured. What survived: `MASCOT` measured at
+  `(255,64,0)`, the pink solved, and the `B = 4` anomaly explained as a mixture floor.
+- `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
+  against an on-screen reference in the same frame, and the colour rules rewritten around
+  it. See its [[Findings]] for the evidence, the method, and the alignment error that
+  inverted a reading before the landmark check caught it.
 
 ## Deferred
 
@@ -87,11 +98,16 @@ Written up in `_tasks/`, in the order they are worth doing:
   largest remaining win.
 - [[Waiting Never Fires]] — `Notification` fired zero times in 1102 events, so the flag
   wave has never once been on the panel.
+- [[Status Overlay]] — a layer *behind* the animation, so the panel can carry a 5-hour
+  usage rail as well as the mascot. Designed and blocked on [[Panel Colour Encoding]].
 - [[Docs GIFs as the Art Source]] — make the docs previews byte-faithful to what the
   device gets, then edit animations as GIFs and build with one command. Part 1 (one
-  command) is small and worth doing on its own.
-- [[Recheck the Panel Colour Rule]] — mostly answered by the 2026-08-18 panel photo; what
-  is left is a per-channel sweep to turn the fitted rule into a real transfer curve.
+  command) is small and worth doing on its own. Its blocker, a real transfer curve, is
+  now measured.
+- [[Recheck the Panel Colour Rule]] — **answered 2026-08-26**; the transfer curve is
+  measured and [[Panel Quirks]] carries it. What is left is no longer a question but a
+  pipeline change: `generate.py` must author through `panel_encode()`, which moves every
+  clip's bytes and needs `export_golden.py` to follow.
 
 Still open, and small enough to live in [[Animation Catalogue]] → Known gaps rather than
 their own task: a `dozing` fidget. (The Z-shaped sleep marks are gone — they are bubbles

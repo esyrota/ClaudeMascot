@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// `MenuBarExtra`'s content: a disabled status row ("is it working?"
 /// answerable at a glance), the `Enabled` master switch, `Options…`, and
@@ -28,6 +29,21 @@ struct MenuBarView: View {
       Divider()
         .padding(.vertical, 4)
 
+      if appModel.diagnosticImage != nil {
+        MenuRow(title: "Resume Mascot") {
+          appModel.endDiagnosticImage()
+        }
+      } else {
+        MenuRow(title: "Send Test Image…") {
+          if let url = chooseImage() {
+            Task { await appModel.sendDiagnosticImage(at: url) }
+          }
+        }
+      }
+
+      Divider()
+        .padding(.vertical, 4)
+
       MenuRow(title: "Options…") {
         openSettings()
         NSApp.activate(ignoringOtherApps: true)
@@ -42,7 +58,24 @@ struct MenuBarView: View {
   }
 
   private var statusLine: String {
-    "\(appModel.currentState.rawValue) · \(connectionDescription)"
+    if let image = appModel.diagnosticImage {
+      return "test image: \(image)"
+    }
+    return "\(appModel.currentState.rawValue) · \(connectionDescription)"
+  }
+
+  /// Modal file picker for a diagnostic image. `LSUIElement` keeps this app
+  /// out of the Dock, so it has to activate itself first or the panel opens
+  /// behind whatever the user was looking at.
+  private func chooseImage() -> URL? {
+    NSApp.activate(ignoringOtherApps: true)
+    let picker = NSOpenPanel()
+    picker.title = "Send Test Image"
+    picker.message = "Pick a 32×32 GIF to hold on the panel."
+    picker.allowedContentTypes = [.gif]
+    picker.allowsMultipleSelection = false
+    picker.canChooseDirectories = false
+    return picker.runModal() == .OK ? picker.url : nil
   }
 
   private var connectionDescription: String {

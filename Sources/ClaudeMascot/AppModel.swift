@@ -36,6 +36,10 @@ final class AppModel: ObservableObject {
   /// Error from `hookServer.start()` if the socket failed to bind. Nil if
   /// startup succeeded or has not been attempted.
   @Published private(set) var hookServerError: String?
+  /// File name of the diagnostic image currently held on the panel, or `nil`
+  /// when the mascot has it. Doubles as the freeze flag for the state
+  /// machine — see `sendDiagnosticImage(at:)`.
+  @Published private(set) var diagnosticImage: String?
 
   let settings: AppSettings
   let bleClient: BLEClient
@@ -181,6 +185,11 @@ final class AppModel: ObservableObject {
         // Apply the event to the tracker, which owns the per-session state reduction.
         self.sessionTracker.apply(event)
 
+        // A held diagnostic image owns the panel: keep tracking sessions so
+        // resuming lands on the truth, but drive nothing. Without this a
+        // session starting mid-measurement would upload over the test card.
+        guard self.diagnosticImage == nil else { return }
+
         // If a new session just started, trigger the entrance animation.
         if self.sessionTracker.takeEntranceRequest() {
           self.panelController.handle(.starting)
@@ -317,6 +326,58 @@ final class AppModel: ObservableObject {
       withWave: withWave, deadline: Date().timeIntervalSince1970 + seconds)
   }
 
+  // MARK: - Diagnostics
+
+  /// Puts an arbitrary GIF on the panel and holds it there until
+  /// `endDiagnosticImage()`.
+  ///
+  /// This exists because **nothing else can**: BLE belongs to this app alone
+  /// (see Docs/Reference/macOS Bluetooth TCC.md), the Python daemon that used
+  /// to send test cards is retired, and the colour characterisation in
+  /// Docs/_tasks/Recheck the Panel Colour Rule.md needs arbitrary images on
+  /// the panel to make any progress at all.
+  ///
+  /// The bytes go straight to `BLEClient`, bypassing `PanelController`
+  /// entirely — a test card is not a `Clip`, has no pose, and must not be
+  /// boundary-gated or escalated into sleep. The freeze that keeps it on
+  /// screen is `diagnosticImage` itself, checked by the tick loop and the
+  /// hook subscription.
+  func sendDiagnosticImage(at url: URL) async {
+    guard enabled, bleClient.state == .connected else {
+      Self.log.error("test image ignored: panel not connected")
+      return
+    }
+    guard let data = try? Data(contentsOf: url) else {
+      Self.log.error("test image unreadable: \(url.lastPathComponent, privacy: .public)")
+      return
+    }
+    // Set before the upload, not after: the tick loop must already be frozen
+    // while these three writes are in flight.
+    diagnosticImage = url.lastPathComponent
+    panelController.invalidateDisplay()
+    do {
+      try await bleClient.setPower(on: true)
+      try await bleClient.setBrightness(settings.brightness)
+      try await bleClient.send(gif: data)
+      Self.log.notice("holding test image \(url.lastPathComponent, privacy: .public)")
+    } catch {
+      Self.log.error("test image upload failed: \(error.localizedDescription, privacy: .public)")
+    }
+  }
+
+  /// Hands the panel back to the mascot, re-deriving state from the sessions
+  /// that carried on arriving while the image was held.
+  func endDiagnosticImage() {
+    guard diagnosticImage != nil else { return }
+    diagnosticImage = nil
+    panelController.invalidateDisplay()
+    sessionTracker.reap()
+    let derivedState = sessionTracker.derived
+    currentState = derivedState
+    panelController.handle(derivedState)
+    Task { await panelController.tick() }
+  }
+
   // MARK: - Timer
 
   /// The repeating tick that drives `PanelController`. Lives here, not in
@@ -336,8 +397,11 @@ final class AppModel: ObservableObject {
         // Skipped mid-departure: `departNow` is already pumping `tick()`
         // itself at a faster rate, and re-deriving from `SessionTracker`
         // here would overwrite `desired` back to `.working` and cancel the
-        // walk-off mid-stride.
-        guard !self.departing else { continue }
+        // walk-off mid-stride. Skipped the same way while a diagnostic image
+        // is held. Both guards sit *after* `applyLiveSettings()` above on
+        // purpose: brightness must stay live during a measurement, since the
+        // same card is shot at more than one brightness.
+        guard !self.departing, self.diagnosticImage == nil else { continue }
         // Reap stale sessions and propagate any state change to the panel.
         self.sessionTracker.reap()
         let derivedState = self.sessionTracker.derived
