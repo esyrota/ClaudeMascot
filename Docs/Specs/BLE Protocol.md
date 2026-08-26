@@ -8,9 +8,15 @@ Implemented by `Sources/ClaudeMascot/GifPacketizer.swift` (framing) and
 `BLEClient.swift` (discovery, connection, writes), and pinned byte-for-byte by
 `Tests/Fixtures/` — if Swift and the fixtures disagree, the Swift side is wrong.
 
-**Key simplification:** the app never *encodes* GIFs. [[Art Pipeline]] emits final
-32×32 GIF files; the app reads those bytes and frames them for BLE. That removes all
-image processing from the Swift side.
+**Passthrough is the common path.** With no overlay to composite, the app uploads
+[[Art Pipeline]]'s bundled GIF bytes untouched — the golden fixtures pin exactly this
+path, byte for byte. When an overlay *is* present ([[Status Overlay]]), the app
+decodes the clip, composites, and re-encodes with its own writer (`GifImage.swift` /
+`GifEncoder.swift`) rather than ImageIO, because the panel's palette rules are
+unforgiving and ImageIO's colour management is not something this project can
+tolerate. Either way the uploaded GIF is always fully opaque and full-frame; the
+framing contract below is unchanged. Every shipped GIF is already full-frame at
+~190–226 B/frame, so re-encoding does not grow what gets uploaded.
 
 ## Discovery and connection
 
@@ -71,4 +77,6 @@ self-contained port of the original Python framing and writes `Tests/Fixtures/`
 then asserts the Swift output matches byte for byte.
 
 **Regenerate the fixtures whenever the art changes** — the animations are inputs to
-these tests, so `art/generate.py` and `art/export_golden.py` are run as a pair.
+these tests, so `art/generate.py` and `art/export_golden.py` are run as a pair. This
+still covers only the passthrough path — see [[Status Overlay]] for the compositor
+and encoder that engage once a widget is on screen.

@@ -39,6 +39,11 @@ First launch shows a consent panel that:
 5. Sets up **Launch at Login** via `SMAppService`
 6. Clears the old `~/.idotmatrix` directory left by the retired Python daemon
 
+A second, independently declinable step offers to install [[Claude Code Plugin]]'s
+statusline wrapper — the input [[Status Overlay]] needs. Declining it leaves the panel
+exactly as it is today; nothing about the plugin offer above depends on this one, or
+vice versa.
+
 The user must restart Claude Code after installation so the hooks load.
 
 **Launch at Login matters** because the socket does not wake the app — if the user quits, it stays quit. Setting it up during first run means the socket is ready before Claude Code starts, so events find it immediately.
@@ -51,6 +56,7 @@ The user must restart Claude Code after installation so the hooks load.
 - **Device** — shows connection status ("Connected" / "Scanning…" / "Connecting…" / "Not connected") and offers Rescan. Never the panel identifier: it is a per-host CoreBluetooth UUID, so it is neither stable across machines nor meaningful to the user
 - **Idle timings** — sleep after (default 5m), panel off after (default 10m)
 - **Plugin** — install status is probed from `~/.claude/plugins/installed_plugins.json` at `PluginInstaller.init` and each time the Settings window appears, with Install or Uninstall buttons matching the probed state, plus a re-register prompt when the app has moved since install
+- **Statusline wrapper** — its own status row beside Plugin, probed the same way, with its own Install / Uninstall; installing or uninstalling it never touches the plugin's state
 
 The pane is a grouped `Form` with four sections: General, Panel, Device, and Plugin.
 
@@ -82,6 +88,8 @@ Clips are either looping (variant loops at their pose, eligible for fidgets) or 
 - **Non-looping clips** hand off at `motion`, *not* `duration`. A transition ends on a long dwell frame so the panel has something to hold; waiting out the whole dwell would park a motionless mascot on screen long after its motion finished.
 - **Power transitions** (wake, power-off) bypass boundary gating entirely, for immediate panel response.
 - **The target is held, never queued.** When a decision is made and the clip is already on screen, nothing uploads; the mascot simply sits and displays the current clip until the boundary arrives. This collapsing of bursts is implicit — the scheduler holds the latest desired state and recomputes the next clip on every tick.
+
+An overlay's staleness is gated the same way — see Overlay, below.
 
 ### Variants and fidgets
 
@@ -120,6 +128,32 @@ Both are always on, size-capped, and rotated; tool input is never logged, matchi
 - **The reconnect chain must never end.** Waking from system sleep reconnects immediately (backoff discarded — the panel is right there), and every tick calls `BLEClient.ensureConnecting()`, which restarts the chain if the client is disconnected with no retry armed. A sleeping Mac used to leave the panel dark until the app was relaunched; [[macOS Bluetooth TCC]] has the anatomy.
 - **Connection stability is a design constraint.** Only a new BLE connection flashes the panel's own icon; everything else stays visible. Dropping and reconnecting is the only visible artefact we cannot hide.
 
+## Overlay
+
+An overlay bitmap can be composited *behind* the mascot animation — the first (and, for
+now, only) use is a 5-hour usage rail; see [[Status Overlay]] for the design and
+[[BLE Protocol]] for how compositing changes the upload path.
+
+- **The overlay is the back layer; the mascot occludes it.** The animation changes
+  constantly and the overlay only a handful of times an hour, so the animation is what
+  should occlude, not the other way round. Which of the clip's pixels do the occluding is
+  a background mask inferred by flood fill from the panel's border, not authored alpha —
+  see [[Art Pipeline]].
+- **The reserved-region budget is rows 0–1, one widget per row.** Everything else stays
+  the mascot's stage. This is a rule to write down now, while only one widget exists, not
+  one to relax quietly when a second one arrives.
+- **A changed overlay is staleness like any other state change.** What is "on the panel"
+  includes the overlay's *quantised* rendering — the actual pixels produced, identified
+  by a key over them rather than over the raw input — so a changed key marks the
+  displayed clip stale and it re-uploads at the next boundary (see Boundary scheduling,
+  above), never mid-loop; restarting a loop early would break [[Art Pipeline]]'s anchor
+  contract just as a clip change would.
+- **The rail dies with the panel.** `PanelController` clears its overlay key together
+  with `displayed` on power-off, so a stale rail can never survive to the next wake.
+- **`sendDiagnosticImage` is never composited over.** It bypasses `PanelAdapter` entirely
+  (see Holding a diagnostic image, below), so a measurement card on the panel is always
+  exactly the bytes chosen — overlay or not.
+
 ## Observability
 
 `BLEClient` logs every connection-state transition, `PanelController` every upload, wake and power-off, and `AppModel` every hook event with the state it maps to. All under one subsystem, so a dark panel is diagnosable without a debugger:
@@ -145,7 +179,8 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
 The colour work in [[Panel Quirks]] needs arbitrary images on the panel, and since the
 Python daemon was retired **nothing else can put one there** — BLE belongs to the app
 alone. `AppModel.sendDiagnosticImage(at:)` uploads a chosen GIF's bytes straight through
-`BLEClient`, bypassing the choreographer entirely.
+`BLEClient`, bypassing the choreographer — and, with it, the compositor described in
+Overlay above — entirely.
 
 While an image is held, the state machine is frozen exactly the way `departing` freezes
 it: hooks are still received, logged and applied to `SessionTracker`, but nothing is
@@ -160,30 +195,31 @@ the card is.
 
 ## Architecture
 
-Data flow: `HookServer` → `SessionTracker` → `Choreographer` → `PanelController` → `PanelAdapter` → `BLEClient`
+Data flow: `HookServer` → `SessionTracker` → `Choreographer` → `PanelController` → `PanelAdapter` → `BLEClient`, with `UsageSnapshot` joining at `PanelAdapter` from the same socket `HookServer` listens on.
 
 ```
 ~/Library/Application Support/ClaudeMascot/hook.sock
                  │
-                 ├─ relay.sh (in plugin) ──> HookServer (Unix domain socket)
-                 │
-                 v
-          SessionTracker (per-session state → priority reduction)
-                 │
-                 v
-           Choreographer (pose graph → one edge per boundary)
-                 │
-                 v
-          PanelController (clip scheduling, power, entrance, retry)
-                 │
-                 v
-           PanelAdapter (clip → GIF bytes)
-                 │
-                 v
-            BLEClient (CoreBluetooth, one boundary-gated write at a time)
-                 │
-                 v
-            iDotMatrix panel
+                 ├─ relay.sh (in plugin) ────────> HookServer (Unix domain socket)
+                 │                                        │
+                 ├─ statusline-wrapper.sh ─> UsageSnapshot │
+                 │                                  │      v
+                 │                                  │  SessionTracker (per-session state → priority reduction)
+                 │                                  │      │
+                 │                                  │      v
+                 │                                  │  Choreographer (pose graph → one edge per boundary)
+                 │                                  │      │
+                 │                                  │      v
+                 │                                  │  PanelController (clip scheduling, power, entrance, retry)
+                 │                                  │      │
+                 │                                  v      v
+                 │                             PanelAdapter (clip → GIF bytes, overlay composited here)
+                 │                                         │
+                 │                                         v
+                 │                                   BLEClient (CoreBluetooth, one boundary-gated write at a time)
+                 │                                         │
+                 │                                         v
+                 └────────────────────────────────>  iDotMatrix panel
 ```
 
 Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comments — the *reasons* for its isolation, its retry rules and its quirks live there, not here.
@@ -192,7 +228,7 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 |---|---|
 | `ClaudeMascotApp.swift` | `@main` scene; the single-instance guard runs from its `init()` |
 | `AppModel.swift` | Owns and wires everything; the `enabled` switch; the tick timer; event logging |
-| `HookServer.swift` | Socket listener, one connection per event, publishes decoded JSON |
+| `HookServer.swift` | Socket listener, one connection per event, publishes decoded JSON — a `Usage` line and a `HookEvent` line are two message kinds on one socket |
 | `HookEvent.swift` | The four-field wire payload |
 | `EventPolicy.swift` | Event name → `PanelState`. **All policy lives here** |
 | `SessionTracker.swift` | Per-session state; reduces multiple sessions to one desired state by priority; reaps stale sessions |
@@ -202,11 +238,17 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 | `Clip.swift` | One animation clip: id, file, frame count, duration, motion, looping, pose, variant group, weight, transition endpoints |
 | `ClipManifest.swift` | Loads `clips.json`; resolves clip ids to `Clip` instances |
 | `EventLog.swift` | Always-on JSONL logging to `~/Library/Application Support/ClaudeMascot/logs/` |
-| `PanelController.swift` | Clip scheduling: boundary gating, done hold, idle escalation, entrance, power, upload retry. See `Choreographer.swift` for the pose-graph logic |
-| `PanelAdapter.swift` | The only place `AnimationLibrary` and `BLEClient` meet |
+| `PanelController.swift` | Clip scheduling: boundary gating, done hold, idle escalation, entrance, power, upload retry, `displayedOverlayKey`. See `Choreographer.swift` for the pose-graph logic |
+| `PanelAdapter.swift` | The only place `AnimationLibrary` and `BLEClient` meet; composites the overlay, or passes clip bytes through untouched — see [[BLE Protocol]] |
 | `AnimationLibrary.swift` | Resolves a clip to GIF bytes, honouring user overrides |
 | `BLEClient.swift` | CoreBluetooth: scan, connect, write. See [[BLE Protocol]] |
 | `GifPacketizer.swift` | Pure bytes-in/packets-out; pinned by golden fixtures, no hardware |
+| `GifImage.swift` | Decodes a bundled GIF to frames with no colour management — the panel-tolerance values in the file come out unchanged |
+| `GifEncoder.swift` | Full-frame GIF89a writer with a global palette; the compositor's counterpart to `GifImage.swift` |
+| `Compositor.swift` | The background mask by border flood fill, the overlay composited beneath the clip's opaque pixels, the mandatory knockout halo, the resulting palette |
+| `Overlay.swift` | The overlay bitmap, the rows-0–1 reserved region, and its quantised key |
+| `UsageRail.swift` | The one shipped widget: fill, clock marker, colour ramp |
+| `UsageSnapshot.swift` | The wrapper's payload decoded, cached to disk, and clocked forward between app launches |
 | `SingleInstance.swift` | Newest-launch-wins duplicate guard |
 | `SleepWatcher.swift` | IOKit power-management registration; holds sleep and always releases |
 | `AppDelegate.swift` | `applicationShouldTerminate` → `.terminateLater`; the one API Cmd-Q, logout, restart and shutdown all route through |
