@@ -120,6 +120,29 @@ and 14 it comes alive.
 floor, and it has been sitting on this page as an unexplained anomaly since the beginning.
 It is also exactly what killed the encode: a green of 5 is *under the floor*.
 
+### Dim and neutral are mutually exclusive
+
+**Observed 2026-08-27**, twice, on the status rail. The panel invents blue roughly in
+proportion to total drive, so at *low* authored values that invented blue outweighs the
+channels actually asked for:
+
+| authored | photographs as |
+|---|---|
+| `(8, 24, 0)` — green, no blue | **cyan** |
+| `(16, 12, 0)` — warm, no blue | **cyan** |
+| `(8, 0, 0)` … `(24, 0, 0)` — red, no blue | red / brown, hue holds |
+
+Only a red-dominant colour keeps its hue at the bottom of the range, because red is the one
+channel strong enough to stay ahead of the invented blue. Anything else goes cool as it dims.
+
+**So a widget cannot be both almost-black and neutral on this panel.** Pick one. A thing that
+must recede without taking on a colour cast has to be *not drawn*, not dimmed — there is no
+authored value that renders as a faint neutral.
+
+**And do not reach for a grey to fix it**: authoring grey is the worst available move, per the
+white-point measurements above. The route to a neutral is `B = 0` plus enough red and green to
+balance the blue that arrives on its own.
+
 ### It makes its own blue into a *green* too, not just a grey
 
 **Observed 2026-08-27** on the status rail. A fill authored `(8, 24, 0)` — blue at zero,
