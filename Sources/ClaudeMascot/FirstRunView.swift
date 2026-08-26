@@ -11,9 +11,21 @@ struct FirstRunView: View {
   @ObservedObject var installer: PluginInstaller
   @ObservedObject var settings: AppSettings
 
+  /// Owned locally rather than passed in from `ClaudeMascotApp`: the
+  /// statusline wrapper is a sibling of the plugin above, offered and
+  /// declined independently, so it does not need to share the app's
+  /// `PluginInstaller` wiring.
+  @StateObject private var statuslineInstaller = StatuslineInstaller()
+
   @Environment(\.dismissWindow) private var dismissWindow
 
   @State private var isInstalling = false
+
+  /// Whether the user dismissed the statusline offer specifically, as
+  /// opposed to the plugin offer above it — the two are independently
+  /// declinable, so declining one must not affect the other or close the
+  /// whole window.
+  @State private var hasSkippedStatusline = false
 
   private var marketplaceAddCommand: String {
     "claude plugin marketplace add \(PluginInstaller.bundledMarketplaceURL.path) --scope user"
@@ -75,6 +87,10 @@ struct FirstRunView: View {
         .keyboardShortcut(.defaultAction)
         .disabled(isInstalling || installer.outcome == .installed)
       }
+
+      Divider()
+
+      statuslineOffer
     }
     .padding(20)
     .frame(width: 460)
@@ -154,6 +170,80 @@ struct FirstRunView: View {
         .padding(8)
         .background(Color(nsColor: .textBackgroundColor))
         .cornerRadius(4)
+      }
+    }
+  }
+
+  /// The second, independently-declinable offer: wrapping the user's
+  /// statusline command so [[Status Overlay]]'s usage rail has numbers to
+  /// show. Declining it (`hasSkippedStatusline`) leaves the plugin offer
+  /// above untouched, and vice versa.
+  @ViewBuilder
+  private var statuslineOffer: some View {
+    if hasSkippedStatusline {
+      Text("Skipped — you can install the statusline wrapper later from Settings.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    } else {
+      VStack(alignment: .leading, spacing: 16) {
+        Text("Show Usage on the Panel")
+          .font(.title2)
+          .bold()
+
+        Text(
+          """
+          The panel can also show how much of your usage window is left. That \
+          needs your statusline command wrapped so it can tee the numbers to \
+          ClaudeMascot — your real statusline still runs exactly as before.
+          """
+        )
+        .fixedSize(horizontal: false, vertical: true)
+
+        statuslineStatusView
+
+        HStack {
+          Spacer()
+          Button("Skip") {
+            hasSkippedStatusline = true
+          }
+
+          Button(
+            statuslineInstaller.outcome == .installed ? "Wrapper Installed" : "Install Wrapper"
+          ) {
+            statuslineInstaller.install()
+          }
+          .disabled(statuslineInstaller.outcome == .installed)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var statuslineStatusView: some View {
+    switch statuslineInstaller.outcome {
+    case .notInstalled:
+      EmptyView()
+
+    case .installed:
+      Label("Statusline wrapper installed.", systemImage: "checkmark.circle.fill")
+        .foregroundStyle(.green)
+
+    case .refused(let reason):
+      VStack(alignment: .leading, spacing: 4) {
+        Label("Couldn't wrap the statusline safely.", systemImage: "exclamationmark.triangle.fill")
+          .foregroundStyle(.orange)
+        Text(reason)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+    case .failed(let step, let message):
+      VStack(alignment: .leading, spacing: 4) {
+        Label("Failed at \(step).", systemImage: "xmark.octagon.fill")
+          .foregroundStyle(.red)
+        Text(message)
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
     }
   }

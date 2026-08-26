@@ -87,7 +87,7 @@ struct GifEncoder {
     let minCodeSize = max(2, sizeBits + 1)
     for frame in image.frames {
       appendGraphicControlExtension(frame, into: &data)
-      appendImageDescriptor(frame, width: image.width, height: image.height, into: &data)
+      appendImageDescriptor(width: image.width, height: image.height, into: &data)
 
       let indices = frame.pixels.map { indexOf[$0]! }
       data.append(UInt8(minCodeSize))
@@ -181,8 +181,10 @@ struct GifEncoder {
     data.append(0)  // block terminator
   }
 
+  /// Takes no frame: every descriptor this encoder writes is the full
+  /// canvas, so the frame's own contents never affect it.
   private static func appendImageDescriptor(
-    _ frame: GifFrame, width: Int, height: Int, into data: inout Data
+    width: Int, height: Int, into data: inout Data
   ) {
     data.append(0x2C)
     data.append(contentsOf: uint16LE(0))  // left
