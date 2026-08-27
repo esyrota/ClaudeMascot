@@ -54,6 +54,12 @@
 
 ## Integration seams
 
+- **`applyUsage(_:)` must not tick the panel.** The existing `$lastUsage` sink assigns
+  `currentUsage` and saves the cache — and deliberately does *not* call
+  `panelController.tick()`, unlike the hook-event sink right above it. That asymmetry is
+  the separation between the usage cycle and the upload cycle; preserve it exactly.
+  Adding a tick here would let probe cadence drive panel traffic, which is the one thing
+  this design must not do.
 - **`AppModel` applies a `UsageSnapshot` in exactly one place today** — the
   `hookServer.$lastUsage` sink at `AppModel.swift:281`, which assigns `currentUsage` *and*
   calls `UsageSnapshotCache.save`. The probe must not duplicate that pair. Extract a
@@ -127,7 +133,9 @@ spawn a probe when `currentUsage` is nil or `receivedAt` is older than the thres
 the current state, and none is in flight.
 **Verify:** incremental `swift build`; unit-test `stalenessThreshold(for:)` across all
 nine `PanelState` cases — it is a pure function and must be exhaustive, not just the two
-interesting cases.
+interesting cases. Also assert that applying a usage snapshot does **not** trigger an
+upload: the panel must pick the number up on its next natural drive, not because a probe
+returned.
 
 ### Chunk 7 — Final verification
 Run the expensive gates once against the finished tree: `swift-format format -ir` over

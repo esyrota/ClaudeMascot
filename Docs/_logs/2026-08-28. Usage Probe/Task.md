@@ -96,10 +96,20 @@ the same instant. Two unrelated sources agreeing is the evidence the parse is ri
   does not delete files in a directory it does not own. At the 30-second working cadence
   this is ~120 probes an hour rather than ~30; a long working day is on the order of a
   thousand directories, so revisit this if `~/.claude` becomes unwieldy.
-- **A tighter cadence does not mean a busier panel.** The overlay re-uploads only on a
-  changed *quantised* key, and a 32-pixel rail gives each pixel ~3.1% of the window. Most
-  30-second probes will return a snapshot that renders identically and change nothing.
-  The gain is latency at a bucket crossing, not a smoother bar.
+- **Fetching usage and uploading to the panel are separate cycles, and stay separate.**
+  A probe updates `currentUsage` and does nothing else — it never ticks the controller,
+  never forces a re-upload, and has no opinion about the panel. The next upload that was
+  going to happen anyway reads whatever the freshest number is. This is not a new rule;
+  it is what `PanelController` already does, and the probe must not break it:
+  `overlayKey()` is read lazily at drive time (`PanelController.swift:395`), an upload
+  needs the *quantised* key to differ from `displayedOverlayKey`, and even then it waits
+  for a clip boundary (`PanelController.swift:406-420`).
+- **So probe cadence cannot change upload cadence.** The number of uploads equals the
+  number of times the quantised rail actually changes — roughly once per ~3.1% of the
+  window, since a 32-pixel rail gives each pixel that much. That count is fixed by real
+  usage, not by sampling rate. Probing at 30s instead of 2m only shortens the delay
+  between a bucket crossing and the panel learning about it; it cannot manufacture an
+  upload, and it cannot restart a loop mid-cycle.
 
 ## Out of scope
 
