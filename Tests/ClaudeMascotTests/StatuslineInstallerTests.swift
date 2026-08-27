@@ -162,6 +162,54 @@ struct StatuslineInstallerTests {
     #expect(afterUninstall["someOtherKey"] as? String == "unchanged")
   }
 
+  /// The sentinel the installer writes when there was no prior command is a
+  /// marker, not a command — and the *wrapper script* is the half that has to
+  /// know that. Without the sentinel branch in the script, every prompt on a
+  /// fresh install prints `sh: ...: command not found`, because the wrapper
+  /// would `exec` the marker. Runs the real script from the source tree so
+  /// the two halves cannot drift apart silently.
+  @Test
+  func wrapperTreatsTheNoPriorCommandSentinelAsNothingToRun() throws {
+    // Recover the sentinel the installer actually writes, rather than
+    // restating the literal here where it could drift.
+    let url = try fixtureURL(contents: "{}")
+    let installer = StatuslineInstaller(settingsURL: url)
+    installer.install()
+    let command = try #require(try readJSON(at: url)["statusLine"] as? [String: Any])
+    let wrapped = try #require(command["command"] as? String)
+    let sentinel = try #require(
+      wrapped.split(separator: "'").last.map(String.init)?.trimmingCharacters(in: .whitespaces))
+    #expect(sentinel.hasPrefix("__claudemascot"))
+
+    let script = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()  // ClaudeMascotTests
+      .deletingLastPathComponent()  // Tests
+      .deletingLastPathComponent()  // repo root
+      .appendingPathComponent("plugin/hooks/statusline-wrapper.sh")
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = [script.path, sentinel]
+    let input = Pipe()
+    let output = Pipe()
+    let errors = Pipe()
+    process.standardInput = input
+    process.standardOutput = output
+    process.standardError = errors
+    try process.run()
+    // A payload with no rate_limits at all: this test is about the passthrough
+    // half, and the socket may not even exist in a test environment.
+    input.fileHandleForWriting.write(Data("{}".utf8))
+    try input.fileHandleForWriting.close()
+    let stdout = output.fileHandleForReading.readDataToEndOfFile()
+    let stderr = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+
+    #expect(process.terminationStatus == 0)
+    #expect(stdout.isEmpty)
+    #expect(String(decoding: stderr, as: UTF8.self) == "")
+  }
+
   // MARK: - Required test 5: unexpected shape is refused and left unchanged
 
   @Test

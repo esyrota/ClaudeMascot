@@ -139,6 +139,14 @@ the terminal's status line reads exactly as it would without the wrapper install
 connection, a payload that fails to parse — because a broken wrapper must never blank
 the user's status line.
 
+Where the user had **no** `statusLine` configured before installing, there is no command
+to pass through. The installer still has to write *something* as the wrapped argument so
+that uninstall can tell "restore an empty command" from "remove the key that never
+existed", so it writes the sentinel `__claudemascot_no_prior_statusline__`
+(`StatuslineInstaller.noPriorCommandSentinel`). The wrapper recognises that exact string
+and exits silently instead of trying to run it — otherwise every prompt on a fresh
+install prints `sh: __claudemascot_no_prior_statusline__: command not found`.
+
 **The wrapper only runs where a status line is actually rendered**, which is not
 everywhere the hooks run. The nine hook events above fire on tool use in any Claude Code
 client; the statusline command fires only when a client draws a terminal status line. In a

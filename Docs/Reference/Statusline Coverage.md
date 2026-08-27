@@ -29,8 +29,16 @@ The cheap checks, in the order that isolates fastest:
 1. **Are hook events arriving?** `tail ~/Library/Application Support/ClaudeMascot/logs/input.jsonl`.
    Recent entries prove the socket, the relay and the app's listener are all fine, so
    anything still wrong is specific to the usage path.
-2. **Are `Usage` events among them?** `grep Usage` the same file. Hooks arriving *without*
-   `Usage` is this exact situation.
+2. **Has a `Usage` line arrived recently?** Check `usage.json`'s *mtime*, not the event log —
+   `AppModel` records only hook events to `input.jsonl`, so `Usage` lines never appear there
+   and grepping for them always comes up empty, working or not. `usage.json` is rewritten on
+   every `Usage` line, so its mtime is the arrival time of the last one.
+
+   ```sh
+   stat -f "%Sm" -t "%F %T" ~/Library/Application\ Support/ClaudeMascot/usage.json
+   ```
+
+   An mtime older than your last prompt in a terminal session is this exact situation.
 3. **Is the stored snapshot stale?** `cat .../usage.json` and compare `resetsAt` to now. Past
    it means the rail is refusing to draw on purpose.
 4. **Does the relay still work?** Feed the wrapper a synthetic payload directly (below). If
@@ -50,13 +58,8 @@ if the number was not true.
 
 ## Confirming it, when it matters
 
-Run a prompt in an interactive terminal session and watch the file:
-
-```sh
-stat -f "%Sm" ~/Library/Application\ Support/ClaudeMascot/usage.json
-```
-
-A timestamp that jumps confirms coverage; one that does not, in a terminal session, points
+Run a prompt in an interactive terminal session and watch the same file as step 2. A
+timestamp that jumps confirms coverage; one that does not, in a terminal session, points
 at the payload shape instead.
 
 ## The durable fix, if the rail should be present everywhere
