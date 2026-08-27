@@ -598,55 +598,39 @@ def sleeping():
 # on the bubble sleeping() actually holds once it stops swelling (BUBBLE_SIZES[-1]).
 BLOOM_CENTER = (BUBBLE_AT[0] + BUBBLE_SIZES[-1] // 2, BUBBLE_AT[1] + BUBBLE_SIZES[-1] // 2)
 
-# More rungs on the sleep bubble's own ladder (BUBBLE_SIZES: 2, 3, 4, 4) -- not
-# BUBBLE_STAGES, which this beat's brief names first. BUBBLE_STAGES was tried in
-# that reading and rejected: it sizes a (width, height) *rectangle* for
-# `_thought_bubble`, corner-knocked only on its final stage, anchored at BUBBLE_CX/CY
-# above the shoulder for `thinking` -- a different bubble, a different pose, drawn by
-# a different function. This one keeps swelling the exact round box `_draw_bubble`
-# already draws for `sleeping()`, corners knocked at every stage, so BUBBLE_SIZES is
-# the ladder that actually continues here. The last two rungs deliberately overshoot
-# SIZE: past that point a *ring* draws nothing at all (once the box is wide enough,
-# its border falls off-canvas on every edge at once), where a *solid* box still
-# floods everything inside it -- see BLOOM_SOLID_FROM below.
-BLOOM_SIZES = (8, 14, 22, 32, 44)
-
-# Ring stays a ring -- hollow, corners knocked, drawn with `_draw_bubble` -- only
-# while the box's near edge is still on-canvas on every side. `SIZE` (the panel's
-# short side) was the first cutoff tried, since it's what the brief for this beat
-# names, and it does not hold up off-centre: BLOOM_CENTER sits well right and up of
-# panel-centre, so well before the box is SIZE wide its TOP edge alone has already
-# cleared the canvas, and a ring missing a whole side loses more pixels than the
-# larger box gained -- the growth briefly reverses. Checked per frame in
-# `_bloom_frames()` instead of hard-coded here, so it stays correct if BLOOM_CENTER
-# or BLOOM_SIZES ever move.
+# The bloom's growth ladder. Diameters, not the (width, height) pairs BUBBLE_STAGES
+# holds for `_thought_bubble` -- this bubble is round, so one number is the whole
+# shape. The last rung has to clear the panel entirely: BLOOM_CENTER sits up and to
+# the right, and its farthest corner is the bottom-left one at ~31px, so a ring only
+# leaves the screen for good once its radius passes that. 68 gives a diameter of 34px
+# of margin over it, which is one full frame of the ring being genuinely gone rather
+# than a last arc clinging to a corner.
+BLOOM_SIZES = (8, 16, 26, 38, 52, 68)
 
 
 def _bloom_frames():
-    """The sleep bubble that doesn't pop: it keeps swelling until it owns the panel.
+    """The sleep bubble that doesn't pop: it swells until it has swallowed everything.
 
-    Each frame redraws from the bare `dozing` anchor rather than carrying the
-    previous frame's bubble forward -- the same choice `sleeping()` makes per step --
-    so the mascot is drawn full and untouched every time, and the growing bloom is
-    composited on top of it, not the other way round. That ordering is the whole
-    point: the mascot must be swallowed BY the bubble, not the bubble tucked in
-    behind him.
+    A **hollow circle** -- a 1px `PROP` stroke around a `BG` fill -- growing from where
+    `sleeping()` blows its bubbles. Both halves of that do work. The stroke is what
+    keeps it reading as the same bubble it started as rather than a shape wipe, and
+    the black fill is what swallows the mascot: each frame redraws him whole from the
+    bare `dozing` anchor and then the fill takes him, so he goes *inside* the bubble
+    instead of being covered by it.
 
-    The final frame is not one more `BLOOM_SIZES` entry: it is an unconditional fill
-    of the whole canvas in `PROP`. Reaching full coverage the geometric way -- a
-    `BLOOM_CENTER`-anchored box wide enough that its clipped footprint provably
-    covers all 1024 pixels from a corner-heavy anchor -- was the first thing tried,
-    and the arithmetic to prove it right in every direction at once is exactly the
-    kind of thing that is quietly wrong by a corner and never gets noticed on a
-    28x28 preview. A frame whose only job is to be uniformly white should just be
-    uniformly white.
+    It ends dark on its own. Once the ring's radius passes the farthest corner it has
+    left the panel entirely and what remains is the black it was carrying all along --
+    no separate wipe, no flash. An earlier cut of this beat flooded the last frame
+    solid `PROP` instead, which put all 1024 pixels at full white; it was dropped
+    because a bubble that ends by turning into its own opposite is a different beat
+    from a bubble that grows past you, and only the second one is what the dream is
+    doing. It also retires the only frame in this project that would have needed a
+    brightness check of its own.
 
-    `PROP` here is undimmed (255,255,255), the largest area of solid white this
-    project has ever put on the panel -- everywhere else it has appeared at most a
-    handful of pixels at a time. [[Panel Quirks]] already measures white as dim and
-    blue at that small scale; whether the same holds at 1024 lit pixels is precisely
-    what the verification video exists to answer, which is also why this frame does
-    not pre-correct the colour by guessing at one -- there is nothing to guess yet.
+    `ImageDraw.ellipse` rather than `_draw_bubble`: that helper draws the perimeter of
+    a *square* box with the corners knocked off, which is a fine 3-or-4px bubble and
+    stops being a circle the moment it is bigger than that. `_pacman_frames()` already
+    set the precedent for reaching for a real curve when the shape genuinely is one.
     """
     out = []
     base = _dozing_anchor()
@@ -654,16 +638,12 @@ def _bloom_frames():
         im = base.copy()
         d = ImageDraw.Draw(im)
         half = size // 2
-        x, y = BLOOM_CENTER[0] - half, BLOOM_CENTER[1] - half
-        if x < 0 or y < 0:
-            # The near edge has left the canvas on at least one side: a ring would
-            # now be missing a whole edge rather than merely reading bigger, so fill
-            # solid instead. See the note above BLOOM_SIZES.
-            rect(d, x, y, size, size, PROP)
-        else:
-            _draw_bubble(d, x, y, size, PROP)
+        box = [
+            BLOOM_CENTER[0] - half, BLOOM_CENTER[1] - half,
+            BLOOM_CENTER[0] - half + size - 1, BLOOM_CENTER[1] - half + size - 1,
+        ]
+        d.ellipse(box, fill=BG, outline=PROP, width=1)
         out.append((im, SLEEP_FRAME_MS))
-    out.append((Image.new("RGB", (SIZE, SIZE), PROP), SLEEP_FRAME_MS))
     return out
 
 

@@ -42,7 +42,7 @@
     },
     "doze-dream": {
       "file": "doze-dream.gif",
-      "frameCount": 35,
+      "frameCount": 34,
       "durationMs": 15620,
       "motionMs": 13120,
       "loops": false,

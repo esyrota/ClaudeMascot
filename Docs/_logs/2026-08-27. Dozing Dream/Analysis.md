@@ -122,3 +122,26 @@ mirroring it would be a no-op.
 post-change frames, saw "shade on the RIGHT", and nearly read it as still-broken. Shade side and
 facing direction are inverses, and only a before/after comparison against the raw source frame
 made that legible. A single measurement of an ambiguous quantity is not a verification.
+
+## Feedback round (chunk 10)
+
+**The bloom became a hollow circle.** Reported from the panel: the growing bubble read as a
+rectangle. It was — `_draw_bubble` draws the perimeter of a square box with the corners knocked
+off, which is a convincing bubble at 3–4px and a plain rectangle at 30. Chunk 6 had extended that
+helper's ladder rather than reaching for a curve, which was the right instinct for continuity and
+the wrong shape at size.
+
+Now `ImageDraw.ellipse` with `fill=BG, outline=PROP, width=1`: a 1px white ring around black.
+Two things fell out of it that are worth recording:
+
+- **The white flash is gone, and with it the only open colour risk in the task.** The old bloom
+  ended by flooding all 1024 pixels solid `PROP` — the brightest frame this project had drawn,
+  and the one thing the verification video specifically existed to judge. A hollow ring that
+  grows past the edges leaves the screen dark by itself. Two specs asserted that frame existed
+  ([[Panel Quirks]] and [[Animation Catalogue]]); both were corrected in the same change, which
+  is exactly the drift CLAUDE.md's spec rule is meant to catch.
+- **The black fill is what swallows the mascot.** Each frame still redraws him whole from the
+  `dozing` anchor and the fill takes him, so he goes *inside* the bubble rather than behind it —
+  the property chunk 6 was briefed on, preserved through a complete change of mechanism.
+
+Clip is now 34 frames, 15.62s (13.12s motion), 5,762 bytes.

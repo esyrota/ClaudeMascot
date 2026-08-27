@@ -172,10 +172,6 @@ bloom and feature size are mixed in and it is indicative rather than measured; a
 white swatch has not been shot. **Anything that depends on white reading as white — an
 overlay marker, a highlight — should measure it first.** A warm white is the likely fix.
 
-**The `doze-dream` bloom is the brightest frame this project has drawn:** all 1024 pixels at
-`PROP` (255,255,255). This is the frame to compare against in the verification video when
-judging whether the panel is rendering white correctly.
-
 ### The body colour
 
 `MASCOT = (255,64,0)`, interpolated from the row above against the Claude loading-art

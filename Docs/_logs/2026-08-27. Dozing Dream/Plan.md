@@ -165,3 +165,11 @@ that a wake during the dream cuts in promptly rather than waiting it out.
 Handled inline rather than dispatched: a two-frame mirror is the "literal one-liner" exception,
 and the diagnosis (which side `appear.gif` shades, and which way that reads) had to be measured
 by the orchestrator anyway before any brief could state the fix.
+
+## Feedback round (chunk 10)
+
+| Item | Fix | File | Chunk |
+|---|---|---|---|
+| The bloom is a rectangle; make it a circle | `ImageDraw.ellipse` instead of `_draw_bubble`'s corner-knocked square box | `art/generate.py` — `_bloom_frames()` | 10 |
+| 1px white stroke, black fill | `fill=BG, outline=PROP, width=1`; the solid-`PROP` final frame is dropped, and the ring now clears the panel on its own | same | 10 |
+| Consequence: two specs claimed a full-white frame | Note removed from [[Panel Quirks]]; the beat rewritten in [[Animation Catalogue]] | `Docs/` | 10 |
