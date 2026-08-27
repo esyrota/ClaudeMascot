@@ -251,6 +251,66 @@ def card_g_body() -> Image.Image:
     return im
 
 
+# Card H: status overlay colours and markers.
+BLACK = (0, 0, 0)
+OVERLAY_WHITE = (255, 255, 255)
+# Half-value white, to see whether a dimmer white drifts less blue than a full one --
+# and, incidentally, the 9th colour on the card. `save_gif` does not pad the palette the
+# way the shipped art does, and an 8-entry palette sat right on the boundary [[Panel
+# Quirks]] flags as the garbling risk; a 9th entry forces 16 and removes the doubt.
+OVERLAY_WHITE_HALF = (128, 128, 128)
+OVERLAY_WARM_WHITES = [
+    (255, 245, 200),    # barely warm — most blue
+    (255, 235, 150),    # warmer
+    (255, 225, 96),     # warmest still readable as white
+]
+OVERLAY_RAMP = [
+    (0, 255, 0),        # green
+    (255, 160, 0),      # amber
+    (255, 0, 0),        # red
+]
+
+
+def card_h_overlay_whites() -> Image.Image:
+    """Overlay card, part 1 of 2: white reference and the clock-marker candidates.
+
+    Split from a single card because the combined version **would not upload**: the
+    panel dropped the BLE connection mid-transfer and reset, every time, while each
+    half went up cleanly on its own. The cause is not understood and is not amount --
+    `shade-test` (600 lit pixels), `c-thin` (436) and `g-body` (1024, and nearly three
+    times the total channel sum) all upload fine, where the combined card failed at
+    325 lit pixels. See [[Panel Quirks]]; the split is a workaround, not a diagnosis.
+    """
+    im = _blank()
+    _fill(im, 2, 1, 9, 4, OVERLAY_WHITE)          # 8x4 white reference
+    _fill(im, 13, 1, 20, 4, OVERLAY_WHITE_HALF)   # the same white at half value
+    for col, rgb in enumerate(OVERLAY_WARM_WHITES):
+        x_start = 2 + col * 8
+        _fill(im, x_start, 7, x_start + 5, 10, rgb)
+    # The marker as the rail draws it: one lit pixel, alone, on unlit background.
+    _fill(im, 6, 22, 25, 27, BLACK)
+    px = im.load()
+    px[16, 24] = OVERLAY_WARM_WHITES[0]
+    return im
+
+
+def card_h_overlay_ramps() -> Image.Image:
+    """Overlay card, part 2 of 2: the three fill colours as 1px rows, each paired
+    with a copy carrying a single unlit pixel at column 16.
+
+    The pairing is the measurement: the rail's clock marker is one unlit pixel inside
+    a lit 1px row, and whether that reads at all is the assumption the marker design
+    rests on. A 2px hole would measure a case the rail never draws.
+    """
+    im = _blank()
+    px = im.load()
+    for row, (lit_y, holed_y) in enumerate([(13, 14), (16, 17), (19, 20)]):
+        for x in range(SIZE):
+            px[x, lit_y] = OVERLAY_RAMP[row]
+            px[x, holed_y] = BLACK if x == 16 else OVERLAY_RAMP[row]
+    return im
+
+
 CARDS = [
     ("a-ramps", card_a_ramps, "per-channel transfer curve (R, G, B, grey; dark → bright)"),
     ("b-halftones", card_b_halftones, "1px and 2px dithers against the solids they average to"),
@@ -259,7 +319,21 @@ CARDS = [
     ("e-gamma", card_e_gamma, "gamma-encoded ladders above naive ones — the model's falsification test"),
     ("f-mixture", card_f_mixture, "a green sweep beside a saturated red — where a small channel starts to register"),
     ("g-body", card_g_body, "candidate body colours against the brand salmon — pick MASCOT from a photograph"),
+    ("h-overlay-whites", card_h_overlay_whites, "status overlay 1/2: white reference, warm-white clock-marker candidates, lone marker pixel"),
+    ("h-overlay-ramps", card_h_overlay_ramps, "status overlay 2/2: fill colours as 1px rows, each with a 1px unlit marker"),
 ]
+
+
+def _check_card_h_channel_floor() -> None:
+    """Assertion: no colour on card H uses a channel in 1–7 (the measured floor
+    where small channels contribute nothing). All channels must be 0 or 8+."""
+    all_colours = [OVERLAY_WHITE, OVERLAY_WHITE_HALF] + OVERLAY_WARM_WHITES + OVERLAY_RAMP + [(0, 0, 0)]
+    for rgb in all_colours:
+        for channel in rgb:
+            if 1 <= channel <= 7:
+                raise AssertionError(
+                    f"card_h_overlay: colour {rgb} has channel {channel} in floor range 1–7"
+                )
 
 
 def save_gif(im: Image.Image, path: Path) -> None:
@@ -310,6 +384,7 @@ def reference_html(path: Path) -> None:
 
 
 def main() -> None:
+    _check_card_h_channel_floor()
     OUT.mkdir(exist_ok=True)
     for name, build, _ in CARDS:
         path = OUT / f"{name}.gif"

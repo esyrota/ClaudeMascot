@@ -62,9 +62,13 @@ Each one cost a wrong diagnosis to find.
 | Catalogue images | `art/export_docs.py` | working — 6× previews for [[Animation Catalogue]] |
 | Python daemon | `legacy/` | **retired and non-functional** |
 | Colour test card | `art/testcard.py` | diagnostic, keep |
-| Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — seven cards, the on-screen reference, and the photo/video reader (averages video frames; the panel is scan-driven) |
+| Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — nine cards, the on-screen reference, and the photo/video reader (averages video frames; the panel is scan-driven) |
 | Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
 | Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
+| Status overlay | `Overlay.swift` + `UsageRail.swift` | **shipped** — a layer behind the mascot; row 0 carries the 5-hour usage rail |
+| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 39 clips pixel-exact |
+| Compositor | `Compositor.swift` | **shipped** — overlay behind, mascot in front, mandatory 1px knockout halo. **No overlay = byte-identical passthrough** |
+| Usage input | `plugin/hooks/statusline-wrapper.sh` + `UsageSnapshot.swift` | **shipped** — wraps the user's own statusline, tees two fields to the socket |
 
 Installation is now a single step: build and run the app. It offers to install the
 plugin on first launch, and the repo is no longer a marketplace.
@@ -84,6 +88,11 @@ plugin on first launch, and the repo is no longer a marketplace.
   **withdrawn** when the panel showed a red mascot. Its [[Analysis]] records a plan built
   on a case its own risk list called unmeasured. What survived: `MASCOT` measured at
   `(255,64,0)`, the pink solved, and the `B = 4` anomaly explained as a mixture floor.
+- `_logs/2026-08-26. Status Overlay/` — **shipped**: a layer behind the mascot, a GIF codec
+  in Swift, and the 5-hour usage rail riding on it. Its [[Analysis]] records the cost of an
+  assumption two Run Reports had already flagged as unverified. What the panel taught: a 1px
+  unlit marker is legible at 2.2–6.3× contrast, every white photographs blue, and **dim and
+  neutral are mutually exclusive** — see [[Panel Quirks]].
 - `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
   against an on-screen reference in the same frame, and the colour rules rewritten around
   it. See its [[Findings]] for the evidence, the method, and the alignment error that
@@ -98,8 +107,6 @@ Written up in `_tasks/`, in the order they are worth doing:
   largest remaining win.
 - [[Waiting Never Fires]] — `Notification` fired zero times in 1102 events, so the flag
   wave has never once been on the panel.
-- [[Status Overlay]] — a layer *behind* the animation, so the panel can carry a 5-hour
-  usage rail as well as the mascot. Designed and blocked on [[Panel Colour Encoding]].
 - [[Docs GIFs as the Art Source]] — make the docs previews byte-faithful to what the
   device gets, then edit animations as GIFs and build with one command. Part 1 (one
   command) is small and worth doing on its own. Its blocker, a real transfer curve, is

@@ -120,6 +120,42 @@ and 14 it comes alive.
 floor, and it has been sitting on this page as an unexplained anomaly since the beginning.
 It is also exactly what killed the encode: a green of 5 is *under the floor*.
 
+### Dim and neutral are mutually exclusive
+
+**Observed 2026-08-27**, twice, on the status rail. The panel invents blue roughly in
+proportion to total drive, so at *low* authored values that invented blue outweighs the
+channels actually asked for:
+
+| authored | photographs as |
+|---|---|
+| `(8, 24, 0)` — green, no blue | **cyan** |
+| `(16, 12, 0)` — warm, no blue | **cyan** |
+| `(8, 0, 0)` … `(24, 0, 0)` — red, no blue | red / brown, hue holds |
+
+Only a red-dominant colour keeps its hue at the bottom of the range, because red is the one
+channel strong enough to stay ahead of the invented blue. Anything else goes cool as it dims.
+
+**So a widget cannot be both almost-black and neutral on this panel.** Pick one. A thing that
+must recede without taking on a colour cast has to be *not drawn*, not dimmed — there is no
+authored value that renders as a faint neutral.
+
+**And do not reach for a grey to fix it**: authoring grey is the worst available move, per the
+white-point measurements above. The route to a neutral is `B = 0` plus enough red and green to
+balance the blue that arrives on its own.
+
+### It makes its own blue into a *green* too, not just a grey
+
+**Observed 2026-08-27** on the status rail. A fill authored `(8, 24, 0)` — blue at zero,
+red barely above the floor — photographed distinctly **cyan** on the panel. The
+manufactured blue is not a property of greys and warm mixtures alone; a green with no
+authored blue gets it as well, and at low levels it dominates, because green and the
+invented blue are then the only two channels doing anything.
+
+**Consequence for anything meant to recede.** A cool colour beside the warm mascot
+*separates* rather than sitting behind it, however dim it is — dimming a cyan does not make
+it recede, it makes it a dim cyan. [[Status Overlay]]'s rail is therefore red-dominant with
+`B = 0` at every step, including the one that used to be green.
+
 ### The panel makes its own blue
 
 Every measurement above comes from a file with **blue = 0**, and the panel returns
@@ -166,6 +202,87 @@ blend between `MASCOT` and `MASCOT_DARK` spans 20% of luma with no clean progres
 **So half-tones come from encoding the values correctly, not from dithering**; dithering
 stays a texture tool. (Card B's own fit is weak — a nearly uniform card gives the aligner
 nothing to lock onto — so treat its numbers as indicative and card E's as the evidence.)
+
+## The overlay's colours, measured
+
+**Measured 2026-08-26** from four videos (`art/photos/IMG_2806–2809.mov`), panel beside an
+on-screen copy in the same frame, frames averaged. Cards `h-overlay-whites` and
+`h-overlay-ramps`.
+
+### A warm white is not warm enough to be white
+
+Every white on this panel photographs **blue**, and lowering the authored blue moves it
+but does not fix it:
+
+| authored | B/R at brightness 100 | B/R at brightness 30 |
+|---|---|---|
+| `(255,255,255)` white | 1.67 | 1.44 |
+| `(128,128,128)` half white | 1.74 | 1.52 |
+| `(255,245,200)` | 1.57 | 1.36 |
+| `(255,235,150)` | 1.45 | 1.28 |
+| `(255,225,96)` | **1.25** | **1.15** |
+
+A neutral white would sit at B/R = 1.0. Dropping authored blue from 255 to 96 buys about
+0.4 of ratio and still lands blue. The trend is smooth and roughly linear in authored
+blue, so **neutral needs blue near 40–60, and anything meant to read warm needs less
+still**. This sharpens the older "white is dim and blue" note, which came from 2px sleep
+bubbles: the effect is real, it is not bloom, and it survives at both brightnesses.
+
+**Consequence for [[Status Overlay]]:** a white marker pixel is not available. The marker
+is either a much lower blue (40–60), or `B = 0` and frankly yellow.
+
+### The fill ramp: green and amber wash out, red does not
+
+Panel RGB for a full-width 1px row, brightness 100:
+
+| authored | panel RGB | G/R | B/R | reads as |
+|---|---|---|---|---|
+| `(0,255,0)` | (130,190,137) | 1.46 | 1.05 | pale mint, not green |
+| `(255,160,0)` | (187,181,122) | 0.97 | 0.66 | pale cream, not amber |
+| `(255,0,0)` | (199,72,13) | 0.36 | 0.06 | orange-red, saturated |
+
+The panel manufactures both red and blue into a pure green, and the authored amber carries
+so much green that it lands nearly neutral. Green and amber therefore sit close together —
+both pale — while red is clearly separated. **A green→amber→red ramp authored naively does
+not give three distinct steps on this panel**; the amber needs far less green (the mixture
+table above puts file green 96 at G/R 0.68 and green 40 at 0.40).
+
+### The 1px marker is legible, which was the open question
+
+A single unlit pixel punched into a lit 1px row reads at **2.2× to 6.3×** contrast against
+the row around it, across all three ramp colours and both brightnesses. The marker design
+in [[Status Overlay]] rests on this and it holds.
+
+## Some images will not upload at all, and it is not their size
+
+**Measured 2026-08-26, cause unknown.** A test card carrying a white swatch, three
+warm-white candidates and three 1px colour ramps would not transfer: the panel dropped
+the BLE connection about a second into the upload and reset, then reconnected, every
+time. `PanelController` logged `BLEError error 2` on the write; the app was healthy
+either side of it, and an unrelated card uploaded normally seconds later.
+
+Bisecting the card found no guilty band. Each third uploaded on its own, and **all three
+pairs uploaded**; only all three together failed. But the obvious cumulative explanations
+are contradicted by cards that have always worked:
+
+| card | lit pixels | sum of channels | uploads |
+|---|---|---|---|
+| the combined overlay card | 325 | 141k | **no** |
+| `c-thin` | 436 | 140k | yes |
+| `shade-test` | 600 | 121k | yes |
+| `b-halftones` | 928 | 246k | yes |
+| `g-body` | 1024 | 352k | yes |
+
+So it is neither lit-pixel count nor total current: cards with three times the load go up
+fine. The failing file was also structurally indistinguishable from `c-thin` — same
+GIF89a, same 32×32 canvas, same 16-entry global palette with 8 real colours, same LZW
+minimum code size, same single merged frame, and 267 bytes against `c-thin`'s 343.
+
+**The workaround is to split the card in two**, which is why the overlay cards are
+`h-overlay-whites` and `h-overlay-ramps` rather than one card. That is a workaround, not a
+diagnosis. **If a new card ever refuses to upload, split it before suspecting anything
+else** — and do not reach for the brightness or the colour values, which is where two
+wrong guesses went first.
 
 ## The panel is scan-driven: measure from video, not stills
 

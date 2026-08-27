@@ -8,6 +8,12 @@ struct SettingsView: View {
   @ObservedObject var settings: AppSettings
 
   @State private var isBusy: Bool = false
+  @State private var isStatuslineBusy: Bool = false
+
+  /// Owned locally rather than threaded through `AppModel`: the statusline
+  /// wrapper is a sibling of `PluginInstaller`, installed and uninstalled
+  /// independently, so it does not need to share the app's plugin wiring.
+  @StateObject private var statuslineInstaller = StatuslineInstaller()
 
   /// Minute options for "Dim the panel", in menu order. `1` is the only
   /// value that reads singular ("For 1 minute").
@@ -115,6 +121,27 @@ struct SettingsView: View {
       } header: {
         sectionHeader("Plugin")
       }
+
+      Section {
+        LabeledContent {
+          HStack {
+            if isStatuslineBusy {
+              ProgressView()
+                .controlSize(.small)
+            }
+
+            Button(statuslineActionTitle) {
+              statuslineAction()
+            }
+            .disabled(isStatuslineBusy)
+          }
+        } label: {
+          Text(statuslineStatusText)
+            .foregroundStyle(statuslineStatusColor)
+        }
+      } header: {
+        sectionHeader("Statusline")
+      }
     }
     .formStyle(.grouped)
     .frame(width: 500, height: 600)
@@ -122,6 +149,7 @@ struct SettingsView: View {
       settings.sleepAfterMinutes = nearestOption(settings.sleepAfterMinutes, in: Self.dimOptions)
       settings.offAfterMinutes = nearestOption(settings.offAfterMinutes, in: Self.offOptions)
       appModel.pluginInstaller.refreshOutcome()
+      statuslineInstaller.refreshOutcome()
     }
   }
 
@@ -175,6 +203,47 @@ struct SettingsView: View {
     } else {
       installPlugin()
     }
+  }
+
+  private var statuslineStatusText: String {
+    switch statuslineInstaller.outcome {
+    case .notInstalled: return "Statusline wrapper not installed"
+    case .installed: return "Statusline wrapper installed"
+    case .refused(let reason): return "Refused: \(reason)"
+    case .failed(let step, _): return "Failed at \(step)"
+    }
+  }
+
+  private var statuslineStatusColor: Color {
+    switch statuslineInstaller.outcome {
+    case .notInstalled: return .secondary
+    case .installed: return .green
+    case .refused, .failed: return .red
+    }
+  }
+
+  private var statuslineActionTitle: String {
+    statuslineInstaller.outcome == .installed ? "Uninstall" : "Install"
+  }
+
+  private func statuslineAction() {
+    if statuslineInstaller.outcome == .installed {
+      uninstallStatusline()
+    } else {
+      installStatusline()
+    }
+  }
+
+  private func uninstallStatusline() {
+    isStatuslineBusy = true
+    statuslineInstaller.uninstall()
+    isStatuslineBusy = false
+  }
+
+  private func installStatusline() {
+    isStatuslineBusy = true
+    statuslineInstaller.install()
+    isStatuslineBusy = false
   }
 
   private func rescan() {

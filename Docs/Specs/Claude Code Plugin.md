@@ -110,3 +110,36 @@ both are load-bearing:
   reference rather than a copy. `PluginInstaller.needsReregistration()` compares
   `Bundle.main.bundleURL` against the path recorded at install time, and Options offers
   a **Re-register** button when they differ.
+
+## Statusline wrapper
+
+A second, independent input, unconnected to the nine hook events above:
+[[Status Overlay]]'s usage rail needs Claude Code's usage numbers, and the statusline
+is the only place they already surface. A small wrapper script sits in front of the
+user's own statusline command and tees the numbers it needs to the same socket.
+
+It reads Claude Code's statusline JSON from stdin once. The payload carries four rate
+limit periods nested under `rate_limits`: `five_hour`, `seven_day`, `seven_day_sonnet`,
+and `seven_day_opus`, each with identical field names. The wrapper extracts
+`rate_limits.five_hour.used_percentage` and `rate_limits.five_hour.resets_at`
+(epoch seconds, not an ISO 8601 string), and writes one line to
+`~/Library/Application Support/ClaudeMascot/hook.sock`:
+
+```json
+{"event":"Usage","usedPercent":42.5,"resetsAt":1756270800}
+```
+
+The same privacy rule that keeps `tool_input` off the wire above applies here: the
+wrapper **extracts rather than forwards**. The statusline payload carries far more than
+those two fields, and only they cross the socket.
+
+It then `exec`s the user's actual configured statusline command with the same stdin, so
+the terminal's status line reads exactly as it would without the wrapper installed. That
+`exec` runs on **every** failure path too — a missing mascot, a socket refusing the
+connection, a payload that fails to parse — because a broken wrapper must never blank
+the user's status line.
+
+It is installed and removed independently of the plugin above: the first-run flow offers
+it as its own, separately declinable step alongside the plugin offer (see
+[[Menu Bar App]]), and it can be installed or uninstalled from Settings without
+touching plugin state either way.

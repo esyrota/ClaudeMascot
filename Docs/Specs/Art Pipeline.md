@@ -28,7 +28,7 @@ see [[Animation Catalogue]]'s `sitting` section for why.
 | `art/make_icon.py` | Builds `Sources/ClaudeMascot/Resources/AppIcon.icns` from `art/sources/logo.gif` — see [[#The app icon]] |
 | `art/testcard.py` | Four saturated quadrants for diagnosing colour — see [[Panel Quirks]] |
 | `art/read_panel_photo.py` | Reads a photographed card back into numbers — warps the lit area to a 32×32 grid and reports per-patch values. Check the landmark line it prints before believing anything |
-| `art/testcards.py` | The five characterisation cards (ramps, halftones, thin features, hues) plus `reference.html`, the on-screen half of the measurement — see [[Recheck the Panel Colour Rule]] |
+| `art/testcards.py` | The characterisation cards — ramps, halftones, thin features, hues, gamma, mixture, body colour, and the two overlay cards — plus `reference.html`, the on-screen half of the measurement. The overlay pair is two cards because the combined one would not upload; see [[Panel Quirks]] |
 
 `Animations/custom/<state>.gif` takes priority over `Animations/<state>.gif`, so re-running
 the generator never clobbers hand-imported art. Resolution order, including the user's
@@ -111,6 +111,29 @@ Two consequences worth knowing before editing a state:
   handed. Measured against the shipped, encoded GIFs: still needed (every clip's
   sparsest dense frame lands on exactly 9, never more) and still working (no two
   nudges' encoded values collapse) — see [[Panel Quirks]] § Palette for the counts.
+
+## The overlay's background mask
+
+[[Status Overlay]] composites a widget behind the mascot and needs to know which pixels
+of a clip are background. That mask is **inferred in the app**, by flood fill from the
+border, not authored here.
+
+Authored transparency was the first design and it was deferred on evidence, not merely
+postponed. The drawing code conflates background with black art by construction:
+`_paste_over()`'s own transparency marker is `transparent=BG`, and the recolour
+functions return `BG` for "background, and the eyes" (`generate.py:918`). Giving the
+overlay a real alpha channel would mean teaching this file the difference between the
+two `BG` uses throughout, not adding a flag to it — surgery this build does not do. The
+art therefore still emits no alpha of its own, and none of it should be read as carrying
+any.
+
+**The 1px knockout halo bundled with clips that reach rows 0–1 is what makes the
+inferred mask exact there anyway — load-bearing, not cosmetic.** A composited widget is
+cleared under a 1px dilation of the mascot's own opaque silhouette, so border-connected
+black sitting next to lit art (the `done-flag` case) reads as background in the
+overlay's rows regardless of what a plain flood fill would resolve. This equivalence
+holds only because every such pixel in rows 0–1 is adjacent to opaque art; a widget that
+left rows 0–1 would need authored alpha again.
 
 ## Importing the hand-drawn states
 

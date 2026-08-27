@@ -22,7 +22,8 @@ private func readLines(_ url: URL) -> [String] {
 func inputRecordAppendsAsOneLineAndRoundTrips() async throws {
   try await withTempDirectory { directory in
     let log = EventLog(directory: directory)
-    let record = InputRecord(at: Date(), event: "PreToolUse", tool: "Task", session: "abc", mode: "default")
+    let record = InputRecord(
+      at: Date(), event: "PreToolUse", tool: "Task", session: "abc", mode: "default")
     await log.record(record)
     await log.record(record)
 
@@ -67,7 +68,8 @@ func rotationFiresAtThresholdAndLeavesExactlyTwoFiles() async throws {
     // Each encoded input line is well under 200 bytes, so a small total cap
     // forces rotation after only a few writes.
     let log = EventLog(directory: directory, maxTotalBytes: 2 * 1024)
-    let record = InputRecord(at: Date(), event: "PreToolUse", tool: "Task", session: "abc", mode: "default")
+    let record = InputRecord(
+      at: Date(), event: "PreToolUse", tool: "Task", session: "abc", mode: "default")
 
     for _ in 0..<40 {
       await log.record(record)
@@ -100,6 +102,7 @@ func badDirectoryDegradesSilentlyInsteadOfThrowing() async throws {
     let record = InputRecord(at: Date(), event: "PreToolUse", tool: nil, session: nil, mode: nil)
     await log.record(record)
 
-    #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("input.jsonl").path))
+    #expect(
+      !FileManager.default.fileExists(atPath: directory.appendingPathComponent("input.jsonl").path))
   }
 }

@@ -169,7 +169,8 @@ private func makeController(
   clock: FakeClock,
   clipByID: @escaping (String) -> Clip? = { _ in nil },
   sleeper: @escaping (TimeInterval) async -> Void = { _ in },
-  resolve: @escaping (PanelState, Clip?) -> Clip? = { state, _ in defaultTestClips[state] }
+  resolve: @escaping (PanelState, Clip?) -> Clip? = { state, _ in defaultTestClips[state] },
+  overlayKey: @escaping () -> Int? = { nil }
 ) -> PanelController {
   PanelController(
     panel: panel,
@@ -178,7 +179,8 @@ private func makeController(
     timings: timings,
     brightness: { 40 },
     clock: { clock() },
-    sleeper: sleeper
+    sleeper: sleeper,
+    overlayKey: overlayKey
   )
 }
 
@@ -826,4 +828,131 @@ func departureReturnsOnceThePanelGoesOffDespiteEveryWalkOffUploadFailing() async
   #expect(
     panel.uploadCount > 1, "the walk-off upload must have been retried, not given up on early")
   #expect(panel.calls.last == .setPower(false))
+}
+
+// MARK: - Overlay refresh rule
+
+/// `overlayKey` defaults to `{ nil }` in `makeController`, exactly like every
+/// test above this section, so the whole existing suite already pins the
+/// nil-overlay default as reproducing today's pair-only behaviour -- it
+/// still passes unmodified with the `(clip, overlayKey)` identity test in
+/// place.
+
+@Test @MainActor
+func unchangedOverlayKeyNeverReuploads() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock, overlayKey: { 7 })
+
+  controller.handle(.working)
+  await controller.tick()  // nothing showing yet: uploads immediately
+  #expect(panel.uploadCount == 1)
+
+  // Repeatedly cross the loop's own boundary with the same clip and the
+  // same overlay key: none of these ticks should ever find a reason to
+  // re-upload.
+  for _ in 0..<20 {
+    clock.advance(1)
+    await controller.tick()
+  }
+  #expect(panel.uploadCount == 1)
+}
+
+@Test @MainActor
+func changedOverlayKeyReuploadsAtTheSeamNotBefore() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var key: Int? = 1
+  let controller = makeController(panel: panel, clock: clock, overlayKey: { key })
+
+  controller.handle(.working)
+  await controller.tick()  // nothing showing yet: uploads immediately
+  #expect(panel.uploadCount == 1)
+
+  key = 2  // the overlay changes mid-loop; the clip itself does not
+  clock.advance(0.4)  // `.working`'s 1s duration has not elapsed
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+  #expect(panel.uploadCount == 1)  // deferred to the boundary, not applied mid-loop
+
+  clock.advance(0.6)  // total 1.0s: the loop boundary
+  await controller.tick()
+  #expect(panel.uploadCount == 2)  // exactly one re-upload, and only at the seam
+  #expect(controller.displayed?.id == PanelState.working.rawValue)  // same clip, refreshed overlay
+}
+
+@Test @MainActor
+func changedOverlayKeyWithChangedClipStillUploadsOnce() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var key: Int? = 1
+  let controller = makeController(panel: panel, clock: clock, overlayKey: { key })
+
+  controller.handle(.working)
+  await controller.tick()
+  #expect(panel.uploadCount == 1)
+
+  key = 2
+  controller.handle(.thinking)
+  clock.advance(1)  // `.working`'s loop boundary
+  await controller.tick()
+  #expect(panel.uploadCount == 2)  // one upload, not two, even though both changed together
+  #expect(controller.displayed?.id == PanelState.thinking.rawValue)
+}
+
+@Test @MainActor
+func powerOffClearsTheDisplayedOverlayKeyToo() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var key: Int? = 1
+  let controller = makeController(panel: panel, clock: clock, overlayKey: { key })
+
+  controller.handle(.working)
+  await controller.tick()  // nothing showing yet: uploads immediately
+
+  // `.off` walks the mascot off, then cuts power once it has left --
+  // immediate, not through idle escalation (see
+  // `offWalksTheMascotOffWithoutWaitingForIdleEscalation`).
+  controller.handle(.off)
+  clock.advance(1)  // `.working`'s loop finishes -- the walk off lands on a seam
+  await controller.tick()  // -> away
+  await controller.tick()  // nothing lit left to keep -> off
+  #expect(controller.isPanelOff == true)
+
+  // The overlay changes while the panel is dark -- there is nothing on
+  // screen to refresh yet.
+  key = 2
+  controller.handle(.working)
+  await controller.tick()  // wakes and uploads unconditionally: no loop to respect
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+  let uploadsAfterWake = panel.uploadCount
+
+  // Had the pre-power-off key (1) survived uncleared, this tick would see a
+  // mismatch against the current key (2) and try to defer to a boundary
+  // that serves no purpose -- the wake's own upload already carried key 2.
+  await controller.tick()
+  #expect(panel.uploadCount == uploadsAfterWake)  // no spurious re-upload
+}
+
+@Test @MainActor
+func invalidateDisplayForcesAnUploadEvenWithAnUnchangedOverlayKey() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock, overlayKey: { 3 })
+
+  controller.handle(.working)
+  await controller.tick()
+  #expect(panel.uploadCount == 1)
+
+  // The diagnostics path wrote a test card straight to `BLEClient`, behind
+  // this machine's back.
+  controller.invalidateDisplay()
+  #expect(controller.displayed == nil)
+
+  // Same clip, same overlay key as before -- without `invalidateDisplay`
+  // this would read as "already showing the target" and be skipped
+  // regardless of any boundary.
+  await controller.tick()
+  #expect(panel.uploadCount == 2)
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
 }
