@@ -934,6 +934,44 @@ def _pacman_frames():
     return out
 
 
+def doze_dream():
+    """
+    The set-piece nightmare: a dream played once during `dozing`.
+
+    Assembled entirely from beats chunks 6 and 7 built as frame producers, in the
+    order `Task.md`'s "The dream, as scripted" lays out: a beat of the ordinary
+    sleeping bubbles, the largest one swallowing the panel instead of popping, a
+    cut to black, walk-in, a look back, a startle, walk-off, Pac-Man crossing
+    behind him, and dark again.
+
+    The last frame is `_dozing_anchor()` held for `APPEAR_TAIL_MS` -- copying
+    `sleeping()` and `_doze_edge()`'s own contract, since this clip's `toPose` is
+    `dozing` and the `sleeping` loop it hands off to begins on that exact pixel
+    data. Anything else here would pop on every hand-off back to sleep.
+
+    One seam needed a fix at the assembly level rather than in either helper:
+    `_startle_frames()`'s last frame is a re-grounded mid-rise sprite, not the
+    neutral pose `walk_off_right()`'s first frame already is (`_standing_anchor()`
+    in all but name), so the two cut hard into each other. A single held anchor
+    frame between them reads as him catching his footing before he bolts, rather
+    than a pop -- ordering and a held frame, exactly the kind of fix that belongs
+    here and not in `_startle_frames()` itself.
+    """
+    out = []
+    out.extend(sleeping()[:6])          # a beat of bubbles before the dream turns
+    out.extend(_bloom_frames())
+    out.extend(_blackout_frames())
+    out.extend(walk_in_left()[:-1])     # motion only -- drop the long dwell tail
+    out.extend(_look_back_frames())
+    out.extend(_startle_frames())
+    out.append((_standing_anchor(), 100))  # settle before the bolt -- see docstring
+    out.extend(walk_off_right()[:-1])   # motion only -- as with the walk-in above
+    out.extend(_pacman_frames())
+    out.extend(_blackout_frames())
+    out.append((_dozing_anchor(), APPEAR_TAIL_MS))
+    return out
+
+
 # --------------------------------------------------------------------------
 # Wander fidgets -- the mascot steps out and comes back.
 #
@@ -1791,6 +1829,7 @@ STATES = {
     "fidget-look": fidget_look,
     "stand-to-doze": stand_to_doze,
     "doze-to-stand": doze_to_stand,
+    "doze-dream": doze_dream,
     "walk-off-left": walk_off_left,
     "walk-in-left": walk_in_left,
     "walk-off-right": walk_off_right,
@@ -1996,6 +2035,25 @@ CLIP_METADATA = {
         "loops": False,
         "fromPose": "dozing",
         "toPose": "standing",
+    },
+    "doze-dream": {
+        # A set piece, not a third weighted `dozing` fidget: `weight` is a
+        # relative number, there is no other `dozing` fidget to weigh it
+        # against, and there never will be more than one dream, so it would
+        # fire on every due roll regardless of what it was set to. `maxPerPhase:
+        # 1` uses the phase ledger instead -- once played, this clip is excluded
+        # for the rest of the current sleep, `selectFidget` finds no `dozing`
+        # candidate left, and falls through to the `sleeping` loop. Without
+        # `interruptible: True` a wake could not cut in until the epoch turned
+        # over: a fidget is otherwise re-picked for the rest of its epoch, which
+        # for a set piece this long means either finishing a second play of the
+        # dream from the top or being guillotined mid-way when the epoch ends.
+        "loops": False,
+        "fromPose": "dozing",
+        "toPose": "dozing",
+        "fidgetGroup": "sleeping",
+        "maxPerPhase": 1,
+        "interruptible": True,
     },
     "walk-off-left": {
         "loops": False,
