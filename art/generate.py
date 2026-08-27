@@ -586,6 +586,95 @@ def sleeping():
     return out
 
 
+# Where the bloom grows from. The brief for this beat says "centred on where it was
+# blown" -- and that has to mean BUBBLE_AT itself, not wherever either bubble has
+# drifted to by the time the dream starts: sleeping()'s two bubbles are half a cycle
+# apart, so there is no single instance that is uniquely "the largest" to anchor on,
+# but there is only one place either of them is ever blown from. The offset centres
+# on the bubble sleeping() actually holds once it stops swelling (BUBBLE_SIZES[-1]).
+BLOOM_CENTER = (BUBBLE_AT[0] + BUBBLE_SIZES[-1] // 2, BUBBLE_AT[1] + BUBBLE_SIZES[-1] // 2)
+
+# More rungs on the sleep bubble's own ladder (BUBBLE_SIZES: 2, 3, 4, 4) -- not
+# BUBBLE_STAGES, which this beat's brief names first. BUBBLE_STAGES was tried in
+# that reading and rejected: it sizes a (width, height) *rectangle* for
+# `_thought_bubble`, corner-knocked only on its final stage, anchored at BUBBLE_CX/CY
+# above the shoulder for `thinking` -- a different bubble, a different pose, drawn by
+# a different function. This one keeps swelling the exact round box `_draw_bubble`
+# already draws for `sleeping()`, corners knocked at every stage, so BUBBLE_SIZES is
+# the ladder that actually continues here. The last two rungs deliberately overshoot
+# SIZE: past that point a *ring* draws nothing at all (once the box is wide enough,
+# its border falls off-canvas on every edge at once), where a *solid* box still
+# floods everything inside it -- see BLOOM_SOLID_FROM below.
+BLOOM_SIZES = (8, 14, 22, 32, 44)
+
+# Ring stays a ring -- hollow, corners knocked, drawn with `_draw_bubble` -- only
+# while the box's near edge is still on-canvas on every side. `SIZE` (the panel's
+# short side) was the first cutoff tried, since it's what the brief for this beat
+# names, and it does not hold up off-centre: BLOOM_CENTER sits well right and up of
+# panel-centre, so well before the box is SIZE wide its TOP edge alone has already
+# cleared the canvas, and a ring missing a whole side loses more pixels than the
+# larger box gained -- the growth briefly reverses. Checked per frame in
+# `_bloom_frames()` instead of hard-coded here, so it stays correct if BLOOM_CENTER
+# or BLOOM_SIZES ever move.
+
+
+def _bloom_frames():
+    """The sleep bubble that doesn't pop: it keeps swelling until it owns the panel.
+
+    Each frame redraws from the bare `dozing` anchor rather than carrying the
+    previous frame's bubble forward -- the same choice `sleeping()` makes per step --
+    so the mascot is drawn full and untouched every time, and the growing bloom is
+    composited on top of it, not the other way round. That ordering is the whole
+    point: the mascot must be swallowed BY the bubble, not the bubble tucked in
+    behind him.
+
+    The final frame is not one more `BLOOM_SIZES` entry: it is an unconditional fill
+    of the whole canvas in `PROP`. Reaching full coverage the geometric way -- a
+    `BLOOM_CENTER`-anchored box wide enough that its clipped footprint provably
+    covers all 1024 pixels from a corner-heavy anchor -- was the first thing tried,
+    and the arithmetic to prove it right in every direction at once is exactly the
+    kind of thing that is quietly wrong by a corner and never gets noticed on a
+    28x28 preview. A frame whose only job is to be uniformly white should just be
+    uniformly white.
+
+    `PROP` here is undimmed (255,255,255), the largest area of solid white this
+    project has ever put on the panel -- everywhere else it has appeared at most a
+    handful of pixels at a time. [[Panel Quirks]] already measures white as dim and
+    blue at that small scale; whether the same holds at 1024 lit pixels is precisely
+    what the verification video exists to answer, which is also why this frame does
+    not pre-correct the colour by guessing at one -- there is nothing to guess yet.
+    """
+    out = []
+    base = _dozing_anchor()
+    for size in BLOOM_SIZES:
+        im = base.copy()
+        d = ImageDraw.Draw(im)
+        half = size // 2
+        x, y = BLOOM_CENTER[0] - half, BLOOM_CENTER[1] - half
+        if x < 0 or y < 0:
+            # The near edge has left the canvas on at least one side: a ring would
+            # now be missing a whole edge rather than merely reading bigger, so fill
+            # solid instead. See the note above BLOOM_SIZES.
+            rect(d, x, y, size, size, PROP)
+        else:
+            _draw_bubble(d, x, y, size, PROP)
+        out.append((im, SLEEP_FRAME_MS))
+    out.append((Image.new("RGB", (SIZE, SIZE), PROP), SLEEP_FRAME_MS))
+    return out
+
+
+def _blackout_frames():
+    """A brief hold on black between the bloom and whatever the dream does next.
+
+    Three bare `frame()`s at the loop's own SLEEP_FRAME_MS -- long enough to read as
+    a deliberate cut to dark, short enough that it does not feel like the panel has
+    hung. There is nothing to compose: `frame()` already returns a bare BG canvas, so
+    this function exists only to fix the frame count and timing in one place rather
+    than have the clip that assembles this beat invent both.
+    """
+    return [(frame(), SLEEP_FRAME_MS) for _ in range(3)]
+
+
 def _doze_edge(src: Path) -> list:
     """One imported dozing transition, its last frame held as the dwell.
 
