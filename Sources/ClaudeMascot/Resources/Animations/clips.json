@@ -326,7 +326,8 @@
       "fromPose": "sitting",
       "toPose": "sitting",
       "fidgetGroup": "working",
-      "weight": 0.25
+      "weight": 0.25,
+      "maxRepeats": 1
     },
     "work-idea": {
       "file": "work-idea.gif",

@@ -110,7 +110,10 @@ private func testClip(
     fidgetGroup: nil,
     weight: 1,
     fromPose: nil,
-    toPose: nil
+    toPose: nil,
+    maxPerPhase: nil,
+    maxRepeats: nil,
+    interruptible: false
   )
 }
 
@@ -137,7 +140,10 @@ private let defaultTestClips: [PanelState: Clip] = {
     fidgetGroup: nil,
     weight: 1,
     fromPose: .standing,
-    toPose: .offLeft
+    toPose: .offLeft,
+    maxPerPhase: nil,
+    maxRepeats: nil,
+    interruptible: false
   )
   return clips
 }()
@@ -159,7 +165,10 @@ private let waveOffClip = Clip(
   fidgetGroup: "away",
   weight: 1,
   fromPose: .standing,
-  toPose: .standing
+  toPose: .standing,
+  maxPerPhase: nil,
+  maxRepeats: nil,
+  interruptible: false
 )
 
 @MainActor

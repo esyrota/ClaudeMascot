@@ -1762,6 +1762,8 @@ CLIP_METADATA = {
         "toPose": "sitting",
         "fidgetGroup": "working",
         "weight": 0.25,
+        # Two sips with only typing in between reads as a stutter; restrict it.
+        "maxRepeats": 1,
     },
     "work-look": {
         "loops": False,
@@ -2007,9 +2009,12 @@ if __name__ == "__main__":
         else:
             clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
-            # Optional on a transition, and only the wander fidgets carry them:
-            # a group to scope fidget selection to, and a weight to pick within it.
-            for key in ("fidgetGroup", "weight"):
+            # Optional on a transition; each is carried only by the clips that
+            # need it: a group to scope fidget selection to, a weight to pick
+            # within it, and the three scheduling limits -- how often a clip may
+            # play per phase, how often consecutively, and whether a swap may cut
+            # into it mid-motion.
+            for key in ("fidgetGroup", "weight", "maxPerPhase", "maxRepeats", "interruptible"):
                 if key in CLIP_METADATA[name]:
                     clip_entry[key] = CLIP_METADATA[name][key]
 

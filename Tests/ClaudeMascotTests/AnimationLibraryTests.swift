@@ -78,7 +78,10 @@ final class AnimationLibraryTests: XCTestCase {
         fidgetGroup: nil,
         weight: 1,
         fromPose: nil,
-        toPose: nil
+        toPose: nil,
+        maxPerPhase: nil,
+        maxRepeats: nil,
+        interruptible: false
       )
       let data = try library.data(for: clip)
       XCTAssertGreaterThan(
@@ -99,7 +102,8 @@ final class AnimationLibraryTests: XCTestCase {
 
     let clip = Clip(
       id: "idle", file: "idle.gif", frameCount: 1, duration: 1, motion: 1, loops: true,
-      pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: nil, toPose: nil)
+      pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: nil, toPose: nil,
+      maxPerPhase: nil, maxRepeats: nil, interruptible: false)
 
     XCTAssertThrowsError(try library.data(for: clip)) { error in
       guard case AnimationLibraryError.clipNotFound("idle") = error else {

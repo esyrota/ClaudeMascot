@@ -27,7 +27,8 @@ private func loopClip(
 {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: duration, loops: true,
-    pose: pose, variantGroup: group, fidgetGroup: nil, weight: weight, fromPose: nil, toPose: nil)
+    pose: pose, variantGroup: group, fidgetGroup: nil, weight: weight, fromPose: nil, toPose: nil,
+    maxPerPhase: nil, maxRepeats: nil, interruptible: false)
 }
 
 /// A non-looping transition edge between two different poses.
@@ -38,7 +39,8 @@ private func edgeClip(
 {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: motion, loops: false,
-    pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: from, toPose: to)
+    pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: from, toPose: to,
+    maxPerPhase: nil, maxRepeats: nil, interruptible: false)
 }
 
 /// A non-looping self-edge at `pose` — the shape both `"<group>-enter"`
@@ -52,7 +54,7 @@ private func selfEdgeClip(
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: motion, loops: false,
     pose: nil, variantGroup: variantGroup, fidgetGroup: fidgetGroup, weight: 1,
-    fromPose: pose, toPose: pose)
+    fromPose: pose, toPose: pose, maxPerPhase: nil, maxRepeats: nil, interruptible: false)
 }
 
 private func manifest(_ clips: [Clip]) -> ClipManifest {

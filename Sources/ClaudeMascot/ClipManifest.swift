@@ -62,6 +62,9 @@ private struct ClipDTO: Decodable {
   let weight: Double?
   let fromPose: Pose?
   let toPose: Pose?
+  let maxPerPhase: Int?
+  let maxRepeats: Int?
+  let interruptible: Bool?
 
   func makeClip(id: String) -> Clip {
     Clip(
@@ -76,7 +79,10 @@ private struct ClipDTO: Decodable {
       fidgetGroup: fidgetGroup,
       weight: weight ?? 1.0,
       fromPose: fromPose,
-      toPose: toPose
+      toPose: toPose,
+      maxPerPhase: maxPerPhase,
+      maxRepeats: maxRepeats,
+      interruptible: interruptible ?? false
     )
   }
 }
