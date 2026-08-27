@@ -84,10 +84,10 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 **done** — two, and they celebrate in opposite idioms.
 
-|                                |                                       |
-| ------------------------------ | ------------------------------------- |
+|                                |                                         |
+| ------------------------------ | --------------------------------------- |
 | ![done](_animations/done.gif)  | ![done-flag](_animations/done-flag.gif) |
-| **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0  |
+| **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0    |
 
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
@@ -195,9 +195,9 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### dozing
 
-|                                       |                                                            |                                                            |
-| ------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif)             | ![doze-to-stand](_animations/doze-to-stand.gif)             |
+|                                       |                                                             |                                                              |
+| ------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
+| ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif)             | ![doze-to-stand](_animations/doze-to-stand.gif)              |
 | **sleeping** · 19f · 9.5s · w 1.0     | **stand-to-doze**<br>standing → dozing<br>5f · motion 1.32s | **doze-to-stand**<br>dozing → standing<br>14f · motion 4.06s |
 
 The mascot sleeps **on its feet**: same silhouette as every standing clip, arms slumped
@@ -316,7 +316,7 @@ wander fidgets use for `idle`, below. `work-look-down` belongs here, not with th
 |                                         |                                             |                                         |                                           |                                                   |
 | --------------------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
 | ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif) | ![work-look](_animations/work-look.gif) | ![work-think](_animations/work-think.gif) | ![work-look-down](_animations/work-look-down.gif) |
-| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 43f · 10.32s      | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
+| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 43f · 10.32s    | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
 
 `work-idea` lifts an eye, sparks, and runs a fast typing burst — the same imported frames
 `working` plays, just stepped through at a faster cadence. `work-coffee` brings a cup up,

@@ -37,9 +37,13 @@ final class Choreographer {
     manifest: ClipManifest,
     clock: @escaping () -> TimeInterval,
     rotationPeriod: TimeInterval = 20,
-    // 0.15 per rotation-period epoch is roughly one fidget every 7 loops --
-    // the sparser end of the "4-8 loops then an alt" the product wants.
-    fidgetChance: Double = 0.15
+    // 0.3 per rotation-period epoch is roughly one fidget onset a minute --
+    // twice the old 0.15, because the seated `working` hold read as monotonous
+    // at the sparser rate. Note a fired fidget holds the rest of its epoch (the
+    // same clip is re-picked until the epoch rolls, and an unchanged clip is
+    // never re-uploaded), so this is the share of held time that fidgets, not a
+    // count of discrete beats.
+    fidgetChance: Double = 0.3
   ) {
     self.manifest = manifest
     self.clock = clock

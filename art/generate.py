@@ -1746,7 +1746,8 @@ CLIP_METADATA = {
     # state. "working" keeps each of these to `sitting` alone. work-look is the
     # calmest of the four -- a held look, then back down -- so it carries the
     # highest weight; work-coffee is the most eventful (a prop enters and leaves),
-    # so it carries the lowest. All four stay well under fidget-stretch/fidget-look's
+    # and was the rarest at 0.15 -- rare enough never to be seen in practice, so it
+    # now sits level with its siblings. All four stay well under fidget-stretch/fidget-look's
     # implicit 1.0 default so a beat stays occasional rather than constant.
     "work-idea": {
         "loops": False,
@@ -1760,7 +1761,7 @@ CLIP_METADATA = {
         "fromPose": "sitting",
         "toPose": "sitting",
         "fidgetGroup": "working",
-        "weight": 0.15,
+        "weight": 0.25,
     },
     "work-look": {
         "loops": False,
@@ -1780,8 +1781,8 @@ CLIP_METADATA = {
         # Chunk 10: the fifth `sitting` fidget, imported rather than drawn -- see
         # work_look_down()'s own docstring. Same fidgetGroup as its four siblings
         # so selection stays confined to `sitting`; weight matches work-idea and
-        # work-think, a middling beat, neither the calmest (work-look) nor the
-        # most eventful (work-coffee).
+        # work-think, a middling beat, no longer the calmest (work-look still
+        # carries that) nor the most eventful (work-coffee).
         "loops": False,
         "fromPose": "sitting",
         "toPose": "sitting",
