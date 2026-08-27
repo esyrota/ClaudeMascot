@@ -244,7 +244,7 @@ and 140ms a frame) and keep their own.
 |                                       |
 | ------------------------------------- |
 | ![doze-dream](_animations/doze-dream.gif) |
-| **doze-dream**<br>dozing → dozing, non-looping, 35f · 15.62s (motion 13.12s)<br>`fidgetGroup: "sleeping"` · `maxPerPhase: 1` · `interruptible: true` |
+| **doze-dream**<br>dozing → dozing, non-looping, 34f · 15.62s (motion 13.12s)<br>`fidgetGroup: "sleeping"` · `maxPerPhase: 1` · `interruptible: true` |
 
 **`doze-dream` is a `dozing` self-edge with `fidgetGroup: "sleeping"`, `maxPerPhase: 1`, and
 `interruptible: true`.** The nine beats: he sleeps while bubbles drift, the largest bubble
@@ -543,8 +543,10 @@ stall.
    at last; then all three were retired for the single question-mark clip, because saying
    the right thing once beats saying the wrong thing three ways. `waiting` is back to one
    clip on purpose and this is not a gap — see the `standing` section above.
-2. **No fidgets at `dozing`.** `fidget-doze` was drawn against the retired floor blob and
-   went with it, so a doze fidget is a clean slot to fill.
+2. ~~**No fidgets at `dozing`**~~ — **closed.** `fidget-doze` was drawn against the retired
+   floor blob and went with it, leaving the slot empty; `doze-dream` fills it, and is the
+   first clip to need scheduling limits of its own rather than a rarity weight — see the
+   `dozing` section above and [[Menu Bar App]].
 3. ~~The second Z is a 2×2 dot~~ — **closed, and then moot.** `sleeping` drew two Zs at
    sizes 3 and 2; at size 2 the diagonal stroke had zero height, so the smaller one
    degenerated into a square. There are no Zs any more — see the bubbles in the `dozing`
