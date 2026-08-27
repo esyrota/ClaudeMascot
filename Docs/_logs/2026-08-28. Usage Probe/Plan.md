@@ -9,7 +9,8 @@
    the socket.
 2. A `UsageProbe` type that runs `claude -p "/usage" --output-format json`, parses the
    "Current session" line, and returns an `UsageSnapshot`.
-3. A staleness-gated refresh rule in `AppModel`, driven off the existing hook-event sink.
+3. A phase-aware, staleness-gated refresh rule in `AppModel`, driven off the existing
+   hook-event sink: 30s while `.working`/`.thinking`, 2 minutes otherwise.
 4. The specs rewritten to describe a third input and to correct
    [[Statusline Coverage]]'s wrong durable-fix premise.
 
@@ -40,8 +41,16 @@
   alone. It must never clear the rail, and it must never surface an error to the user —
   the probe is a background convenience, not something they asked for.
 - **The probe is serialized.** A single in-flight flag on `AppModel`; hook events arrive in
-  bursts and 600ms is long enough for several. Without it a burst spawns a pile of
-  redundant subprocesses.
+  bursts and 600ms is long enough for several. This matters more at the 30-second
+  threshold than at 2 minutes: `.working` is exactly the state that produces the densest
+  bursts of hook events, so without the flag the tight cadence would multiply subprocesses
+  rather than freshness.
+- **The threshold is a function, not a constant.** `stalenessThreshold(for: PanelState)`
+  returns 30s for `.working`/`.thinking` and 120s for everything else — one testable pure
+  function rather than a branch buried in the sink. Read it from `currentState`, which
+  `AppModel` already maintains (`AppModel.swift:262`), *after* the tracker has applied the
+  event, so the threshold reflects the state the event just produced rather than the
+  previous one.
 
 ## Integration seams
 
@@ -111,10 +120,14 @@ The `async` method: take a `claude` URL, run `-p "/usage" --output-format json` 
 **Verify:** incremental `swift build` (medium risk — `Process` + environment plumbing).
 
 ### Chunk 6 — Wire it into `AppModel`
-Extract `applyUsage(_:)` and route the existing `$lastUsage` sink through it. In the
-hook-event sink, after the existing handling, spawn a probe when `currentUsage` is nil or
-`receivedAt` is older than 2 minutes and none is in flight.
-**Verify:** incremental `swift build`; `swift test --filter AppModel` if such a suite exists.
+Extract `applyUsage(_:)` and route the existing `$lastUsage` sink through it. Add
+`stalenessThreshold(for:)` (30s for `.working`/`.thinking`, 120s otherwise). In the
+hook-event sink, after the existing handling and after `currentState` has been updated,
+spawn a probe when `currentUsage` is nil or `receivedAt` is older than the threshold for
+the current state, and none is in flight.
+**Verify:** incremental `swift build`; unit-test `stalenessThreshold(for:)` across all
+nine `PanelState` cases — it is a pure function and must be exhaustive, not just the two
+interesting cases.
 
 ### Chunk 7 — Final verification
 Run the expensive gates once against the finished tree: `swift-format format -ir` over

@@ -23,9 +23,16 @@ machine where these numbers exist.
 
 ## What was measured, and what it settles
 
-`claude -p "/usage" --output-format json` is **free**: `total_cost_usd: 0`,
-`num_turns: 0`, `duration_api_ms: 0`, zero input and output tokens. `/usage` resolves
-client-side and never reaches the model, so it cannot itself move the limit it reports.
+`claude -p "/usage" --output-format json` costs **nothing against the rate limit**:
+`total_cost_usd: 0`, `num_turns: 0`, `duration_api_ms: 0`, zero input and output tokens.
+`/usage` resolves client-side and never reaches the model, so it cannot itself move the
+number it reports — the one thing that would make this idea self-defeating.
+
+It is not *costless*, and the distinction matters at a 30-second cadence: each run is a
+~600ms process spawn and leaves ~3.3KB of transcript plus a `session-env` directory under
+`~/.claude`. At the 2-minute threshold that is ~30 probes an hour; at 30 seconds while
+working it is ~120. Accepted (see below), but accepted with the higher number in view.
+
 It returns in ~600ms and carries what the rail needs:
 
 ```
@@ -50,8 +57,17 @@ the same instant. Two unrelated sources agreeing is the evidence the parse is ri
   the snapshot fresh, it never goes stale, and the probe never spawns. The wrapper's JSON
   stays the precise source; the probe is the universal fallback.
 - **The trigger is hook events, not a timer.** Hook events already arrive in every client.
-  On each one, if the snapshot is older than **2 minutes**, spawn a probe. Zero cost when
-  idle, self-throttling to actual activity, and no timer to own.
+  On each one, if the snapshot is older than the current staleness threshold, spawn a
+  probe. Zero cost when idle, self-throttling to actual activity, and no timer to own.
+- **The threshold is phase-aware: 30s while burning, 2 minutes otherwise.** Usage moves
+  fast only while the model is actually running, so that is the only time a tight refresh
+  buys anything. "Burning" is `currentState == .working || currentState == .thinking` —
+  both are active model use and both move the number; every other state (`idle`,
+  `waiting`, `sleeping`, `done`, ...) gets the 2-minute threshold.
+- **The staleness gate is what keeps the probe off the fast path.** It is checked against
+  `currentUsage.receivedAt` regardless of which source last wrote it, so a wrapper line
+  arriving within the window suppresses the probe exactly as a probe would. Where a
+  terminal status line is being drawn, the probe should essentially never spawn.
 - **The probe must not feed itself.** `claude -p` starts a real session, so it fires
   `SessionStart` and `SessionEnd` through `relay.sh` into our own socket — measured, not
   theorised. Left alone this is a feedback loop, and worse: `SessionTracker` would read
@@ -77,7 +93,13 @@ the same instant. Two unrelated sources agreeing is the evidence the parse is ri
 - **Session litter is accepted.** Each probe leaves ~3.3KB of transcript and a
   `session-env` directory under `~/.claude` — the same litter any `claude -p` leaves, and
   263 such directories already exist from normal use. Documented, not cleaned up: the app
-  does not delete files in a directory it does not own.
+  does not delete files in a directory it does not own. At the 30-second working cadence
+  this is ~120 probes an hour rather than ~30; a long working day is on the order of a
+  thousand directories, so revisit this if `~/.claude` becomes unwieldy.
+- **A tighter cadence does not mean a busier panel.** The overlay re-uploads only on a
+  changed *quantised* key, and a 32-pixel rail gives each pixel ~3.1% of the window. Most
+  30-second probes will return a snapshot that renders identically and change nothing.
+  The gain is latency at a bucket crossing, not a smoother bar.
 
 ## Out of scope
 
