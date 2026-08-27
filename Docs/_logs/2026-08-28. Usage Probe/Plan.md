@@ -150,3 +150,51 @@ That last check is the whole point of chunk 2 and cannot be tested any other way
 The weekly window; retiring the statusline wrapper; any UI; cleaning up the `~/.claude`
 session litter each probe leaves. All four are argued in
 [[_logs/2026-08-28. Usage Probe/Task]].
+
+## Run state — paused 2026-08-28 ~01:50 EEST, resume with `/plan-runner`
+
+Branch `feature/usage-probe`, **nothing pushed**, working tree clean. Safe to resume at a
+chunk boundary; no chunk was interrupted mid-flight.
+
+| Chunk | Status | Commit | Cost |
+|---|---|---|---|
+| 1 — Specs first | ✅ done | `e2cfff3` | 73k tokens, 11 tools, ~50s (est. 45k — **1.6× over**) |
+| 2 — `relay.sh` env guard | pending | — | est. 18k, Haiku |
+| 3 — `UsageProbe.parse`, pure | pending | — | est. 55k, Sonnet, high risk |
+| 4 — Parsing tests | pending | — | est. 30k, Haiku |
+| 5 — Subprocess + `AppModel` wiring | pending | — | est. 70k, Sonnet, high risk |
+| 6 — Final verification + install | pending | — | est. 35k, Haiku |
+
+Also committed: the six chunk briefs (`f944038`), and — from the session that produced
+this plan — the statusline wrapper sentinel fix (`2cbbe27`), which is a real bug fix
+riding on the same branch and belongs in the same PR.
+
+### Why it paused
+
+Budget, not a failure. The 5h window went 39% → 49% across chunk 1 alone. Projecting
+chunk 1's 1.6× overrun across the remaining five put the run at ~90–99%, with chunk 6 —
+the reinstall and the only real test of chunk 2's guard — most at risk of being cut off.
+
+**Eugene's decision was to stop and resume the next day**, not to trim scope. Resume with
+the full six chunks; chunks 2–6 are unchanged and their briefs are written.
+
+### Read this before dispatching chunk 2
+
+- **Take a budget reading first and after every chunk.** `claude -p "/usage"
+  --output-format json` is free (zero tokens, no model call) — this task is what
+  established that, and it is now baked into the `/plan-runner` skill. Do not fall back to
+  a wall-clock proxy.
+- **Re-project from actuals, not estimates.** Chunk 1 ran 1.6× its estimate; assume the
+  others will too until proven otherwise.
+- **Subagent tokens are not the whole cost.** A long orchestrator session re-sends a large
+  context every turn, and the two cannot be cleanly separated. Say so when reporting.
+- **This repo tracks `Docs/`** (`git ls-files Docs` is non-empty), unlike the project the
+  `/plan-runner` skill was written for. Spec changes are committed alongside code — do not
+  apply the skill's "never commit Docs/" rule here.
+- **This is a macOS SwiftPM package.** Verify with `swift build` / `swift test`. There is
+  no simulator, no `xcodebuild -quiet`, no iOS destination — ignore every such instruction in the
+  skill. "Device testing" here means `./make-app.sh`, replacing
+  `/Applications/ClaudeMascot.app`, relaunching, and watching the panel.
+- **Chunk 6 is the only real test of chunk 2.** The relay guard cannot be verified from
+  the Bash tool — it needs the installed app and a live probe. Do not let it be dropped as
+  "just validation".
