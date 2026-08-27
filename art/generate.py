@@ -85,6 +85,10 @@ EYE = (0, 0, 0)
 BG = (0, 0, 0)
 # Props are kept at full value for the same reason.
 PROP = (255, 255, 255)
+# The dozing-dream Pac-Man. B = 0, same rule as MASCOT: any real amount of blue on
+# this panel photographs as pink or magenta, and yellow satisfies B = 0 on its own --
+# there is nothing here to "fix" by adding blue back in for a truer yellow.
+PACMAN = (255, 200, 0)
 CONFETTI = [
     (255, 209, 102),
     (120, 255, 160),
@@ -835,6 +839,98 @@ def sink():
     for oy in (0, 4, 9, 14, 19):
         out.append((mascot_at(0, oy, by=HOME_Y), 140))
     out.append((frame(), APPEAR_TAIL_MS))  # below the panel -- the offBottom anchor
+    return out
+
+
+# --------------------------------------------------------------------------
+# The dozing dream's chase beats -- frame producers only. `Docs/_logs/2026-08-27.
+# Dozing Dream/Task.md` assembles walk-in-left, a look back, a startle, walk-off-
+# right and this Pac-Man into one clip; that assembly, and its STATES/CLIPS entry,
+# belong to the chunk that does the splicing, not to these three functions.
+# --------------------------------------------------------------------------
+
+def _look_back_frames():
+    """
+    He looks back over his left shoulder before the startle.
+
+    This mascot is drawn front-on in every clip and there is no away-facing pose to
+    turn to -- the turned-head rule in the Animation Catalogue is explicit about it,
+    and `work-look`/`work-look-down` solve the same problem by moving the eyes, not
+    the body. Here the body itself is meant to read as half-turned, and `dancing()`
+    already has the art for exactly that: appear.gif's second half shades one side
+    of the torso to imply a weight shift, which is what a turned shoulder looks like
+    at this scale, drawn front-on. `APPEAR_RISE` and the frame after it (15, 16) are
+    the first step into that shade and the deeper hold, per the comment above
+    `APPEAR_RISE` itself; playing them, holding, then walking back through 15 turns
+    `dancing()`'s continuous sway into a single held glance instead. `dancing()`'s
+    fuller loop is not reused here because it cycles through the shade twice before
+    returning to the anchor, which reads as swaying in place, not looking back once.
+    """
+    anchor = _standing_anchor()
+    turn_in, turn_held = (appear_frames()[APPEAR_RISE][0], appear_frames()[APPEAR_RISE + 1][0])
+    return [
+        (anchor, 200),
+        (turn_in, 160),
+        (turn_held, 500),   # the look, held
+        (turn_in, 160),
+        (anchor, 200),
+    ]
+
+
+def _startle_frames():
+    """
+    He startles in place -- `starting`'s own frames 4-5, with the rise taken back out.
+
+    `appear_frames()`'s own comment splits the entrance into the rise (0-14) and the
+    turn (15 on); frames 4-5 sit inside the rise, just past the crouch and well
+    before the landing, which is exactly why they carry a body hanging in mid-air --
+    that vertical burst is `starting`'s whole point and precisely wrong for a shock
+    that has to keep both feet down. Each source frame is measured against its own
+    lowest drawn row with `getbbox()` and re-pasted with `_paste_over()` far enough
+    down that row lands on `_standing_anchor()`'s own floor row instead of wherever
+    appear.gif happened to leave it airborne -- the re-grounding `mascot_at()`'s own
+    docstring describes for pasting past a drawn call's safe bounds, aimed at a
+    y-offset instead of the walks' x one.
+    """
+    floor_row = _standing_anchor().getbbox()[3]
+    out = []
+    for index in (4, 5):
+        sprite, duration = appear_frames()[index]
+        oy = floor_row - sprite.getbbox()[3]
+        out.append((_paste_over(frame(), sprite, oy=oy), duration))
+    return out
+
+
+def _pacman_frames():
+    """
+    A big yellow Pac-Man hunts him left edge to right edge, mouth chomping.
+
+    Nothing else in this file draws a circle -- every other shape is `rect()`
+    rectangles -- but Pac-Man IS a circle with a wedge missing, and `ImageDraw`
+    already draws exactly that shape in one call: `pieslice()` cuts the mouth out of
+    the body in the same stroke that fills it, so there is no separate "paint the
+    mouth in BG" step to get wrong, and `ellipse()` closes it for the bite between
+    chomps. Radius 9 -- an 18px circle, bigger across than the mascot's own 24px
+    total width once you count how much of that is empty leg-gap -- is sized to read
+    as the thing chasing him, not a prop scaled to his head; a Pac-Man the size of an
+    eye would be a joke about pupils, not about being hunted. It is drawn on its own
+    blank frames rather than composited over the mascot, because by this beat
+    `walk-off-right` has already carried him off the panel -- there is nothing left
+    to composite over.
+    """
+    r = 9
+    cy = 31 - r  # floor-aligned, same row the mascot's own feet rest on
+    xs = (-11, -3, 5, 13, 21, 29, 37, 45)  # fully off-left through fully off-right
+    out = []
+    for i, cx in enumerate(xs):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        box = [cx - r, cy - r, cx + r, cy + r]
+        if i % 2 == 0:
+            d.pieslice(box, 35, 325, fill=PACMAN)  # mouth open, facing the way he's moving
+        else:
+            d.ellipse(box, fill=PACMAN)            # mouth shut, between chomps
+        out.append((im, 140))
     return out
 
 
