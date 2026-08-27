@@ -241,9 +241,9 @@ timing is overridden wholesale in `art/generate.py`: the bubbles are the only th
 so their cadence is the clip's cadence. The two edges are authored at deliberate rates (330ms
 and 140ms a frame) and keep their own.
 
-|                                       |
-| ------------------------------------- |
-| ![doze-dream](_animations/doze-dream.gif) |
+|                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![doze-dream](_animations/doze-dream.gif)                                                                                                            |
 | **doze-dream**<br>dozing → dozing, non-looping, 34f · 15.62s (motion 13.12s)<br>`fidgetGroup: "sleeping"` · `maxPerPhase: 1` · `interruptible: true` |
 
 **`doze-dream` is a `dozing` self-edge with `fidgetGroup: "sleeping"`, `maxPerPhase: 1`, and
