@@ -1,6 +1,6 @@
 # Sleep Exit — Implementation Plan
 
-**Source:** [[Task]] (this folder)
+**Source:** [[_logs/2026-08-24. Sleep Exit/Task]] (this folder)
 **Touches:** [[Menu Bar App]], [[Animation Catalogue]], [[Art Pipeline]]
 
 ## Scope

@@ -1,6 +1,6 @@
 # Settings Window Cleanup — Implementation Plan
 
-**Source:** [[Task]] (this folder)
+**Source:** [[_logs/2026-08-16. Settings Window Cleanup/Task]] (this folder)
 **Touches:** [[Menu Bar App]], [[Home]]
 
 ## Scope

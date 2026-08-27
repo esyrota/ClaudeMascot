@@ -1,6 +1,6 @@
 # Waiting Never Fires — what it turned out to be
 
-Run date: 2026-08-19. Task: [Task.md](Task.md).
+Run date: 2026-08-19. Task: [Task.md](_logs/2026-08-19.%20Waiting%20Never%20Fires/Task.md).
 
 ## 1. Does `Notification` fire at all?
 

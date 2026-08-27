@@ -1,6 +1,6 @@
 # Dozing Dream — Implementation Plan
 
-**Source:** [[Task]]
+**Source:** [[_logs/2026-08-27. Dozing Dream/Task]]
 **Touches:** [[Menu Bar App]], [[Animation Catalogue]], [[Panel Quirks]], [[Art Pipeline]]
 
 ## Scope

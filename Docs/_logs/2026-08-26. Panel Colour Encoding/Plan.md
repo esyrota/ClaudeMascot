@@ -1,6 +1,6 @@
 # Panel Colour Encoding — Implementation Plan
 
-**Source:** [[Task]]
+**Source:** [[_logs/2026-08-26. Panel Colour Encoding/Task]]
 **Touches:** [[Art Pipeline]], [[Animation Catalogue]], [[Panel Quirks]], [[BLE Protocol]]
 
 ## Scope

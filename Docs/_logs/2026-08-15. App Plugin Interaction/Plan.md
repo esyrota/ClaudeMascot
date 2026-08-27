@@ -1,6 +1,6 @@
 # App Plugin Interaction — Implementation Plan
 
-**Source:** [[Task]]
+**Source:** [[_logs/2026-08-15. App Plugin Interaction/Task]]
 **Touches:** [[Claude Code Plugin]], [[Menu Bar App]], [[macOS Bluetooth TCC]]
 
 ## Scope

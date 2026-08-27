@@ -1,6 +1,6 @@
 # Working State Rework — Implementation Plan
 
-**Source:** [[Task]] (this folder)
+**Source:** [[_logs/2026-08-17. Working State Rework/Task]] (this folder)
 **Touches:** [[Animation Catalogue]], [[Menu Bar App]], [[Art Pipeline]], [[Panel Quirks]]
 
 ## Scope

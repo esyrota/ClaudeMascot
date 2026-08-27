@@ -1,6 +1,6 @@
 # Stateful Mascot Choreography — Implementation Plan
 
-**Source:** [[Task]] (this folder)
+**Source:** [[_logs/2026-08-16. Stateful Mascot Choreography/Task]] (this folder)
 **Touches:** [[Menu Bar App]], [[Art Pipeline]], [[Panel Quirks]]
 
 ## Scope
