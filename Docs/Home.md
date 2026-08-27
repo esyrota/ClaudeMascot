@@ -44,6 +44,7 @@ Each one cost a wrong diagnosis to find.
 - [[Panel Quirks]] — colour and palette behaviour that is not documented anywhere
 - [[Library Quirks]] — sharp edges in `markusressel/idotmatrix-api-client`
 - [[Hook Relay Quirks]] — shell and socket traps that produce working-looking bugs
+- [[Statusline Coverage]] — why the usage rail can be absent with every part of it working
 
 ## Current state
 
@@ -52,9 +53,9 @@ Each one cost a wrong diagnosis to find.
 | Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer, single-instance guard |
 | Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
-| Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling |
+| Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling, per-phase play limits (`PhaseLedger.swift`) |
 | Event log | `EventLog.swift` | **shipped** — always-on input + decision JSONL under Application Support |
-| Art generator | `art/generate.py` | working, **39 clips** — 12 loops, 27 one-shots. See [[Animation Catalogue]] |
+| Art generator | `art/generate.py` | working, **40 clips** — 12 loops, 28 one-shots. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Sprite-sheet importer | `art/sheet_import.py` | standalone — nothing imports a sheet any more; kept for a future one |
@@ -66,7 +67,7 @@ Each one cost a wrong diagnosis to find.
 | Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
 | Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
 | Status overlay | `Overlay.swift` + `UsageRail.swift` | **shipped** — a layer behind the mascot; row 0 carries the 5-hour usage rail |
-| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 39 clips pixel-exact |
+| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 40 clips pixel-exact |
 | Compositor | `Compositor.swift` | **shipped** — overlay behind, mascot in front, mandatory 1px knockout halo. **No overlay = byte-identical passthrough** |
 | Usage input | `plugin/hooks/statusline-wrapper.sh` + `UsageSnapshot.swift` | **shipped** — wraps the user's own statusline, tees two fields to the socket |
 
@@ -93,6 +94,11 @@ plugin on first launch, and the repo is no longer a marketplace.
   assumption two Run Reports had already flagged as unverified. What the panel taught: a 1px
   unlit marker is legible at 2.2–6.3× contrast, every white photographs blue, and **dim and
   neutral are mutually exclusive** — see [[Panel Quirks]].
+- `_logs/2026-08-27. Dozing Dream/` — **shipped**: `doze-dream`, the panel's first set
+  piece, and the three scheduling fields it needed (`maxPerPhase`, `maxRepeats`,
+  `interruptible`) with a phase ledger owned by `PanelController`. Its [[Analysis]] records
+  two defects that every green Run Report and all 190 tests were blind to, both found only
+  by reading the produced frames back.
 - `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
   against an on-screen reference in the same frame, and the colour rules rewritten around
   it. See its [[Findings]] for the evidence, the method, and the alignment error that
@@ -116,9 +122,14 @@ Written up in `_tasks/`, in the order they are worth doing:
   pipeline change: `generate.py` must author through `panel_encode()`, which moves every
   clip's bytes and needs `export_golden.py` to follow.
 
-Still open, and small enough to live in [[Animation Catalogue]] → Known gaps rather than
-their own task: a `dozing` fidget. (The Z-shaped sleep marks are gone — they are bubbles
-now, at the user's request; see [[Animation Catalogue]] → `dozing`.)
+(The Z-shaped sleep marks are gone — they are bubbles now, at the user's request; see
+[[Animation Catalogue]] → `dozing`. The `dozing` fidget that sat here as the last small
+open item is now `doze-dream`.)
+
+- **The usage rail is only as present as the user's terminal sessions are.** Its one data
+  source is the statusline wrapper, which never runs in a client that draws no status line,
+  while hook events arrive from all of them. Deriving usage from something that reaches the
+  socket everywhere is a change of source, not architecture — see [[Statusline Coverage]].
 
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.

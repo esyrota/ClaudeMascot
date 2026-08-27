@@ -84,10 +84,10 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 **done** — two, and they celebrate in opposite idioms.
 
-|                                |                                       |
-| ------------------------------ | ------------------------------------- |
+|                                |                                         |
+| ------------------------------ | --------------------------------------- |
 | ![done](_animations/done.gif)  | ![done-flag](_animations/done-flag.gif) |
-| **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0  |
+| **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0    |
 
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
@@ -195,9 +195,9 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### dozing
 
-|                                       |                                                            |                                                            |
-| ------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
-| ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif)             | ![doze-to-stand](_animations/doze-to-stand.gif)             |
+|                                       |                                                             |                                                              |
+| ------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
+| ![sleeping](_animations/sleeping.gif) | ![stand-to-doze](_animations/stand-to-doze.gif)             | ![doze-to-stand](_animations/doze-to-stand.gif)              |
 | **sleeping** · 19f · 9.5s · w 1.0     | **stand-to-doze**<br>standing → dozing<br>5f · motion 1.32s | **doze-to-stand**<br>dozing → standing<br>14f · motion 4.06s |
 
 The mascot sleeps **on its feet**: same silhouette as every standing clip, arms slumped
@@ -240,6 +240,18 @@ is authored at a flat 1000ms a frame — the drawing tool's default, not an inte
 timing is overridden wholesale in `art/generate.py`: the bubbles are the only thing moving,
 so their cadence is the clip's cadence. The two edges are authored at deliberate rates (330ms
 and 140ms a frame) and keep their own.
+
+|                                       |
+| ------------------------------------- |
+| ![doze-dream](_animations/doze-dream.gif) |
+| **doze-dream**<br>dozing → dozing, non-looping, 34f · 15.62s (motion 13.12s)<br>`fidgetGroup: "sleeping"` · `maxPerPhase: 1` · `interruptible: true` |
+
+**`doze-dream` is a `dozing` self-edge with `fidgetGroup: "sleeping"`, `maxPerPhase: 1`, and
+`interruptible: true`.** The nine beats: he sleeps while bubbles drift, the largest bubble
+grows instead of popping — a hollow circle, 1px white stroke around a black fill, swallowing
+the mascot and then passing off the panel entirely, which is what leaves the screen dark — he walks in from the left and looks back the way he came — left, toward the corner the Pac-Man will enter from, since a glance the other way makes the startle a reaction to nothing, he startles without
+rising using frames 4–5 from `starting`, walks off right, a yellow Pac-Man chases left to
+right, and the screen goes dark as he sleeps again.
 
 ### sitting
 
@@ -316,7 +328,7 @@ wander fidgets use for `idle`, below. `work-look-down` belongs here, not with th
 |                                         |                                             |                                         |                                           |                                                   |
 | --------------------------------------- | ------------------------------------------- | --------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
 | ![work-idea](_animations/work-idea.gif) | ![work-coffee](_animations/work-coffee.gif) | ![work-look](_animations/work-look.gif) | ![work-think](_animations/work-think.gif) | ![work-look-down](_animations/work-look-down.gif) |
-| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 43f · 10.32s      | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
+| **work-idea**<br>sitting, 7f · 1.31s    | **work-coffee**<br>sitting, 43f · 10.32s    | **work-look**<br>sitting, 15f · 1.35s   | **work-think**<br>sitting, 13f · 4.88s    | **work-look-down**<br>sitting, 15f · 1.35s        |
 
 `work-idea` lifts an eye, sparks, and runs a fast typing burst — the same imported frames
 `working` plays, just stepped through at a faster cadence. `work-coffee` brings a cup up,
@@ -531,8 +543,10 @@ stall.
    at last; then all three were retired for the single question-mark clip, because saying
    the right thing once beats saying the wrong thing three ways. `waiting` is back to one
    clip on purpose and this is not a gap — see the `standing` section above.
-2. **No fidgets at `dozing`.** `fidget-doze` was drawn against the retired floor blob and
-   went with it, so a doze fidget is a clean slot to fill.
+2. ~~**No fidgets at `dozing`**~~ — **closed.** `fidget-doze` was drawn against the retired
+   floor blob and went with it, leaving the slot empty; `doze-dream` fills it, and is the
+   first clip to need scheduling limits of its own rather than a rarity weight — see the
+   `dozing` section above and [[Menu Bar App]].
 3. ~~The second Z is a 2×2 dot~~ — **closed, and then moot.** `sleeping` drew two Zs at
    sizes 3 and 2; at size 2 the diagonal stroke had zero height, so the smaller one
    degenerated into a square. There are no Zs any more — see the bubbles in the `dozing`

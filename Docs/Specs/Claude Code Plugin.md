@@ -139,6 +139,14 @@ the terminal's status line reads exactly as it would without the wrapper install
 connection, a payload that fails to parse — because a broken wrapper must never blank
 the user's status line.
 
+**The wrapper only runs where a status line is actually rendered**, which is not
+everywhere the hooks run. The nine hook events above fire on tool use in any Claude Code
+client; the statusline command fires only when a client draws a terminal status line. In a
+client that draws none, no usage payload is ever produced, the stored snapshot ages out,
+and the rail correctly goes dark — see [[Statusline Coverage]] for the diagnosis this cost
+and how to tell it apart from a broken relay. The rail is therefore only as present as the
+user's terminal sessions are.
+
 It is installed and removed independently of the plugin above: the first-run flow offers
 it as its own, separately declinable step alongside the plugin offer (see
 [[Menu Bar App]]), and it can be installed or uninstalled from Settings without

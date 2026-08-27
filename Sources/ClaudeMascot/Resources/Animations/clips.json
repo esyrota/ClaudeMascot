@@ -40,6 +40,18 @@
       "variantGroup": "done",
       "weight": 1.0
     },
+    "doze-dream": {
+      "file": "doze-dream.gif",
+      "frameCount": 34,
+      "durationMs": 15620,
+      "motionMs": 13120,
+      "loops": false,
+      "fromPose": "dozing",
+      "toPose": "dozing",
+      "fidgetGroup": "sleeping",
+      "maxPerPhase": 1,
+      "interruptible": true
+    },
     "doze-to-stand": {
       "file": "doze-to-stand.gif",
       "frameCount": 14,
@@ -326,7 +338,8 @@
       "fromPose": "sitting",
       "toPose": "sitting",
       "fidgetGroup": "working",
-      "weight": 0.15
+      "weight": 0.25,
+      "maxRepeats": 1
     },
     "work-idea": {
       "file": "work-idea.gif",

@@ -95,8 +95,11 @@ final class PanelController: ObservableObject {
   /// `Choreographer` walks a pose graph behind this closure without
   /// touching a line here. Called speculatively on every `tick()`, so it
   /// must be side-effect-free: the second argument is `displayed` at the
-  /// moment of the call, not a state the resolver should mutate or remember.
-  private let resolve: (PanelState, Clip?) -> Clip?
+  /// moment of the call, and the third is `ledger`, at the moment of the
+  /// call — neither is a value the resolver should mutate or remember. The
+  /// resolver only ever reads the ledger; this machine is what records into
+  /// it, and only in `attemptUpload`'s success branch.
+  private let resolve: (PanelState, Clip?, PhaseLedger) -> Clip?
   /// Looks a clip up by manifest id, independent of `PanelState`. `depart`
   /// is the only caller: `wave-off` is not something any `PanelState` ever
   /// resolves to (there is no `.waving`), so reaching it needs a seam of its
@@ -148,6 +151,15 @@ final class PanelController: ObservableObject {
   /// off and set together on a successful upload.
   private var clipStartedAt: TimeInterval?
 
+  /// What has already played during the current phase, read by `resolve`
+  /// and advanced by this machine alone, always in step with `displayed`:
+  /// `enterPhase` before each resolve, `record` on each successful upload —
+  /// the gated path in `attemptUpload`, the ungated one in `attemptWake`.
+  /// `depart`'s `wave-off` is the deliberate exception: no `PanelState`
+  /// resolves to it, so it belongs to no phase. See `PhaseLedger` and
+  /// `Choreographer`'s doc comment for the contract this keeps.
+  private var ledger = PhaseLedger()
+
   /// The overlay key that was on the panel the last time `displayed` was
   /// uploaded. Part of the same invariant as `displayed` and
   /// `clipStartedAt` — now a triple, not a pair: all three are `nil`
@@ -178,7 +190,7 @@ final class PanelController: ObservableObject {
 
   init(
     panel: any PanelDriving,
-    resolve: @escaping (PanelState, Clip?) -> Clip?,
+    resolve: @escaping (PanelState, Clip?, PhaseLedger) -> Clip?,
     clipByID: @escaping (String) -> Clip? = { _ in nil },
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
@@ -357,7 +369,12 @@ final class PanelController: ObservableObject {
   /// the ordinary path and the departure, so walking off the panel obeys the
   /// same "never interrupt mid-animation" rule as everything else.
   private func driveTowards(_ targetState: PanelState, now: TimeInterval) async {
-    guard let targetClip = resolve(targetState, displayed) else {
+    // The phase key duplicated: `Choreographer.clip(for:)` derives the same
+    // group from this same `targetState` (`let group = target.rawValue`), so
+    // the two agree by construction — this is the one place that has to stay
+    // in step with it.
+    ledger.enterPhase(targetState.rawValue)
+    guard let targetClip = resolve(targetState, displayed, ledger) else {
       if targetState == .away {
         // No route off the panel from where the mascot stands. Waiting out
         // the departure deadline would leave it lit and motionless for no
@@ -476,6 +493,11 @@ final class PanelController: ObservableObject {
     -> TimeInterval
   {
     guard clip.loops else {
+      // An interruptible clip has no seam worth waiting for: making the user
+      // watch out a set piece before the mascot reacts costs more than the cut
+      // does. `driveTowards` short-circuits a same-id swap before reaching
+      // here, so this cannot make a clip interrupt itself.
+      if clip.interruptible { return now }
       // Non-looping (transition) clips hand off at `motion`, not `duration`.
       // A transition clip ends on a long dwell frame so the panel has
       // something to loop while it waits to be told what's next; waiting out
@@ -544,10 +566,16 @@ final class PanelController: ObservableObject {
       // failed wake retries from the beginning rather than burning the hold.
       beginAppearing(now: now)
       let targetState = currentTarget(now: now)
+      // Same phase bookkeeping the gated path does, for the same reason: the
+      // wake resolves a real state to a real clip, so it is a play of that
+      // phase like any other. Waking into a group the ledger has never seen
+      // must start that phase, or the first clip off a dark panel would be
+      // filtered against a stale one.
+      ledger.enterPhase(targetState.rawValue)
       // `displayed` is `nil` here (a dark panel shows nothing) — passed
       // through anyway so the resolver sees the same "nothing on screen"
       // signal it would from any other call.
-      guard let targetClip = resolve(targetState, displayed) else {
+      guard let targetClip = resolve(targetState, displayed, ledger) else {
         throw ClipResolutionError.unresolved(targetState)
       }
       // Unconditional, like every upload out of "nothing showing": `displayed`
@@ -556,6 +584,11 @@ final class PanelController: ObservableObject {
       try await panel.upload(targetClip)
       isPanelOff = false
       displayed = targetClip
+      // `displayed` and the ledger advance together, here as in
+      // `attemptUpload`. This path uploads inline rather than through it, so
+      // it carries its own `record` — without it a capped clip resolved by a
+      // wake would never be counted and could play again immediately.
+      ledger.record(targetClip)
       clipStartedAt = now
       displayedOverlayKey = overlayKey()
       nextRetryAt = nil
@@ -591,6 +624,10 @@ final class PanelController: ObservableObject {
     do {
       try await panel.upload(target)
       displayed = target
+      // The ledger's one write site: recorded only once the panel actually
+      // shows `target`, never speculatively — see `Choreographer`'s doc
+      // comment for why a call that uploads nothing must not advance it.
+      ledger.record(target)
       clipStartedAt = clock()
       displayedOverlayKey = overlayKey
       nextRetryAt = nil

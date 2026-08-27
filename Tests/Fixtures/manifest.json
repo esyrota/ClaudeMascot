@@ -81,6 +81,27 @@
       18
     ]
   },
+  "doze-dream": {
+    "gif_bytes": 5762,
+    "crc32": 1252233086,
+    "outer_chunks": 2,
+    "ble_packets": 13,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      509,
+      509,
+      509,
+      155
+    ]
+  },
   "doze-to-stand": {
     "gif_bytes": 2709,
     "crc32": 2724286831,

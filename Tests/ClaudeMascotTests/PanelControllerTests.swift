@@ -94,7 +94,8 @@ private final class MockPanel: PanelDriving {
 /// not about clip boundary scheduling.
 @MainActor
 private func testClip(
-  _ state: PanelState, loops: Bool = true, duration: TimeInterval = 1, motion: TimeInterval? = nil
+  _ state: PanelState, loops: Bool = true, duration: TimeInterval = 1, motion: TimeInterval? = nil,
+  interruptible: Bool = false
 )
   -> Clip
 {
@@ -110,7 +111,10 @@ private func testClip(
     fidgetGroup: nil,
     weight: 1,
     fromPose: nil,
-    toPose: nil
+    toPose: nil,
+    maxPerPhase: nil,
+    maxRepeats: nil,
+    interruptible: interruptible
   )
 }
 
@@ -137,7 +141,10 @@ private let defaultTestClips: [PanelState: Clip] = {
     fidgetGroup: nil,
     weight: 1,
     fromPose: .standing,
-    toPose: .offLeft
+    toPose: .offLeft,
+    maxPerPhase: nil,
+    maxRepeats: nil,
+    interruptible: false
   )
   return clips
 }()
@@ -159,7 +166,10 @@ private let waveOffClip = Clip(
   fidgetGroup: "away",
   weight: 1,
   fromPose: .standing,
-  toPose: .standing
+  toPose: .standing,
+  maxPerPhase: nil,
+  maxRepeats: nil,
+  interruptible: false
 )
 
 @MainActor
@@ -169,7 +179,9 @@ private func makeController(
   clock: FakeClock,
   clipByID: @escaping (String) -> Clip? = { _ in nil },
   sleeper: @escaping (TimeInterval) async -> Void = { _ in },
-  resolve: @escaping (PanelState, Clip?) -> Clip? = { state, _ in defaultTestClips[state] },
+  resolve: @escaping (PanelState, Clip?, PhaseLedger) -> Clip? = { state, _, _ in
+    defaultTestClips[state]
+  },
   overlayKey: @escaping () -> Int? = { nil }
 ) -> PanelController {
   PanelController(
@@ -265,7 +277,7 @@ func departureIsAbandonedIfTheMascotCannotLeave() async {
   // panel must still go dark rather than stay lit forever waiting to leave.
   let controller = makeController(
     panel: panel, clock: clock,
-    resolve: { state, _ in state == .away ? nil : defaultTestClips[state] })
+    resolve: { state, _, _ in state == .away ? nil : defaultTestClips[state] })
 
   await controller.tick()
   clock.advance(600)
@@ -598,7 +610,7 @@ func nonLoopingClipHandsOffAtMotionNotDuration() async {
   let transition = testClip(.sleeping, loops: false, duration: 10, motion: 3)
   var clips = defaultTestClips
   clips[.sleeping] = transition
-  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
 
   controller.handle(.sleeping)
   await controller.tick()  // nothing showing yet: uploads immediately
@@ -613,6 +625,72 @@ func nonLoopingClipHandsOffAtMotionNotDuration() async {
   await controller.tick()
   // Hands off at motion, not duration.
   #expect(controller.displayed?.id == PanelState.working.rawValue)
+}
+
+@Test @MainActor
+func interruptibleNonLoopingClipSwapsImmediately() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  // Shaped like `nonLoopingClipHandsOffAtMotionNotDuration`, but marked
+  // interruptible: the long dwell after `motion` is not worth making the
+  // user wait through once the target has already changed.
+  let transition = testClip(.sleeping, loops: false, duration: 10, motion: 3, interruptible: true)
+  var clips = defaultTestClips
+  clips[.sleeping] = transition
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
+
+  controller.handle(.sleeping)
+  await controller.tick()  // nothing showing yet: uploads immediately
+  #expect(controller.displayed?.id == PanelState.sleeping.rawValue)
+
+  controller.handle(.working)
+  clock.advance(0.5)  // well short of `motion` (3), let alone `duration` (10)
+  await controller.tick()
+  // Interruptible: the swap does not wait for a seam that costs more to
+  // watch out than the cut is worth.
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+}
+
+@Test @MainActor
+func nonInterruptibleNonLoopingClipStillDefersToMotion() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let transition = testClip(.sleeping, loops: false, duration: 10, motion: 3, interruptible: false)
+  var clips = defaultTestClips
+  clips[.sleeping] = transition
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
+
+  controller.handle(.sleeping)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.sleeping.rawValue)
+
+  controller.handle(.working)
+  clock.advance(0.5)  // well short of `motion` (3)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.sleeping.rawValue)  // deferred, unchanged
+  #expect(panel.uploadCount == 1)
+}
+
+@Test @MainActor
+func interruptibleClipCannotInterruptItself() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let transition = testClip(.sleeping, loops: false, duration: 10, motion: 3, interruptible: true)
+  // Every state resolves to the same clip -- standing in for a resolver
+  // whose graph walk lands back on what is already showing.
+  let controller = makeController(panel: panel, clock: clock, resolve: { _, _, _ in transition })
+
+  controller.handle(.sleeping)
+  await controller.tick()
+  #expect(controller.displayed?.id == transition.id)
+  #expect(panel.uploadCount == 1)
+
+  controller.handle(.working)
+  clock.advance(0.5)  // well short of `motion`
+  await controller.tick()
+  // `driveTowards` short-circuits a same-id swap before `nextBoundary` is
+  // ever consulted, so an interruptible clip cannot cut into itself.
+  #expect(panel.uploadCount == 1)
 }
 
 @Test @MainActor
@@ -665,7 +743,7 @@ func loopingClipWithNonMultipleDurationStillSwaps() async {
   // 2.1s is the real `thinking-alt` duration that exposed this on the panel.
   var clips = defaultTestClips
   clips[.thinking] = testClip(.thinking, duration: 2.1)
-  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
 
   controller.handle(.thinking)
   await controller.tick()
@@ -695,7 +773,7 @@ func swapDoesNotLandBeforeTheLoopCompletes() async {
   let panel = MockPanel()
   var clips = defaultTestClips
   clips[.thinking] = testClip(.thinking, duration: 2.1)
-  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
 
   controller.handle(.thinking)
   await controller.tick()

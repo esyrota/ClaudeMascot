@@ -85,6 +85,10 @@ EYE = (0, 0, 0)
 BG = (0, 0, 0)
 # Props are kept at full value for the same reason.
 PROP = (255, 255, 255)
+# The dozing-dream Pac-Man. B = 0, same rule as MASCOT: any real amount of blue on
+# this panel photographs as pink or magenta, and yellow satisfies B = 0 on its own --
+# there is nothing here to "fix" by adding blue back in for a truer yellow.
+PACMAN = (255, 200, 0)
 CONFETTI = [
     (255, 209, 102),
     (120, 255, 160),
@@ -586,6 +590,75 @@ def sleeping():
     return out
 
 
+# Where the bloom grows from. The brief for this beat says "centred on where it was
+# blown" -- and that has to mean BUBBLE_AT itself, not wherever either bubble has
+# drifted to by the time the dream starts: sleeping()'s two bubbles are half a cycle
+# apart, so there is no single instance that is uniquely "the largest" to anchor on,
+# but there is only one place either of them is ever blown from. The offset centres
+# on the bubble sleeping() actually holds once it stops swelling (BUBBLE_SIZES[-1]).
+BLOOM_CENTER = (BUBBLE_AT[0] + BUBBLE_SIZES[-1] // 2, BUBBLE_AT[1] + BUBBLE_SIZES[-1] // 2)
+
+# The bloom's growth ladder. Diameters, not the (width, height) pairs BUBBLE_STAGES
+# holds for `_thought_bubble` -- this bubble is round, so one number is the whole
+# shape. The last rung has to clear the panel entirely: BLOOM_CENTER sits up and to
+# the right, and its farthest corner is the bottom-left one at ~31px, so a ring only
+# leaves the screen for good once its radius passes that. 68 gives a diameter of 34px
+# of margin over it, which is one full frame of the ring being genuinely gone rather
+# than a last arc clinging to a corner.
+BLOOM_SIZES = (8, 16, 26, 38, 52, 68)
+
+
+def _bloom_frames():
+    """The sleep bubble that doesn't pop: it swells until it has swallowed everything.
+
+    A **hollow circle** -- a 1px `PROP` stroke around a `BG` fill -- growing from where
+    `sleeping()` blows its bubbles. Both halves of that do work. The stroke is what
+    keeps it reading as the same bubble it started as rather than a shape wipe, and
+    the black fill is what swallows the mascot: each frame redraws him whole from the
+    bare `dozing` anchor and then the fill takes him, so he goes *inside* the bubble
+    instead of being covered by it.
+
+    It ends dark on its own. Once the ring's radius passes the farthest corner it has
+    left the panel entirely and what remains is the black it was carrying all along --
+    no separate wipe, no flash. An earlier cut of this beat flooded the last frame
+    solid `PROP` instead, which put all 1024 pixels at full white; it was dropped
+    because a bubble that ends by turning into its own opposite is a different beat
+    from a bubble that grows past you, and only the second one is what the dream is
+    doing. It also retires the only frame in this project that would have needed a
+    brightness check of its own.
+
+    `ImageDraw.ellipse` rather than `_draw_bubble`: that helper draws the perimeter of
+    a *square* box with the corners knocked off, which is a fine 3-or-4px bubble and
+    stops being a circle the moment it is bigger than that. `_pacman_frames()` already
+    set the precedent for reaching for a real curve when the shape genuinely is one.
+    """
+    out = []
+    base = _dozing_anchor()
+    for size in BLOOM_SIZES:
+        im = base.copy()
+        d = ImageDraw.Draw(im)
+        half = size // 2
+        box = [
+            BLOOM_CENTER[0] - half, BLOOM_CENTER[1] - half,
+            BLOOM_CENTER[0] - half + size - 1, BLOOM_CENTER[1] - half + size - 1,
+        ]
+        d.ellipse(box, fill=BG, outline=PROP, width=1)
+        out.append((im, SLEEP_FRAME_MS))
+    return out
+
+
+def _blackout_frames():
+    """A brief hold on black between the bloom and whatever the dream does next.
+
+    Three bare `frame()`s at the loop's own SLEEP_FRAME_MS -- long enough to read as
+    a deliberate cut to dark, short enough that it does not feel like the panel has
+    hung. There is nothing to compose: `frame()` already returns a bare BG canvas, so
+    this function exists only to fix the frame count and timing in one place rather
+    than have the clip that assembles this beat invent both.
+    """
+    return [(frame(), SLEEP_FRAME_MS) for _ in range(3)]
+
+
 def _doze_edge(src: Path) -> list:
     """One imported dozing transition, its last frame held as the dwell.
 
@@ -746,6 +819,153 @@ def sink():
     for oy in (0, 4, 9, 14, 19):
         out.append((mascot_at(0, oy, by=HOME_Y), 140))
     out.append((frame(), APPEAR_TAIL_MS))  # below the panel -- the offBottom anchor
+    return out
+
+
+# --------------------------------------------------------------------------
+# The dozing dream's chase beats -- frame producers only. `Docs/_logs/2026-08-27.
+# Dozing Dream/Task.md` assembles walk-in-left, a look back, a startle, walk-off-
+# right and this Pac-Man into one clip; that assembly, and its STATES/CLIPS entry,
+# belong to the chunk that does the splicing, not to these three functions.
+# --------------------------------------------------------------------------
+
+def _look_back_frames():
+    """
+    He looks back over his left shoulder before the startle.
+
+    This mascot is drawn front-on in every clip and there is no away-facing pose to
+    turn to -- the turned-head rule in the Animation Catalogue is explicit about it,
+    and `work-look`/`work-look-down` solve the same problem by moving the eyes, not
+    the body. Here the body itself is meant to read as half-turned, and `dancing()`
+    already has the art for exactly that: appear.gif's second half shades one side
+    of the torso to imply a weight shift, which is what a turned shoulder looks like
+    at this scale, drawn front-on. `APPEAR_RISE` and the frame after it (15, 16) are
+    the first step into that shade and the deeper hold, per the comment above
+    `APPEAR_RISE` itself; playing them, holding, then walking back through 15 turns
+    `dancing()`'s continuous sway into a single held glance instead. `dancing()`'s
+    fuller loop is not reused here because it cycles through the shade twice before
+    returning to the anchor, which reads as swaying in place, not looking back once.
+
+    **Both frames are mirrored, and that is the whole point of the beat.** appear.gif
+    shades the torso's LEFT side, and a body shaded on its left reads as facing right
+    -- the far side is the one that recedes into shadow -- so lifted unchanged the
+    glance goes right, away from the thing chasing him. Mirrored, the shade sits on
+    the right and he faces left. Measured, not eyeballed: the shade centroid moves
+    from x=8.0 to x=23.0 against a body centre of ~16. The Pac-Man enters from the LEFT edge, and he has
+    just walked in from the left himself, so the look has to go left or the startle
+    that follows is a reaction to nothing. Mirroring moves the shade to the other
+    side of a body that is drawn front-on and near-symmetric, which is the only
+    thing that has to flip; it also shifts the leaning body a pixel the other way,
+    which is the lean going the other way and is correct for the same reason. The
+    anchor bookends are NOT mirrored -- `_standing_anchor()` is symmetric (a 4px gap
+    each side), so mirroring it would be a no-op that only invited the question.
+    """
+    anchor = _standing_anchor()
+    turn_in, turn_held = (
+        appear_frames()[APPEAR_RISE][0].transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        appear_frames()[APPEAR_RISE + 1][0].transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+    )
+    return [
+        (anchor, 200),
+        (turn_in, 160),
+        (turn_held, 500),   # the look, held
+        (turn_in, 160),
+        (anchor, 200),
+    ]
+
+
+def _startle_frames():
+    """
+    He startles in place -- `starting`'s own frames 4-5, with the rise taken back out.
+
+    `appear_frames()`'s own comment splits the entrance into the rise (0-14) and the
+    turn (15 on); frames 4-5 sit inside the rise, just past the crouch and well
+    before the landing, which is exactly why they carry a body hanging in mid-air --
+    that vertical burst is `starting`'s whole point and precisely wrong for a shock
+    that has to keep both feet down. Each source frame is measured against its own
+    lowest drawn row with `getbbox()` and re-pasted with `_paste_over()` far enough
+    down that row lands on `_standing_anchor()`'s own floor row instead of wherever
+    appear.gif happened to leave it airborne -- the re-grounding `mascot_at()`'s own
+    docstring describes for pasting past a drawn call's safe bounds, aimed at a
+    y-offset instead of the walks' x one.
+    """
+    floor_row = _standing_anchor().getbbox()[3]
+    out = []
+    for index in (4, 5):
+        sprite, duration = appear_frames()[index]
+        oy = floor_row - sprite.getbbox()[3]
+        out.append((_paste_over(frame(), sprite, oy=oy), duration))
+    return out
+
+
+def _pacman_frames():
+    """
+    A big yellow Pac-Man hunts him left edge to right edge, mouth chomping.
+
+    Nothing else in this file draws a circle -- every other shape is `rect()`
+    rectangles -- but Pac-Man IS a circle with a wedge missing, and `ImageDraw`
+    already draws exactly that shape in one call: `pieslice()` cuts the mouth out of
+    the body in the same stroke that fills it, so there is no separate "paint the
+    mouth in BG" step to get wrong, and `ellipse()` closes it for the bite between
+    chomps. Radius 9 -- an 18px circle, bigger across than the mascot's own 24px
+    total width once you count how much of that is empty leg-gap -- is sized to read
+    as the thing chasing him, not a prop scaled to his head; a Pac-Man the size of an
+    eye would be a joke about pupils, not about being hunted. It is drawn on its own
+    blank frames rather than composited over the mascot, because by this beat
+    `walk-off-right` has already carried him off the panel -- there is nothing left
+    to composite over.
+    """
+    r = 9
+    cy = 31 - r  # floor-aligned, same row the mascot's own feet rest on
+    xs = (-11, -3, 5, 13, 21, 29, 37, 45)  # fully off-left through fully off-right
+    out = []
+    for i, cx in enumerate(xs):
+        im = frame()
+        d = ImageDraw.Draw(im)
+        box = [cx - r, cy - r, cx + r, cy + r]
+        if i % 2 == 0:
+            d.pieslice(box, 35, 325, fill=PACMAN)  # mouth open, facing the way he's moving
+        else:
+            d.ellipse(box, fill=PACMAN)            # mouth shut, between chomps
+        out.append((im, 140))
+    return out
+
+
+def doze_dream():
+    """
+    The set-piece nightmare: a dream played once during `dozing`.
+
+    Assembled entirely from beats chunks 6 and 7 built as frame producers, in the
+    order `Task.md`'s "The dream, as scripted" lays out: a beat of the ordinary
+    sleeping bubbles, the largest one swallowing the panel instead of popping, a
+    cut to black, walk-in, a look back, a startle, walk-off, Pac-Man crossing
+    behind him, and dark again.
+
+    The last frame is `_dozing_anchor()` held for `APPEAR_TAIL_MS` -- copying
+    `sleeping()` and `_doze_edge()`'s own contract, since this clip's `toPose` is
+    `dozing` and the `sleeping` loop it hands off to begins on that exact pixel
+    data. Anything else here would pop on every hand-off back to sleep.
+
+    One seam needed a fix at the assembly level rather than in either helper:
+    `_startle_frames()`'s last frame is a re-grounded mid-rise sprite, not the
+    neutral pose `walk_off_right()`'s first frame already is (`_standing_anchor()`
+    in all but name), so the two cut hard into each other. A single held anchor
+    frame between them reads as him catching his footing before he bolts, rather
+    than a pop -- ordering and a held frame, exactly the kind of fix that belongs
+    here and not in `_startle_frames()` itself.
+    """
+    out = []
+    out.extend(sleeping()[:6])          # a beat of bubbles before the dream turns
+    out.extend(_bloom_frames())
+    out.extend(_blackout_frames())
+    out.extend(walk_in_left()[:-1])     # motion only -- drop the long dwell tail
+    out.extend(_look_back_frames())
+    out.extend(_startle_frames())
+    out.append((_standing_anchor(), 100))  # settle before the bolt -- see docstring
+    out.extend(walk_off_right()[:-1])   # motion only -- as with the walk-in above
+    out.extend(_pacman_frames())
+    out.extend(_blackout_frames())
+    out.append((_dozing_anchor(), APPEAR_TAIL_MS))
     return out
 
 
@@ -1606,6 +1826,7 @@ STATES = {
     "fidget-look": fidget_look,
     "stand-to-doze": stand_to_doze,
     "doze-to-stand": doze_to_stand,
+    "doze-dream": doze_dream,
     "walk-off-left": walk_off_left,
     "walk-in-left": walk_in_left,
     "walk-off-right": walk_off_right,
@@ -1746,7 +1967,8 @@ CLIP_METADATA = {
     # state. "working" keeps each of these to `sitting` alone. work-look is the
     # calmest of the four -- a held look, then back down -- so it carries the
     # highest weight; work-coffee is the most eventful (a prop enters and leaves),
-    # so it carries the lowest. All four stay well under fidget-stretch/fidget-look's
+    # and was the rarest at 0.15 -- rare enough never to be seen in practice, so it
+    # now sits level with its siblings. All four stay well under fidget-stretch/fidget-look's
     # implicit 1.0 default so a beat stays occasional rather than constant.
     "work-idea": {
         "loops": False,
@@ -1760,7 +1982,9 @@ CLIP_METADATA = {
         "fromPose": "sitting",
         "toPose": "sitting",
         "fidgetGroup": "working",
-        "weight": 0.15,
+        "weight": 0.25,
+        # Two sips with only typing in between reads as a stutter; restrict it.
+        "maxRepeats": 1,
     },
     "work-look": {
         "loops": False,
@@ -1780,8 +2004,8 @@ CLIP_METADATA = {
         # Chunk 10: the fifth `sitting` fidget, imported rather than drawn -- see
         # work_look_down()'s own docstring. Same fidgetGroup as its four siblings
         # so selection stays confined to `sitting`; weight matches work-idea and
-        # work-think, a middling beat, neither the calmest (work-look) nor the
-        # most eventful (work-coffee).
+        # work-think, a middling beat, no longer the calmest (work-look still
+        # carries that) nor the most eventful (work-coffee).
         "loops": False,
         "fromPose": "sitting",
         "toPose": "sitting",
@@ -1808,6 +2032,25 @@ CLIP_METADATA = {
         "loops": False,
         "fromPose": "dozing",
         "toPose": "standing",
+    },
+    "doze-dream": {
+        # A set piece, not a third weighted `dozing` fidget: `weight` is a
+        # relative number, there is no other `dozing` fidget to weigh it
+        # against, and there never will be more than one dream, so it would
+        # fire on every due roll regardless of what it was set to. `maxPerPhase:
+        # 1` uses the phase ledger instead -- once played, this clip is excluded
+        # for the rest of the current sleep, `selectFidget` finds no `dozing`
+        # candidate left, and falls through to the `sleeping` loop. Without
+        # `interruptible: True` a wake could not cut in until the epoch turned
+        # over: a fidget is otherwise re-picked for the rest of its epoch, which
+        # for a set piece this long means either finishing a second play of the
+        # dream from the top or being guillotined mid-way when the epoch ends.
+        "loops": False,
+        "fromPose": "dozing",
+        "toPose": "dozing",
+        "fidgetGroup": "sleeping",
+        "maxPerPhase": 1,
+        "interruptible": True,
     },
     "walk-off-left": {
         "loops": False,
@@ -2006,9 +2249,12 @@ if __name__ == "__main__":
         else:
             clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
-            # Optional on a transition, and only the wander fidgets carry them:
-            # a group to scope fidget selection to, and a weight to pick within it.
-            for key in ("fidgetGroup", "weight"):
+            # Optional on a transition; each is carried only by the clips that
+            # need it: a group to scope fidget selection to, a weight to pick
+            # within it, and the three scheduling limits -- how often a clip may
+            # play per phase, how often consecutively, and whether a swap may cut
+            # into it mid-motion.
+            for key in ("fidgetGroup", "weight", "maxPerPhase", "maxRepeats", "interruptible"):
                 if key in CLIP_METADATA[name]:
                     clip_entry[key] = CLIP_METADATA[name][key]
 

@@ -21,6 +21,18 @@ struct Clip: Sendable, Equatable, Identifiable {
   let weight: Double  // 1.0 when absent
   let fromPose: Pose?  // transition clips only
   let toPose: Pose?  // transition clips only
+  /// How many times this clip may play in one phase — a maximal run at one
+  /// group. `nil` means unlimited. `doze-dream` sets 1: one dream per sleep.
+  let maxPerPhase: Int?
+  /// How many times this clip may play consecutively, where "consecutive"
+  /// means with no other *fidget* in between — the group's loop clip always
+  /// sits between two fidgets across an epoch boundary, so counting it would
+  /// make this unreachable. `nil` means unlimited.
+  let maxRepeats: Int?
+  /// Whether a swap may cut into this clip mid-motion instead of waiting out
+  /// `motion`. False for everything but the long set pieces, where making the
+  /// user wait out the animation costs more than the seam is worth.
+  let interruptible: Bool
 
   /// Where this clip leaves the mascot: its own pose if it loops at one,
   /// otherwise the pose its edge ends at.
@@ -30,4 +42,9 @@ struct Clip: Sendable, Equatable, Identifiable {
   /// `PanelController` reads to know a departure has finished, so the power
   /// is only cut on an empty screen.
   var endsOffscreen: Bool { endPose?.isOffscreen ?? false }
+
+  /// A fidget: a non-looping clip that starts and ends at the same pose,
+  /// which is what distinguishes it from a transition (two different poses).
+  /// What the phase ledger counts runs of.
+  var isFidget: Bool { !loops && fromPose != nil && fromPose == toPose }
 }

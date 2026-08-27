@@ -3,13 +3,14 @@ import Foundation
 /// Chooses what plays next: walks the pose graph one edge at a time, rotates
 /// weighted variants, and injects ambient fidgets on long holds.
 ///
-/// Deliberately a **pure function of (target, displayed, now)**. `PanelController`
-/// calls `clip(for:displayed:)` on every `tick()`, speculatively, just to compare
-/// its answer against what is already showing — including ticks where nothing
-/// changes. If this type remembered anything ("last variant played", "next
-/// fidget due at"), that bookkeeping would advance on every speculative call,
-/// not just the calls that actually led to an upload, and the same instant
-/// asked twice would give two different answers. So nothing is stored:
+/// Deliberately a **pure function of (target, displayed, ledger, now)**.
+/// `PanelController` calls `clip(for:displayed:ledger:)` on every `tick()`,
+/// speculatively, just to compare its answer against what is already showing
+/// — including ticks where nothing changes. If this type remembered anything
+/// itself ("last variant played", "next fidget due at"), that bookkeeping
+/// would advance on every speculative call, not just the calls that actually
+/// led to an upload, and the same instant asked twice would give two
+/// different answers. So nothing is stored here:
 ///
 /// - **Selection is derived from time, not remembered.** An epoch
 ///   (`Int(now / rotationPeriod)`) seeds a deterministic RNG together with a
@@ -23,9 +24,21 @@ import Foundation
 ///   says the mascot now is. There is no plan to unwind or cancel — this is
 ///   what makes a mid-journey flip self-correcting instead of a bug to guard
 ///   against.
+/// - **The ledger is a fourth input, passed in, never kept.** What has
+///   already played this phase cannot be derived from `(target, displayed,
+///   now)` alone — once a phase ends and its loop resumes, nothing on screen
+///   still records that a clip played during it — so `PanelController` holds
+///   the bookkeeping and hands it in for `allows(_:)` to filter candidates
+///   with. The speculative-call hazard above applies to it exactly as much as
+///   to any state this type might have kept itself: recording a play inside
+///   `clip(for:)` would advance the ledger on calls that uploaded nothing.
+///   That is why the ledger is only ever written where a clip has actually
+///   reached the panel — `PanelController.attemptUpload`'s success branch and
+///   the ungated wake beside it, both in step with `displayed`. This type
+///   only ever reads it.
 ///
 /// This also makes the type exhaustively testable against a fake clock: every
-/// answer is reproducible from its three inputs alone.
+/// answer is reproducible from its four inputs alone.
 @MainActor
 final class Choreographer {
   private let manifest: ClipManifest
@@ -37,9 +50,13 @@ final class Choreographer {
     manifest: ClipManifest,
     clock: @escaping () -> TimeInterval,
     rotationPeriod: TimeInterval = 20,
-    // 0.15 per rotation-period epoch is roughly one fidget every 7 loops --
-    // the sparser end of the "4-8 loops then an alt" the product wants.
-    fidgetChance: Double = 0.15
+    // 0.3 per rotation-period epoch is roughly one fidget onset a minute --
+    // twice the old 0.15, because the seated `working` hold read as monotonous
+    // at the sparser rate. Note a fired fidget holds the rest of its epoch (the
+    // same clip is re-picked until the epoch rolls, and an unchanged clip is
+    // never re-uploaded), so this is the share of held time that fidgets, not a
+    // count of discrete beats.
+    fidgetChance: Double = 0.3
   ) {
     self.manifest = manifest
     self.clock = clock
@@ -52,7 +69,7 @@ final class Choreographer {
   /// manifest, or a state with no clip in its group yet) — `PanelController`
   /// treats that like a failed upload and retries, so this never has to
   /// throw or stall to signal "not yet possible".
-  func clip(for target: PanelState, displayed: Clip?) -> Clip? {
+  func clip(for target: PanelState, displayed: Clip?, ledger: PhaseLedger) -> Clip? {
     let now = clock()
     let currentPose = pose(of: displayed)
 
@@ -89,7 +106,7 @@ final class Choreographer {
       // `.starting` on a mascot that is already standing: fall through to the
       // pose it was arriving at anyway, so the entrance settles into idle
       // instead of resolving to nothing.
-      return clip(for: .idle, displayed: displayed)
+      return clip(for: .idle, displayed: displayed, ledger: ledger)
     }
 
     // 2. Not there yet: take the next step, not the whole trip. `nextEdge`
@@ -136,7 +153,7 @@ final class Choreographer {
     // no body on the panel to move.
     if target != .off, let displayed, !isRealTransition(displayed) {
       if fidgetDue(group: group, now: now),
-        let fidget = selectFidget(group: group, pose: targetPose, now: now)
+        let fidget = selectFidget(group: group, pose: targetPose, now: now, ledger: ledger)
       {
         return fidget
       }
@@ -276,12 +293,14 @@ final class Choreographer {
   /// kept to it: the wander fidgets walk the mascot off the panel entirely, which
   /// is charming during `idle` and alarming during `waiting`, where the whole
   /// point of the clip on screen is that Claude needs the user.
-  private func selectFidget(group: String, pose: Pose, now: TimeInterval) -> Clip? {
+  private func selectFidget(group: String, pose: Pose, now: TimeInterval, ledger: PhaseLedger)
+    -> Clip?
+  {
     let candidates =
       manifest.clips.values
       .filter {
         !$0.loops && $0.fromPose == pose && $0.toPose == pose && $0.id != "\(group)-enter"
-          && ($0.fidgetGroup == nil || $0.fidgetGroup == group)
+          && ($0.fidgetGroup == nil || $0.fidgetGroup == group) && ledger.allows($0)
       }
       .sorted { $0.id < $1.id }
     guard !candidates.isEmpty else { return nil }
