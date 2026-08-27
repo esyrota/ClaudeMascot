@@ -172,8 +172,8 @@ final class AppModel: ObservableObject {
     )
     self.panelController = PanelController(
       panel: adapter,
-      resolve: { [choreographer] state, displayed in
-        choreographer.clip(for: state, displayed: displayed)
+      resolve: { [choreographer] state, displayed, ledger in
+        choreographer.clip(for: state, displayed: displayed, ledger: ledger)
       },
       // Looks a clip up by id directly, independent of `PanelState` — `depart`'s
       // route to `wave-off`, which no `PanelState` ever resolves to. Sourced

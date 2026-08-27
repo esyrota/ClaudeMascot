@@ -105,15 +105,15 @@ func oneEdgeAtATimeTowardATwoHopTarget() {
     manifest: manifest([idle, working, standLeft, leftSit]), clock: { clock() })
 
   // Standing, wants to be sitting: only the first edge comes back.
-  let first = choreographer.clip(for: .working, displayed: idle)
+  let first = choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())
   #expect(first?.id == "stand-left")
 
   // Same call again, nothing displayed yet: identical answer (idempotent).
-  let firstAgain = choreographer.clip(for: .working, displayed: idle)
+  let firstAgain = choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())
   #expect(firstAgain?.id == "stand-left")
 
   // Only once the first edge is actually displayed does the second appear.
-  let second = choreographer.clip(for: .working, displayed: standLeft)
+  let second = choreographer.clip(for: .working, displayed: standLeft, ledger: PhaseLedger())
   #expect(second?.id == "left-sit")
 }
 
@@ -130,13 +130,13 @@ func targetFlippingMidJourneyIsSelfCorrecting() {
     manifest: manifest([idle, working, standLeft, leftStand, leftSit]), clock: { clock() })
 
   // Walking toward .working: first edge lands us at offLeft.
-  let firstEdge = choreographer.clip(for: .working, displayed: idle)
+  let firstEdge = choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())
   #expect(firstEdge?.id == "stand-left")
 
   // The world changes its mind before the second edge plays: target flips
   // back to .idle (standing). From offLeft, that's a single edge back —
   // not a continuation of the walk toward sitting.
-  let corrected = choreographer.clip(for: .idle, displayed: standLeft)
+  let corrected = choreographer.clip(for: .idle, displayed: standLeft, ledger: PhaseLedger())
   #expect(corrected?.id == "left-stand")
 }
 
@@ -150,7 +150,7 @@ func noPathDegradesToADirectSwap() {
   // No edges at all in this manifest — today's real manifest, basically.
   let choreographer = Choreographer(manifest: manifest([idle, working]), clock: { clock() })
 
-  let resolved = choreographer.clip(for: .working, displayed: idle)
+  let resolved = choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())
   #expect(resolved?.id == "working")
 }
 
@@ -167,9 +167,9 @@ func sameInputsReturnIdenticalClipWithinAnEpoch() {
   // The exact same (target, displayed, now) triple, called three times: no
   // stored state means no run of calls can see a different answer than the
   // first.
-  let first = choreographer.clip(for: .idle, displayed: a)
-  let second = choreographer.clip(for: .idle, displayed: a)
-  let third = choreographer.clip(for: .idle, displayed: a)
+  let first = choreographer.clip(for: .idle, displayed: a, ledger: PhaseLedger())
+  let second = choreographer.clip(for: .idle, displayed: a, ledger: PhaseLedger())
+  let third = choreographer.clip(for: .idle, displayed: a, ledger: PhaseLedger())
   #expect(first?.id == second?.id)
   #expect(first?.id == third?.id)
 }
@@ -189,7 +189,7 @@ func variantsRotateAcrossEpochsWithoutImmediateRepeat() {
   var sawBoth = Set<String>()
   for _ in 0..<12 {
     let displayed = previousId.map { $0 == "idle-a" ? a : b } ?? a
-    let picked = choreographer.clip(for: .idle, displayed: displayed)
+    let picked = choreographer.clip(for: .idle, displayed: displayed, ledger: PhaseLedger())
     #expect(picked != nil)
     if let picked {
       if let previousId {
@@ -220,7 +220,7 @@ func heavilyWeightedVariantDominatesAcrossManyEpochs() {
   var counts: [String: Int] = [:]
   var displayed = common
   for _ in 0..<300 {
-    let picked = choreographer.clip(for: .idle, displayed: displayed)!
+    let picked = choreographer.clip(for: .idle, displayed: displayed, ledger: PhaseLedger())!
     counts[picked.id, default: 0] += 1
     displayed = picked
     clock.advance(rotationPeriod)
@@ -252,16 +252,16 @@ func enterOneShotPlaysOnArrivalAndIsNotRepeatedOnceSettled() {
 
   // Arriving at .done straight from a different group's loop clip (same
   // pose, no edge to walk): the one-shot entrance plays.
-  let onArrival = choreographer.clip(for: .done, displayed: idle)
+  let onArrival = choreographer.clip(for: .done, displayed: idle, ledger: PhaseLedger())
   #expect(onArrival?.id == "done-enter")
 
   // Once the entrance itself is what's displayed, asking again must not
   // replay it — it falls through to the settled loop.
-  let settled = choreographer.clip(for: .done, displayed: doneEnter)
+  let settled = choreographer.clip(for: .done, displayed: doneEnter, ledger: PhaseLedger())
   #expect(settled?.id == "done")
 
   // And it stays settled on subsequent calls.
-  let stillSettled = choreographer.clip(for: .done, displayed: settled)
+  let stillSettled = choreographer.clip(for: .done, displayed: settled, ledger: PhaseLedger())
   #expect(stillSettled?.id == "done")
 }
 
@@ -279,14 +279,14 @@ func fidgetInjectedWhenDueAndAbsentFidgetsFallThroughCleanly() {
   let withFidget = Choreographer(
     manifest: manifest([idle, blink]), clock: { clock() }, rotationPeriod: rotationPeriod,
     fidgetChance: 1)
-  let picked = withFidget.clip(for: .idle, displayed: idle)
+  let picked = withFidget.clip(for: .idle, displayed: idle, ledger: PhaseLedger())
   #expect(picked?.id == "blink")
 
   // No fidget clips in the manifest at all (today's real manifest): falls
   // through cleanly to the settled loop instead of stalling or crashing.
   let withoutFidgets = Choreographer(
     manifest: manifest([idle]), clock: { clock() }, rotationPeriod: rotationPeriod, fidgetChance: 1)
-  let fallenThrough = withoutFidgets.clip(for: .idle, displayed: idle)
+  let fallenThrough = withoutFidgets.clip(for: .idle, displayed: idle, ledger: PhaseLedger())
   #expect(fallenThrough?.id == "idle")
 }
 
@@ -305,11 +305,11 @@ func neverFidgetsDuringATransitionOrForOff() {
   // `toPose` matches the target's pose. Even though a fidget for this pose
   // exists and fidgetChance forces it "due", arriving must not be mistaken
   // for a fidget opportunity.
-  let justArrivedAtStanding = choreographer.clip(for: .idle, displayed: sitStand)
+  let justArrivedAtStanding = choreographer.clip(for: .idle, displayed: sitStand, ledger: PhaseLedger())
   #expect(justArrivedAtStanding?.id != "blink")
 
   // `.off` never fidgets, even with a matching pose and a forced-due roll.
-  let offTarget = choreographer.clip(for: .off, displayed: offLoop)
+  let offTarget = choreographer.clip(for: .off, displayed: offLoop, ledger: PhaseLedger())
   #expect(offTarget?.id != "blink")
 }
 
@@ -326,8 +326,8 @@ func aGroupedFidgetOnlyFiresForItsOwnGroup() {
   let choreographer = Choreographer(
     manifest: manifest([idle, waiting, wander]), clock: { clock() }, fidgetChance: 1)
 
-  #expect(choreographer.clip(for: .idle, displayed: idle)?.id == "wander-off-left-in-right")
-  #expect(choreographer.clip(for: .waiting, displayed: waiting)?.id == "waiting")
+  #expect(choreographer.clip(for: .idle, displayed: idle, ledger: PhaseLedger())?.id == "wander-off-left-in-right")
+  #expect(choreographer.clip(for: .waiting, displayed: waiting, ledger: PhaseLedger())?.id == "waiting")
 }
 
 @Test @MainActor
@@ -344,7 +344,7 @@ func aGroupedFidgetIsNeverPickedAsAVariant() {
     manifest: manifest([idle, wander]), clock: { clock() }, fidgetChance: 0)
 
   for _ in 0..<8 {
-    #expect(choreographer.clip(for: .idle, displayed: idle)?.id == "idle")
+    #expect(choreographer.clip(for: .idle, displayed: idle, ledger: PhaseLedger())?.id == "idle")
     clock.advance(30)
   }
 }
@@ -374,7 +374,7 @@ func waveOffNeverLeaksIntoAStandingFidget() {
   ]
   for _ in 0..<400 {
     for (state, displayed) in targets {
-      #expect(choreographer.clip(for: state, displayed: displayed)?.id != "wave-off")
+      #expect(choreographer.clip(for: state, displayed: displayed, ledger: PhaseLedger())?.id != "wave-off")
     }
     clock.advance(rotationPeriod)
   }
@@ -396,7 +396,7 @@ func theEntranceIsSuppressedWhenTheMascotIsAlreadyOnScreen() {
 
   // Standing there already: the arrival has nothing to do, so it settles into
   // the standing loop rather than removing the mascot in order to bring it back.
-  #expect(choreographer.clip(for: .starting, displayed: idle)?.id == "idle")
+  #expect(choreographer.clip(for: .starting, displayed: idle, ledger: PhaseLedger())?.id == "idle")
 }
 
 @Test @MainActor
@@ -410,10 +410,10 @@ func theEntranceStillPlaysFromOffScreen() {
     manifest: manifest([idle, starting, walkInLeft, walkOffLeft]), clock: { clock() })
 
   // Nothing on screen at all (a dark panel, or a fresh launch): rise.
-  #expect(choreographer.clip(for: .starting, displayed: nil)?.id == "starting")
+  #expect(choreographer.clip(for: .starting, displayed: nil, ledger: PhaseLedger())?.id == "starting")
   // Off to one side, because it walked off: come back the way it went, not up
   // through the floor.
-  #expect(choreographer.clip(for: .starting, displayed: walkOffLeft)?.id == "walk-in-left")
+  #expect(choreographer.clip(for: .starting, displayed: walkOffLeft, ledger: PhaseLedger())?.id == "walk-in-left")
 }
 
 @Test @MainActor
@@ -425,7 +425,7 @@ func leavingWalksOffThePanel() {
   let choreographer = Choreographer(
     manifest: manifest([idle, walkOffLeft, walkOffRight]), clock: { clock() })
 
-  let exit = choreographer.clip(for: .away, displayed: idle)
+  let exit = choreographer.clip(for: .away, displayed: idle, ledger: PhaseLedger())
   #expect(exit?.id == "walk-off-left" || exit?.id == "walk-off-right")
   #expect(exit?.toPose?.isOffscreen == true)
 }
@@ -442,7 +442,7 @@ func leavingFromDozingStandsUpFirst() {
 
   // One edge at a time: the mascot has to get up before it can walk anywhere,
   // and the route is found without anything spelling it out.
-  #expect(choreographer.clip(for: .away, displayed: sleeping)?.id == "doze-to-stand")
+  #expect(choreographer.clip(for: .away, displayed: sleeping, ledger: PhaseLedger())?.id == "doze-to-stand")
 }
 
 @Test @MainActor
@@ -454,7 +454,7 @@ func leavingResolvesToNothingOnceAlreadyGone() {
 
   // Already off screen: there is no clip for "gone", and `PanelController`
   // reads the arrival off `displayed` rather than expecting one.
-  #expect(choreographer.clip(for: .away, displayed: walkOffLeft) == nil)
+  #expect(choreographer.clip(for: .away, displayed: walkOffLeft, ledger: PhaseLedger()) == nil)
 }
 
 @Test @MainActor
@@ -468,7 +468,7 @@ func leavingResolvesToNothingWhenNoExitExists() {
   let choreographer = Choreographer(
     manifest: manifest([working, walkOffLeft]), clock: { clock() })
 
-  #expect(choreographer.clip(for: .away, displayed: working) == nil)
+  #expect(choreographer.clip(for: .away, displayed: working, ledger: PhaseLedger()) == nil)
 }
 
 @Test @MainActor
@@ -482,8 +482,8 @@ func sitAndStandRouteThroughTheSitEdges() {
     manifest: manifest([idle, working, standToSit, sitToStand]), clock: { clock() })
 
   // Standing, wants to be sitting: the drawn sit edge, not a direct swap onto `working`.
-  #expect(choreographer.clip(for: .working, displayed: idle)?.id == "stand-to-sit")
+  #expect(choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())?.id == "stand-to-sit")
 
   // Seated, wants to be standing: the reverse edge.
-  #expect(choreographer.clip(for: .idle, displayed: working)?.id == "sit-to-stand")
+  #expect(choreographer.clip(for: .idle, displayed: working, ledger: PhaseLedger())?.id == "sit-to-stand")
 }

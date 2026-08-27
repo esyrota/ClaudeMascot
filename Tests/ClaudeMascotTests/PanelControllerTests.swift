@@ -178,7 +178,9 @@ private func makeController(
   clock: FakeClock,
   clipByID: @escaping (String) -> Clip? = { _ in nil },
   sleeper: @escaping (TimeInterval) async -> Void = { _ in },
-  resolve: @escaping (PanelState, Clip?) -> Clip? = { state, _ in defaultTestClips[state] },
+  resolve: @escaping (PanelState, Clip?, PhaseLedger) -> Clip? = { state, _, _ in
+    defaultTestClips[state]
+  },
   overlayKey: @escaping () -> Int? = { nil }
 ) -> PanelController {
   PanelController(
@@ -274,7 +276,7 @@ func departureIsAbandonedIfTheMascotCannotLeave() async {
   // panel must still go dark rather than stay lit forever waiting to leave.
   let controller = makeController(
     panel: panel, clock: clock,
-    resolve: { state, _ in state == .away ? nil : defaultTestClips[state] })
+    resolve: { state, _, _ in state == .away ? nil : defaultTestClips[state] })
 
   await controller.tick()
   clock.advance(600)
@@ -607,7 +609,7 @@ func nonLoopingClipHandsOffAtMotionNotDuration() async {
   let transition = testClip(.sleeping, loops: false, duration: 10, motion: 3)
   var clips = defaultTestClips
   clips[.sleeping] = transition
-  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
 
   controller.handle(.sleeping)
   await controller.tick()  // nothing showing yet: uploads immediately
@@ -674,7 +676,7 @@ func loopingClipWithNonMultipleDurationStillSwaps() async {
   // 2.1s is the real `thinking-alt` duration that exposed this on the panel.
   var clips = defaultTestClips
   clips[.thinking] = testClip(.thinking, duration: 2.1)
-  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
 
   controller.handle(.thinking)
   await controller.tick()
@@ -704,7 +706,7 @@ func swapDoesNotLandBeforeTheLoopCompletes() async {
   let panel = MockPanel()
   var clips = defaultTestClips
   clips[.thinking] = testClip(.thinking, duration: 2.1)
-  let controller = makeController(panel: panel, clock: clock, resolve: { state, _ in clips[state] })
+  let controller = makeController(panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
 
   controller.handle(.thinking)
   await controller.tick()
