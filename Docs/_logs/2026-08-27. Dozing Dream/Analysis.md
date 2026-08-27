@@ -101,3 +101,24 @@ starts.
 The scheduling work landed clean and the contract-first briefing is why. The art landed correct
 but needed the orchestrator to read the frames back — a run report saying "success" and a clip
 that plays well are different claims, and only one of them was tested.
+
+## Feedback round (chunk 9)
+
+**The look-back faced the wrong way.** Reported from the panel: the mascot reaches centre, looks
+*right*, then bolts — but the Pac-Man enters from the left, so the startle was a reaction to
+nothing on screen.
+
+Cause: `_look_back_frames()` lifts two frames from `appear.gif`'s sway, and that art shades the
+torso's **left** side. A body shaded on its left reads as facing *right* — the far side is the one
+that recedes into shadow. Chunk 7 lifted the frames unchanged and inherited the direction, which
+neither its own verification (feet row, traversal, blue channel) nor the test suite could catch:
+every geometric property was correct and the clip simply pointed the wrong way.
+
+Fixed by mirroring both frames, moving the shade centroid from x=8.0 to x=23.0 against a body
+centre of ~16. The anchor bookends are left alone — `_standing_anchor()` is symmetric, so
+mirroring it would be a no-op.
+
+**Worth noting for the retro:** the first attempt at verifying this fix measured only the
+post-change frames, saw "shade on the RIGHT", and nearly read it as still-broken. Shade side and
+facing direction are inverses, and only a before/after comparison against the raw source frame
+made that legible. A single measurement of an ambiguous quantity is not a verification.

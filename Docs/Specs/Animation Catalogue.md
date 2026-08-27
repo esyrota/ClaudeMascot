@@ -249,7 +249,7 @@ and 140ms a frame) and keep their own.
 **`doze-dream` is a `dozing` self-edge with `fidgetGroup: "sleeping"`, `maxPerPhase: 1`, and
 `interruptible: true`.** The nine beats: he sleeps while bubbles drift, the largest bubble
 grows to fill the panel in white bloom (the brightest frame this project has drawn), a dark
-screen, he walks in from the left and turns to look over his shoulder, he startles without
+screen, he walks in from the left and looks back the way he came — left, toward the corner the Pac-Man will enter from, since a glance the other way makes the startle a reaction to nothing, he startles without
 rising using frames 4–5 from `starting`, walks off right, a yellow Pac-Man chases left to
 right, and the screen goes dark as he sleeps again.
 

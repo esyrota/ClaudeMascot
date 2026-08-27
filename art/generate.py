@@ -865,9 +865,26 @@ def _look_back_frames():
     `dancing()`'s continuous sway into a single held glance instead. `dancing()`'s
     fuller loop is not reused here because it cycles through the shade twice before
     returning to the anchor, which reads as swaying in place, not looking back once.
+
+    **Both frames are mirrored, and that is the whole point of the beat.** appear.gif
+    shades the torso's LEFT side, and a body shaded on its left reads as facing right
+    -- the far side is the one that recedes into shadow -- so lifted unchanged the
+    glance goes right, away from the thing chasing him. Mirrored, the shade sits on
+    the right and he faces left. Measured, not eyeballed: the shade centroid moves
+    from x=8.0 to x=23.0 against a body centre of ~16. The Pac-Man enters from the LEFT edge, and he has
+    just walked in from the left himself, so the look has to go left or the startle
+    that follows is a reaction to nothing. Mirroring moves the shade to the other
+    side of a body that is drawn front-on and near-symmetric, which is the only
+    thing that has to flip; it also shifts the leaning body a pixel the other way,
+    which is the lean going the other way and is correct for the same reason. The
+    anchor bookends are NOT mirrored -- `_standing_anchor()` is symmetric (a 4px gap
+    each side), so mirroring it would be a no-op that only invited the question.
     """
     anchor = _standing_anchor()
-    turn_in, turn_held = (appear_frames()[APPEAR_RISE][0], appear_frames()[APPEAR_RISE + 1][0])
+    turn_in, turn_held = (
+        appear_frames()[APPEAR_RISE][0].transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        appear_frames()[APPEAR_RISE + 1][0].transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+    )
     return [
         (anchor, 200),
         (turn_in, 160),

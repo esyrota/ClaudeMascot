@@ -155,3 +155,13 @@ that a wake during the dream cuts in promptly rather than waiting it out.
 - A "one fidget per epoch" gate that would make fidgets discrete beats generally.
 - Any change to `fidgetChance`, `rotationPeriod`, or the other fidget weights.
 - Dreams at any pose other than `dozing`.
+
+## Feedback round (chunk 9)
+
+| Item | Fix | File | Chunk |
+|---|---|---|---|
+| The look-back goes right, away from the Pac-Man | Mirror the two lifted `appear.gif` sway frames so the shade moves to the torso's right, which reads as facing left | `art/generate.py` — `_look_back_frames()` | 9 |
+
+Handled inline rather than dispatched: a two-frame mirror is the "literal one-liner" exception,
+and the diagnosis (which side `appear.gif` shades, and which way that reads) had to be measured
+by the orchestrator anyway before any brief could state the fix.
