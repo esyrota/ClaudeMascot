@@ -159,3 +159,33 @@ It is installed and removed independently of the plugin above: the first-run flo
 it as its own, separately declinable step alongside the plugin offer (see
 [[Menu Bar App]]), and it can be installed or uninstalled from Settings without
 touching plugin state either way.
+
+## Usage probe
+
+A third, independent input, for clients the statusline wrapper above never reaches (see
+[[Statusline Coverage]]): the app can ask the `claude` CLI directly with
+
+```
+claude -p "/usage" --output-format json
+```
+
+`/usage` resolves client-side, so this costs nothing against the rate limit — zero tokens,
+no model call. It is not costless in every other sense: each run is a ~600ms process spawn
+that leaves ~3.3KB of transcript and a `session-env` directory under `~/.claude`.
+`UsageProbe` parses the result into the same `UsageSnapshot` the statusline wrapper
+produces, and only the two top-line percentages ("Current session", "Current week") are
+used — the breakdown beneath them is explicitly approximate ("local sessions on this
+machine") and is not read. See [[Menu Bar App]] for when the app decides to spawn one.
+
+**`--bare` and `--settings '{"hooks":{}}'` were both tried and both fail.** `--bare`
+suppresses hooks but never reads OAuth, so `/usage` falls back to a local cost summary and
+the subscription percentages vanish entirely. `--settings '{"hooks":{}}'` merges rather than
+replaces, so hooks still fire. Neither gets hook-free output with real numbers.
+
+**`claude -p` starts a real session**, so a probe fires its own `SessionStart` and
+`SessionEnd` through `relay.sh` like any other session — measured, not theorised. Left
+alone this both feeds the probe's own events back into `hook.sock` and, worse,
+re-triggers the entrance animation on every probe. `relay.sh` therefore gains an env
+guard: the app spawns the probe with `CLAUDEMASCOT_PROBE=1` in its environment, and the
+relay exits before forwarding anything when that variable is set. Hook processes inherit
+the spawning environment, so this is sufficient — confirmed directly, not assumed.

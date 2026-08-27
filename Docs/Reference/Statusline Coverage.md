@@ -62,9 +62,18 @@ Run a prompt in an interactive terminal session and watch the same file as step 
 timestamp that jumps confirms coverage; one that does not, in a terminal session, points
 at the payload shape instead.
 
-## The durable fix, if the rail should be present everywhere
+## The fix that was actually built
 
-Derive usage from something that reaches the socket in every client rather than from the
-status line alone. Hook events already do. Nothing in the overlay's design (see [[Menu Bar App]] → Overlay) depends on
-the number arriving via the statusline specifically — only that a `Usage` line reaches
-`hook.sock` — so this is a change of source, not of architecture. Not built.
+This page once proposed deriving usage from hook events, on the theory that hook events
+already reach the socket in every client. **That premise is false.** Hook payloads carry
+only `hook_event_name`, `tool_name`, `session_id`, `cwd` and the tool's input/response —
+no rate limits, ever. Every transcript under `~/.claude/projects` was checked too, and
+none carries a real `rate_limits` object either. Hook events were never a usable source
+for this number.
+
+The fix that shipped instead asks for the number directly: `claude -p "/usage"
+--output-format json`, run as a fallback whenever the stored snapshot goes stale — see
+[[_logs/2026-08-28. Usage Probe/Task]] for why that surface was chosen and
+[[Claude Code Plugin]] and [[Menu Bar App]] for the resulting design. The diagnostic
+steps above are unaffected: they still isolate a coverage gap from a real fault, and a
+probe now closes the gap step 1 would otherwise reveal.

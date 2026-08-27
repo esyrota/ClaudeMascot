@@ -154,6 +154,29 @@ now, only) use is a 5-hour usage rail; see [[Status Overlay]] for the design and
   (see Holding a diagnostic image, below), so a measurement card on the panel is always
   exactly the bytes chosen — overlay or not.
 
+### Keeping the usage rail fed
+
+The statusline wrapper only runs where a terminal status line is drawn (see
+[[Claude Code Plugin]] → Statusline wrapper), so `AppModel` also carries a `UsageProbe` as
+a fallback source for `currentUsage`, feeding the same `UsageSnapshot` the wrapper
+produces. It is triggered off hook events, not a timer: on each hook event, once
+`SessionTracker` has updated `currentState`, the app spawns a probe if none is already
+in flight and `currentUsage` is nil or its `receivedAt` is older than
+`stalenessThreshold(for: currentState)` — 30s while `currentState` is `.working` or
+`.thinking`, 120s otherwise. A single in-flight flag serializes probes, since hook events
+arrive in bursts well inside the ~600ms a probe takes. Where a terminal status line is
+being drawn, the wrapper keeps `receivedAt` inside the threshold and the probe never
+spawns; it exists purely for clients the wrapper never reaches.
+
+**The usage cycle and the upload cycle are separate.** Applying a `UsageSnapshot` —
+`applyUsage(_:)`, called from both the wrapper's socket line and the probe — assigns
+`currentUsage` and saves the cache, and deliberately never calls `panelController.tick()`.
+The overlay only re-uploads on a changed *quantised* key, read lazily at drive time
+(`overlayKey()`, `PanelController.swift:395`), and even then waits for a clip boundary
+(`PanelController.swift:406-420`, see Overlay, above). So probe cadence cannot change
+upload cadence: it can only shorten the delay before the panel notices a bucket it was
+already going to cross.
+
 ## Observability
 
 `BLEClient` logs every connection-state transition, `PanelController` every upload, wake and power-off, and `AppModel` every hook event with the state it maps to. All under one subsystem, so a dark panel is diagnosable without a debugger:
