@@ -46,15 +46,19 @@ private func edgeClip(
 /// A non-looping self-edge at `pose` — the shape both `"<group>-enter"`
 /// one-shots and fidgets have (`fromPose == toPose`). `fidgetGroup` is nil for a
 /// fidget that suits any state at the pose, and set for one scoped to a single
-/// state the way the wander fidgets are scoped to `idle`.
+/// state the way the wander fidgets are scoped to `idle`. `maxPerPhase` and
+/// `maxRepeats` default to nil (unlimited), matching every shipped fidget but
+/// `doze-dream` and `work-coffee`.
 private func selfEdgeClip(
   _ id: String, pose: Pose, fidgetGroup: String? = nil, variantGroup: String? = nil,
-  motion: TimeInterval = 1, duration: TimeInterval = 1
+  motion: TimeInterval = 1, duration: TimeInterval = 1, maxPerPhase: Int? = nil,
+  maxRepeats: Int? = nil
 ) -> Clip {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: duration, motion: motion, loops: false,
     pose: nil, variantGroup: variantGroup, fidgetGroup: fidgetGroup, weight: 1,
-    fromPose: pose, toPose: pose, maxPerPhase: nil, maxRepeats: nil, interruptible: false)
+    fromPose: pose, toPose: pose, maxPerPhase: maxPerPhase, maxRepeats: maxRepeats,
+    interruptible: false)
 }
 
 private func manifest(_ clips: [Clip]) -> ClipManifest {
@@ -377,6 +381,127 @@ func waveOffNeverLeaksIntoAStandingFidget() {
       #expect(choreographer.clip(for: state, displayed: displayed, ledger: PhaseLedger())?.id != "wave-off")
     }
     clock.advance(rotationPeriod)
+  }
+}
+
+// MARK: - Phase ledger: maxPerPhase, maxRepeats, interruptible
+
+@Test @MainActor
+func maxPerPhaseExcludesAfterOnePlayAndFallsThroughToTheLoop() {
+  let clock = FakeClock()
+  let sleeping = loopClip("sleeping", pose: .dozing, group: "sleeping")
+  // The dream: the only fidget candidate at `.dozing`, capped to one play
+  // per phase. Once it is excluded there is nothing else for `selectFidget`
+  // to return, so the fall-through to the group's loop variant is the whole
+  // point of the field -- not nil.
+  let dream = selfEdgeClip("doze-dream", pose: .dozing, maxPerPhase: 1)
+  let choreographer = Choreographer(
+    manifest: manifest([sleeping, dream]), clock: { clock() }, fidgetChance: 1)
+
+  var ledger = PhaseLedger()
+  ledger.enterPhase("sleeping")
+
+  let first = choreographer.clip(for: .sleeping, displayed: sleeping, ledger: ledger)
+  #expect(first?.id == "doze-dream")
+  ledger.record(first!)
+
+  // Same epoch, ledger now has the one play recorded: the dream is excluded
+  // and the only other candidate is the loop itself.
+  let second = choreographer.clip(for: .sleeping, displayed: first, ledger: ledger)
+  #expect(second?.id == "sleeping")
+}
+
+@Test @MainActor
+func aNewPhaseClearsTheLedgerAndReallowsTheCappedClip() {
+  let clock = FakeClock()
+  let sleeping = loopClip("sleeping", pose: .dozing, group: "sleeping")
+  let dream = selfEdgeClip("doze-dream", pose: .dozing, maxPerPhase: 1)
+  let choreographer = Choreographer(
+    manifest: manifest([sleeping, dream]), clock: { clock() }, fidgetChance: 1)
+
+  var ledger = PhaseLedger()
+  ledger.enterPhase("sleeping")
+  let first = choreographer.clip(for: .sleeping, displayed: sleeping, ledger: ledger)
+  #expect(first?.id == "doze-dream")
+  ledger.record(first!)
+  #expect(choreographer.clip(for: .sleeping, displayed: first, ledger: ledger)?.id == "sleeping")
+
+  // Leave the phase and come back: a new sleep, ledger cleared, one dream
+  // available again.
+  ledger.enterPhase("idle")
+  ledger.enterPhase("sleeping")
+  let again = choreographer.clip(for: .sleeping, displayed: sleeping, ledger: ledger)
+  #expect(again?.id == "doze-dream")
+}
+
+@Test @MainActor
+func maxRepeatsExcludesTheClipUntilADifferentFidgetPlays() {
+  let clock = FakeClock()
+  let working = loopClip("working", pose: .sitting, group: "working")
+  // The only fidget candidate in this manifest, capped to one play in a row.
+  // `work-other` below is never a candidate `selectFidget` could return
+  // (it is not in the manifest at all) -- it stands in for "some other
+  // fidget played", recorded directly the way `PanelController` would
+  // record whatever it actually uploaded.
+  let coffee = selfEdgeClip("work-coffee", pose: .sitting, maxRepeats: 1)
+  // Same pose as `coffee` -- `pose(of:)` reads `displayed` to derive the
+  // mascot's current pose, and a mismatched pose here would route the next
+  // call through the edge-graph branch instead of the fidget branch this
+  // test is about.
+  let otherFidget = selfEdgeClip("work-other", pose: .sitting)
+  let choreographer = Choreographer(
+    manifest: manifest([working, coffee]), clock: { clock() }, fidgetChance: 1)
+
+  var ledger = PhaseLedger()
+  ledger.enterPhase("working")
+  ledger.record(coffee)
+
+  // Just played once: not picked again while it is the last fidget played.
+  let excluded = choreographer.clip(for: .working, displayed: coffee, ledger: ledger)
+  #expect(excluded?.id == "working")
+
+  // A different fidget plays in between, breaking the run.
+  ledger.record(otherFidget)
+  let reallowed = choreographer.clip(for: .working, displayed: otherFidget, ledger: ledger)
+  #expect(reallowed?.id == "work-coffee")
+}
+
+@Test @MainActor
+func aLoopClipBetweenTwoFidgetsDoesNotResetTheMaxRepeatsRun() {
+  let clock = FakeClock()
+  let working = loopClip("working", pose: .sitting, group: "working")
+  let coffee = selfEdgeClip("work-coffee", pose: .sitting, maxRepeats: 1)
+  let choreographer = Choreographer(
+    manifest: manifest([working, coffee]), clock: { clock() }, fidgetChance: 1)
+
+  var ledger = PhaseLedger()
+  ledger.enterPhase("working")
+  ledger.record(coffee)
+  // The group's own loop clip lands between two fidgets across an epoch
+  // boundary -- recording it must not count as "a different fidget" and
+  // must not clear the run `work-coffee` is still serving.
+  ledger.record(working)
+
+  let stillExcluded = choreographer.clip(for: .working, displayed: working, ledger: ledger)
+  #expect(stillExcluded?.id == "working")
+}
+
+@Test @MainActor
+func uncappedFidgetsIgnoreTheLedger() {
+  let clock = FakeClock()
+  let idle = loopClip("idle", pose: .standing, group: "idle")
+  // Neither field set: a manifest with no caps must produce exactly today's
+  // selections no matter how many plays land in the ledger.
+  let blink = selfEdgeClip("blink", pose: .standing)
+  let choreographer = Choreographer(
+    manifest: manifest([idle, blink]), clock: { clock() }, fidgetChance: 1)
+
+  var ledger = PhaseLedger()
+  ledger.enterPhase("idle")
+  for _ in 0..<5 {
+    let picked = choreographer.clip(for: .idle, displayed: idle, ledger: ledger)
+    #expect(picked?.id == "blink")
+    ledger.record(picked!)
   }
 }
 

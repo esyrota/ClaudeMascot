@@ -493,6 +493,11 @@ final class PanelController: ObservableObject {
     -> TimeInterval
   {
     guard clip.loops else {
+      // An interruptible clip has no seam worth waiting for: making the user
+      // watch out a set piece before the mascot reacts costs more than the cut
+      // does. `driveTowards` short-circuits a same-id swap before reaching
+      // here, so this cannot make a clip interrupt itself.
+      if clip.interruptible { return now }
       // Non-looping (transition) clips hand off at `motion`, not `duration`.
       // A transition clip ends on a long dwell frame so the panel has
       // something to loop while it waits to be told what's next; waiting out
