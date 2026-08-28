@@ -8,8 +8,8 @@ poses are joined by transition clips. **[[Animation Catalogue]] is the inventory
 clip, its numbers and the pose graph, with a playable image of each. This page covers how
 they are *made*.
 
-Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`), the
-whole of `dozing` (`sleeping` plus both its edges), and the seated pose (`working`,
+Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`), `happy`,
+the whole of `dozing` (`sleeping` plus both its edges), and the seated pose (`working`,
 `work-look-down`, from the two `work-typing` sources) are imported from hand-drawn art
 instead. **`starting`'s silhouette is the reference the drawn clips are built to match**,
 and the `dozing` sources are drawn on it too. No clip ships from a sprite sheet any
@@ -48,7 +48,7 @@ own override folder, is `AnimationLibrary.swift`.
 
 The choreographer keys off three clip shapes; declaring one wrong fails silently.
 
-- **Looping variant** — loops indefinitely, shares a `variantGroup` (e.g. "idle", "thinking"), has a `weight` for selection against other variants in the group. Multiple variants at one pose are rotated by the choreographer, deterministically from time, never the same twice in a row. The loop begins and ends on the anchor frame.
+- **Looping variant** — loops indefinitely, shares a `variantGroup` (e.g. "idle", "thinking"), has a `weight` for selection against other variants in the group. Multiple variants at one pose are rotated by the choreographer, deterministically from time, never the same twice in a row. The loop begins and ends on the anchor frame — `happy` is the one argued exception, and carries no anchor at either end; see below. An optional `minCycles` says how many full cycles must play before any swap may land (`nil` means 1); it is the only clip field that buys a short loop time on the panel, and it is paid for in reaction lag — see [[Menu Bar App]] → Boundary scheduling.
 - **Fidget** — non-looping, self-edge (`fromPose == toPose`), id does *not* end in `-enter`. Blinks, look-arounds, a stretch — motion with no cause, injected at randomised intervals during long holds to separate "animated" from "alive". Selection is by **pose**, so a fidget fires in every state at that pose; an optional `fidgetGroup` (and `weight`) narrows it to one state, which is what keeps the wander clips to `idle` and the five `work-*` clips to `sitting`. `fidgetGroup` is a separate field from `variantGroup` on purpose — a variant pool for loops and a fidget scope for one-shots are different questions.
 - **Entrance one-shot** — id ends in `-enter` (e.g. `done-enter`). Plays exactly once when arriving at a pose, if present in the manifest. The only way to re-entrance is to leave the pose and return. Declaring one wrong is silent, so test coverage is essential.
 
@@ -140,8 +140,9 @@ left rows 0–1 would need authored alpha again.
 `generate.py`'s `imported()` takes each hand-drawn source whole — no crop, and **no frame
 subsampling**: the source durations *are* the animation. What it does do is resample
 each frame to the art's own pixel grid, which is not always the file's, then blow that
-grid up by a whole number of panel pixels and place it. Six sources go through it today:
-`appear.gif`, the three `dozing` sources, and the two `work-typing` sources below.
+grid up by a whole number of panel pixels and place it. Ten sources go through it today:
+`appear.gif`, `happy.gif`, `waiting-question.gif`, `done-flag.gif`, the three `dozing`
+sources, and the three `work-typing`/`work-coffee` sources below.
 `import_gif.py` is the different tool for a different job: art we are importing blind,
 cropped to a power-of-two window and flattened to one colour.
 
@@ -158,6 +159,29 @@ duration unchanged. No motion is lost.
 The last frame is given a long dwell (`APPEAR_TAIL_MS`) so the panel, which loops
 whatever GIF it holds, shows a mascot standing still rather than a restarted entrance
 if the hand-off runs late. The motion length (duration minus tail) is read from `clips.json` at runtime, so no hand-sync is needed.
+
+## The idle rock (`happy.gif`)
+
+Native 32×32, nine frames at 160ms, drawn by the same hand and in the same palette as
+`waiting-question.gif` — one orange family, (255,109,36), against black — so it needs no
+recolour rule of its own and goes through `_body_shade_prop_recolour()` unchanged. It has
+no shaded pixel and no prop; every non-background pixel lands on `MASCOT`.
+
+**The clip ships as frames 1–8 and carries no anchor frame at all.** The source is authored
+intro / cycle: frame 0 *is* the `standing` anchor and 1–8 are the rock itself — dip, three
+right, dip, three left, which loops on its own. Frame 0 is dropped and no closing anchor is
+appended, so `happy()` is the one loop clip here that is a plain slice of its source.
+
+Both bookends were tried and both broke the rhythm: the pair held the mascot still for 480ms
+of every 1.9s, and the closing one alone still put a beat of standing to attention in a clip
+whose whole character is that it does not. The measurements that justify removing them —
+including the fact that the loop seam moves exactly as many pixels as an ordinary beat, and
+that a swap in or out moves *fewer* than one frame of the clip does — are in
+[[Animation Catalogue]] under the anchor contract, which records this as its one exception.
+
+`minCycles: 8` is set here rather than anywhere else because the clip is 1.28s: without it a
+single pass is over before the eye has read it, and a usage-rail update alone could restart
+it that often.
 
 ## The seated pose (`work-typing.gif` / `work-typing-look-down.gif`)
 

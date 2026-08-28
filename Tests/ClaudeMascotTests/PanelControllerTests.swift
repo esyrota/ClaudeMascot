@@ -95,7 +95,7 @@ private final class MockPanel: PanelDriving {
 @MainActor
 private func testClip(
   _ state: PanelState, loops: Bool = true, duration: TimeInterval = 1, motion: TimeInterval? = nil,
-  interruptible: Bool = false
+  interruptible: Bool = false, minCycles: Int? = nil
 )
   -> Clip
 {
@@ -114,7 +114,8 @@ private func testClip(
     toPose: nil,
     maxPerPhase: nil,
     maxRepeats: nil,
-    interruptible: interruptible
+    interruptible: interruptible,
+    minCycles: minCycles
   )
 }
 
@@ -144,7 +145,8 @@ private let defaultTestClips: [PanelState: Clip] = {
     toPose: .offLeft,
     maxPerPhase: nil,
     maxRepeats: nil,
-    interruptible: false
+    interruptible: false,
+    minCycles: nil
   )
   return clips
 }()
@@ -169,7 +171,8 @@ private let waveOffClip = Clip(
   toPose: .standing,
   maxPerPhase: nil,
   maxRepeats: nil,
-  interruptible: false
+  interruptible: false,
+  minCycles: nil
 )
 
 @MainActor
@@ -728,6 +731,58 @@ func theDepartureIsBoundaryGatedButPowerAndWakeAreNot() async {
   await controller.tick()
   #expect(controller.isPanelOff == false)
   #expect(controller.displayed?.id == PanelState.thinking.rawValue)  // wake uploads immediately too
+}
+
+/// `minCycles` holds a short loop on the panel for a whole number of passes.
+///
+/// `happy` is 1.6s: without this, any swap request at all — an epoch roll, a
+/// fidget, even a usage-rail update — lands after a single pass, which is over
+/// before the eye has read it. The cost being pinned here as much as the
+/// benefit: a *real* state change waits out those cycles too.
+@Test @MainActor
+func minCyclesDefersASwapUntilThatManyLoopsHavePlayed() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var clips = defaultTestClips
+  // 0.5s a cycle, four cycles required: two seconds on the panel.
+  clips[.idle] = testClip(.idle, duration: 0.5, minCycles: 4)
+  let controller = makeController(
+    panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
+
+  controller.handle(.idle)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.idle.rawValue)
+
+  // One cycle is a seam for any ordinary loop, and three still are not enough
+  // here. The mascot keeps dancing.
+  controller.handle(.thinking)
+  for _ in 0..<3 {
+    clock.advance(0.5)
+    await controller.tick()
+    #expect(controller.displayed?.id == PanelState.idle.rawValue)
+  }
+
+  // The fourth completes the floor, and the deferred swap lands.
+  clock.advance(0.5)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.thinking.rawValue)
+}
+
+/// A loop with no `minCycles` is unchanged: one cycle is still a seam.
+@Test @MainActor
+func absentMinCyclesStillHandsOffAfterASingleLoop() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(panel: panel, clock: clock)
+
+  controller.handle(.idle)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.idle.rawValue)
+
+  controller.handle(.thinking)
+  clock.advance(1)  // the fixture's own duration, exactly one loop
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.thinking.rawValue)
 }
 
 /// Regression: a looping clip whose duration is not a whole multiple of the

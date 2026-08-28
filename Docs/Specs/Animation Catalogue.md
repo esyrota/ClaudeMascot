@@ -36,8 +36,35 @@ pose at each end. `idle` frame 0 defines `standing`, `sleeping` frame 0 defines 
 `working` frame 0 defines `sitting`, and an offscreen anchor is an empty frame. Break this
 once and every swap visibly jumps.
 
-**Every clip in the manifest satisfies it.** The last holdout was the flag wave that used
-to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
+**One clip is an argued exception, at both ends, and the numbers are why.** `happy` carries
+no anchor frame at all: its source's opening anchor was dropped and no closing one is
+appended. Every seam it creates was measured against the anchor, in pixels of 1024:
+
+| Seam | Pixels moved |
+| --- | --- |
+| `happy`'s own loop, last frame → first | **130** |
+| An ordinary beat inside `happy`, frames 3 → 4 | **131** |
+| Swapping *out* of `happy` (its last frame → any anchor) | **77** |
+| Swapping *into* `happy` (any anchor → its first frame) | **109** |
+| The sit-edge pop, which this page calls a defect | **293** |
+
+Measured on the shipped GIFs, not on the generator's frames — `pad_palette()` nudges a few
+body pixels per frame, so the pre-encode counts run five or six lower.
+
+The loop seam is *the same 130 pixels as an ordinary beat of the animation* — the source was
+authored as a cycle of eight and its frame 0 was an intro, not part of the rhythm. And a swap
+in or out moves **fewer pixels than the clip's own frames do every 160ms**, at well under half
+the sit-edge gap. There is nothing here for the contract to prevent: no resize, no drift, and
+a cut smaller than the motion already on screen. What the anchor bought — and it is a real
+loss — was a seam of exactly zero; what it cost was a quarter of a 1.28s clip spent standing
+still, which broke the rhythm of the one loop whose whole character is that it does not.
+
+**This is not a licence to skip the anchor.** It is an exception that had to be measured to
+earn its way past the rule, and it only clears because this clip's poses sit close to the
+anchor to begin with. Every other loop still satisfies both ends.
+
+**Every other clip in the manifest satisfies it outright.** The last holdout was the flag wave
+that used to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
 four rows and conjured the flag in one frame, and it took a half-raised frame invented at
 each end to fix. The question mark that replaced it needs almost no such repair — its
 source opens *on* the anchor — see the `waiting` notes below for why hand-drawn art
@@ -61,12 +88,12 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### standing
 
-**idle** — three variants, the richest set because idle is on screen most.
+**idle** — four variants, the richest set because idle is on screen most.
 
-|                               |                                     |                                     |
-| ----------------------------- | ----------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
+|                               |                                 |                                     |                                     |
+| ----------------------------- | ------------------------------- | ----------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **happy** · 8f · 1.28s · w 0.5<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — two variants, and neither of them mimes thinking.
 
@@ -89,6 +116,40 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 | ![done](_animations/done.gif)  | ![done-flag](_animations/done-flag.gif) |
 | **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0    |
 
+- **`happy` is the fourth idle variant, and it is the one that carries the mood.** The
+  mascot dips, then rocks its whole body right and left with its arms swung out — the
+  broadest motion any standing loop has. Hand-drawn (`art/sources/happy.gif`, native 32×32,
+  nine frames at 160ms), and the only variant that reads as an expression rather than as a
+  way of standing still.
+- **`happy` ships as eight of its source's nine frames, and carries no anchor.** The source
+  is authored intro / cycle: frame 0 *is* the `standing` anchor and frames 1–8 are the rock
+  itself — dip, three right, dip, three left. Shipping frame 0 put a still pose in a loop
+  whose whole character is that it does not stand still, and appending a closing anchor
+  doubled it: 480ms of the mascot standing to attention in a 1.9s clip. Both are gone. What
+  is left loops 1 → 8 → 1 as one continuous wave, and the seam that creates is measurably
+  indistinguishable from any other beat in it — see the anchor contract above for the
+  pixel counts, and why the cut into and out of this clip is *smaller* than the motion it
+  makes every 160ms.
+- **Weights are shares of the group, not probabilities.** `w 1.0` is not "always"; the
+  choreographer sums the group's weights and draws in proportion, excluding whatever is on
+  screen. At the shipped weights — `idle` 1.0, `happy` 0.5, `dancing` 0.5, `workout` 0.4 —
+  the long-run split is **idle 34%, happy 23%, dancing 23%, workout 20%**. `happy` sat at
+  1.0 for one revision, which bought it 32% and pushed `workout` down to 17%: more presence
+  than a mood clip wants, and not the point of having four.
+- **`happy` is the only clip that sets `minCycles`, and it is the reason the field exists.**
+  At 1.28s a single pass is over before the eye has read it, and any swap request — an epoch
+  roll, a fidget, even a usage-rail update, which restarts the loop like any other upload —
+  could land after one. `minCycles: 8` holds it on the panel for 10.24s. **That is bought with
+  reaction lag:** a real state change (you send a prompt, the mascot should think) is deferred
+  by up to those 10.24s, the same order as the 10.16s a single cycle of `done-flag` already
+  costs. Turn this one number down if the panel starts feeling slow to answer.
+- **`happy` breaks no floor line, but it does lift a foot.** Three of the four feet stay
+  welded to row 31 through every frame; the outermost foot on the leaning side comes up
+  one or two rows and goes back down. That is weight shifting from foot to foot, not the
+  figure leaving the ground, which is the distinction the rule below is actually about.
+  The sway also widens the silhouette past the anchor's 24px — the leading arm reaches
+  x3 and x28 at the extremes — so it is the one standing loop that does not hold the
+  entrance's outline for its whole length.
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
   over, but lifting weights says nothing about working on a prompt — it is the mascot
@@ -107,8 +168,9 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   smaller creature. `idle-alt` was idle's breath at half speed with a one-pixel lean left
   and right underneath it, and the lean was the only thing distinguishing it: a 24px
   figure sliding a pixel sideways on a 32px panel reads as the whole mascot drifting, not
-  as it shifting its weight. A fourth idle variant should *do* something — play with a
-  ball, say — rather than do idle more slowly. `thinking-pace` walked off one edge and
+  as it shifting its weight. A fourth idle variant had to *do* something — play with a
+  ball, say — rather than do idle more slowly; `happy` is that variant, and its
+  side-to-side rock is a whole-body motion rather than a pixel of lean. `thinking-pace` walked off one edge and
   back in the other, twice, and it broke the mascot's position: every other clip in its
   group is a standing loop that never leaves the panel, so the choreographer can swap out
   at any frame, while this one spent most of its length offscreen or halfway through a
@@ -118,7 +180,7 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing`, `sleeping`, `waiting` and `done-flag` are imported; everything else above
+- `happy`, `dancing`, `sleeping`, `waiting` and `done-flag` are imported; everything else above
   is drawn or assembled in `art/generate.py`.
 - `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
   and fills in a "..." one dot at a time, holds, then retreats the way it came. It was
@@ -444,10 +506,10 @@ same numbers.
 
 ### Self-edges — fidgets and one-shots
 
-| | | |
-|---|---|---|
-| ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif) |
-| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **done-enter**<br>standing, 15f · motion 2.45s |
+|                                                   |                                             |                                                |
+| ------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- |
+| ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif)      |
+| **fidget-stretch**<br>standing, 7f · 0.77s        | **fidget-look**<br>standing, 5f · 0.78s     | **done-enter**<br>standing, 15f · motion 2.45s |
 
 |                                   |
 | --------------------------------- |

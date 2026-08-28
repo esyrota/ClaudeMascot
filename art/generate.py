@@ -1166,6 +1166,47 @@ def dancing():
     return out
 
 
+# art/sources/happy.gif -- native 32x32, nine frames at 160ms, the same hand and the
+# same palette as `waiting-question.gif`: one orange family against black, no shade and
+# no prop, so `_body_shade_prop_recolour()` serves it with no rule of its own.
+HAPPY_SRC = SOURCES / "happy.gif"
+# The source is authored intro / cycle: frame 0 IS the standing anchor and 1-8 are the
+# rock itself -- dip, three right, dip, three left, which loops on its own. So the clip
+# is that slice and nothing else: no leading anchor, and no closing bookend either.
+#
+# Both were tried. The pair held the mascot still for 480ms of every 1.9s, and the
+# closing one alone still put a beat of standing to attention into the one loop whose
+# whole character is that it does not stand still.
+#
+# This costs the anchor contract at BOTH ends -- `happy` is the only loop here that
+# carries no anchor frame. Measured, not waved through (pixels of 1024, against the
+# anchor, on the SHIPPED gif): the loop seam moves 130, which is what an ordinary beat
+# inside the clip moves (131); a swap out moves 77 and a swap in 109, both FEWER
+# than the clip's own frames move every 160ms, against the 293 of the sit-edge pop this
+# project calls a defect. See [[Animation Catalogue]], which records the exception and
+# the numbers beside the rule.
+HAPPY_CYCLE = slice(1, None)
+
+
+def happy():
+    """Idle variant: the mascot dips, then rocks its whole body right and left.
+
+    The broadest motion any standing loop has, and the one that carries a mood rather
+    than a way of standing still -- which is exactly what the group was short of: the
+    two variants cut before this one (`idle-alt`, `idle-think`) failed because they did
+    idle more slowly instead of doing something. See [[Animation Catalogue]].
+
+    It shifts weight rather than hopping: three feet stay welded to row 31 throughout
+    and only the outermost foot on the leaning side lifts, so the floor line survives.
+    The sway does widen the silhouette past the anchor's 24px at the extremes, which no
+    other standing loop does.
+
+    The one loop clip that is a plain slice of its source, no anchor frame at either end
+    -- see `HAPPY_CYCLE` above for what that costs and why it is worth it.
+    """
+    return imported(HAPPY_SRC, _body_shade_prop_recolour)[HAPPY_CYCLE]
+
+
 def wave_off():
     """
     Transition: goodbye wave with placeholder pixels, to be replaced by hand-drawn art.
@@ -1806,6 +1847,7 @@ STATES = {
     "starting": appear,
     "idle": idle,
     "dancing": dancing,
+    "happy": happy,
     "sleeping": sleeping,
     "thinking": thinking,
     "thinking-alt": thinking_alt,
@@ -1859,11 +1901,30 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 1.0,
     },
+    "happy": {
+        # The idle variant that carries a mood: a whole-body rock, hand-drawn. The
+        # only variant that reads as an expression rather than as a way of standing
+        # still.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        # Weights are shares of the group, not probabilities: the choreographer sums
+        # them and draws in proportion, excluding whatever is on screen. At 0.5 this
+        # runs 23% of turns, level with `dancing`, against `idle`'s 34%. It sat at 1.0
+        # for one revision, which bought it 32% and pushed `workout` down to 17% --
+        # more presence than a mood clip wants.
+        "weight": 0.5,
+        # At 1.28s a single pass is over before the eye has read it, and any swap
+        # request -- an epoch roll, a fidget, even a usage-rail update -- could land
+        # after one. Eight cycles is 10.24s on the panel, paid for in up to 10.24s of
+        # reaction lag on a real state change. See [[Menu Bar App]].
+        "minCycles": 8,
+    },
     "dancing": {
-        # A fourth "idle" variant: appear.gif's own second half, which used to be
-        # stranded at the tail of the entrance where it played once a session. It is
-        # the most characterful idle art there is, so it carries the highest weight
-        # of the variants -- see dancing()'s docstring.
+        # An "idle" variant: appear.gif's own second half, which used to be stranded
+        # at the tail of the entrance where it played once a session. It outweighs
+        # `workout` for being the more characterful of the two, and is level with
+        # `happy` and below `idle` -- see dancing()'s docstring.
         "loops": True,
         "pose": "standing",
         "variantGroup": "idle",
@@ -2246,6 +2307,10 @@ if __name__ == "__main__":
             clip_entry["pose"] = CLIP_METADATA[name]["pose"]
             clip_entry["variantGroup"] = CLIP_METADATA[name]["variantGroup"]
             clip_entry["weight"] = CLIP_METADATA[name]["weight"]
+            # Optional on a loop: how many full cycles must play before a swap may
+            # land. Absent means one, which is what every other loop wants.
+            if "minCycles" in CLIP_METADATA[name]:
+                clip_entry["minCycles"] = CLIP_METADATA[name]["minCycles"]
         else:
             clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
