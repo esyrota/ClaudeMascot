@@ -98,7 +98,8 @@ plugin on first launch, and the repo is no longer a marketplace.
   piece, and the three scheduling fields it needed (`maxPerPhase`, `maxRepeats`,
   `interruptible`) with a phase ledger owned by `PanelController`. Its [[Analysis]] records
   two defects that every green Run Report and all 190 tests were blind to, both found only
-  by reading the produced frames back.
+  by reading the produced frames back. A third surfaced later and only in the logs: the
+  clip's own cap evicted it 1.5s in, so nobody had ever seen the Pac-Man.
 - `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
   against an on-screen reference in the same frame, and the colour rules rewritten around
   it. See its [[Findings]] for the evidence, the method, and the alignment error that

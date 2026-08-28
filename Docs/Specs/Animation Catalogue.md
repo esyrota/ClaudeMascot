@@ -309,7 +309,11 @@ and 140ms a frame) and keep their own.
 | **doze-dream**<br>dozing → dozing, non-looping, 34f · 15.62s (motion 13.12s)<br>`fidgetGroup: "sleeping"` · `maxPerPhase: 1` · `interruptible: true` |
 
 **`doze-dream` is a `dozing` self-edge with `fidgetGroup: "sleeping"`, `maxPerPhase: 1`, and
-`interruptible: true`.** The nine beats: he sleeps while bubbles drift, the largest bubble
+`interruptible: true`.** Those last two are what a set piece needs and what nearly killed
+it: `interruptible` only ever meant *a waking may cut in*, and a same-phase swap must not —
+see Boundary scheduling in [[Menu Bar App]].
+
+The nine beats: he sleeps while bubbles drift, the largest bubble
 grows instead of popping — a hollow circle, 1px white stroke around a black fill, swallowing
 the mascot and then passing off the panel entirely, which is what leaves the screen dark — he walks in from the left and looks back the way he came — left, toward the corner the Pac-Man will enter from, since a glance the other way makes the startle a reaction to nothing, he startles without
 rising using frames 4–5 from `starting`, walks off right, a yellow Pac-Man chases left to
