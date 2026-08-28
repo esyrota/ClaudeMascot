@@ -130,6 +130,13 @@ final class AppModel: ObservableObject {
     renderCurrentOverlay(usageBox)
   }
 
+  /// Set while a `UsageProbe.run` subprocess is in flight. `.working`
+  /// produces the densest bursts of hook events, so without this a single
+  /// stale window would spawn one subprocess per event instead of one per
+  /// threshold window. Cleared on every path out of `maybeProbeUsage`'s
+  /// spawned `Task`.
+  private var probeInFlight = false
+
   init(
     settings: AppSettings = AppSettings(),
     bleClient: BLEClient = BLEClient(),
@@ -271,6 +278,11 @@ final class AppModel: ObservableObject {
         }
 
         Task { await self.panelController.tick() }
+
+        // Opportunistically refresh the usage rail off the back of this hook
+        // event, after `currentState` reflects whatever the event just
+        // produced — `maybeProbeUsage` reads it to pick the threshold.
+        self.maybeProbeUsage()
       }
       .store(in: &cancellables)
 
@@ -282,8 +294,7 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] usage in
         guard let self, let usage else { return }
-        self.currentUsage = usage
-        UsageSnapshotCache.save(usage, to: self.usageCacheURL)
+        self.applyUsage(usage)
       }
       .store(in: &cancellables)
 
@@ -460,6 +471,65 @@ final class AppModel: ObservableObject {
     currentState = derivedState
     panelController.handle(derivedState)
     Task { await panelController.tick() }
+  }
+
+  // MARK: - Usage probe
+
+  /// The one application point for a `UsageSnapshot`, regardless of source —
+  /// the hook-relayed statusline payload via `hookServer.$lastUsage`, or
+  /// `UsageProbe.run`'s background subprocess below. Assigns `currentUsage`
+  /// and persists it to `usageCacheURL` so the rail survives the next app
+  /// restart.
+  ///
+  /// Deliberately does **not** call `panelController.tick()` — that
+  /// asymmetry with the hook-event sink above it is the separation between
+  /// the usage cycle and the upload cycle; a tick here would let probe
+  /// cadence drive panel traffic, which this design must not do.
+  private func applyUsage(_ usage: UsageSnapshot) {
+    currentUsage = usage
+    UsageSnapshotCache.save(usage, to: usageCacheURL)
+  }
+
+  /// How old `currentUsage` must be, for the panel's current state, before a
+  /// probe is worth spawning. `.working`/`.thinking` produce hook events
+  /// dense enough that the rail can otherwise lag noticeably behind reality;
+  /// every other state is quiet enough that a slower refresh is unnoticed.
+  /// A pure static function (rather than a branch buried in the sink) so it
+  /// is independently testable, and switches exhaustively so a new
+  /// `PanelState` case forces a decision here instead of silently falling
+  /// into a default.
+  static func stalenessThreshold(for state: PanelState) -> TimeInterval {
+    switch state {
+    case .working, .thinking:
+      return 30
+    case .starting, .idle, .sleeping, .waiting, .done, .away, .off:
+      return 120
+    }
+  }
+
+  /// Spawns a `UsageProbe.run` subprocess when `currentUsage` is missing or
+  /// stale for `currentState`, and none is already in flight. The `claude`
+  /// URL is resolved here, on the main actor, via `pluginInstaller` — never
+  /// from the background task itself, since `PluginInstaller.locateClaude()`
+  /// is `@MainActor`-only. The probe then runs off the main actor and its
+  /// result, if any, is applied back via `applyUsage`.
+  private func maybeProbeUsage() {
+    guard !probeInFlight else { return }
+    let threshold = Self.stalenessThreshold(for: currentState)
+    if let usage = currentUsage, Date().timeIntervalSince(usage.receivedAt) <= threshold {
+      return
+    }
+    guard let claudeURL = pluginInstaller.locateClaude() else { return }
+
+    probeInFlight = true
+    Task { [weak self] in
+      let snapshot = await UsageProbe.run(claudeURL: claudeURL, now: Date.init)
+      guard let self else { return }
+      self.probeInFlight = false
+      if let snapshot {
+        self.applyUsage(snapshot)
+      }
+    }
   }
 
   // MARK: - Timer

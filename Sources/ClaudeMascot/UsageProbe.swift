@@ -105,4 +105,90 @@ enum UsageProbe {
     }
     return nil
   }
+
+  /// The wire envelope `claude -p ... --output-format json` prints: a JSON
+  /// object whose `result` field carries the prose `parse` reads. Other
+  /// fields (`is_error`, cost, etc.) are out of scope for this probe.
+  private struct ResultEnvelope: Decodable {
+    let result: String
+  }
+
+  /// Runs `claude -p "/usage" --output-format json` and parses the result.
+  /// `nil` on any failure — a probe is a background convenience and must
+  /// never surface an error or disturb the rail: binary missing, non-zero
+  /// exit, unparseable JSON, no `result` key, `parse` returning nil, or a
+  /// 10s timeout.
+  ///
+  /// `nonisolated` and captures no `AppModel`/main-actor state — everything
+  /// it needs is passed in, matching `UsageSnapshot`'s own discipline, so
+  /// this runs off the main actor and is testable without a live app.
+  static func run(claudeURL: URL, now: @escaping () -> Date) async -> UsageSnapshot? {
+    let process = Process()
+    process.executableURL = claudeURL
+    process.arguments = ["-p", "/usage", "--output-format", "json"]
+
+    // Inherit the environment (PATH, HOME) rather than replace it wholesale,
+    // and add the guard `relay.sh` keys on so this probe's own
+    // SessionStart/SessionEnd hooks do not feed back into the socket and
+    // re-trigger the entrance animation.
+    var environment = ProcessInfo.processInfo.environment
+    environment["CLAUDEMASCOT_PROBE"] = "1"
+    process.environment = environment
+
+    let stdoutPipe = Pipe()
+    process.standardOutput = stdoutPipe
+    process.standardError = FileHandle.nullDevice
+
+    do {
+      try process.run()
+    } catch {
+      return nil
+    }
+
+    // Reading the pipe runs concurrently with the exit/timeout race below,
+    // not after it: the child can fill the pipe buffer and block on write
+    // before it exits, so waiting on `waitUntilExit()` first — with nothing
+    // draining the pipe — can deadlock against that. On a timeout,
+    // `terminate()` closes the pipe from the writing end, which is what lets
+    // this read return instead of hanging past the 10s budget.
+    let readTask = Task.detached(priority: .utility) {
+      stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+    }
+
+    // `withTaskGroup` implicitly awaits every child before returning, and
+    // `process.waitUntilExit()` is a blocking call that never observes
+    // cancellation — so `group.cancelAll()` alone cannot make that child
+    // return early. The timeout child must terminate the process itself,
+    // before it returns, so `waitUntilExit()` unblocks and the group can
+    // drain. Guarded by `Task.isCancelled` so the normal, non-timeout path
+    // (the sleep cancelled because the process already exited) never
+    // terminates an already-finished child.
+    let timedOut = await withTaskGroup(of: Bool.self) { group in
+      group.addTask {
+        process.waitUntilExit()
+        return false
+      }
+      group.addTask {
+        try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+        if Task.isCancelled { return false }
+        if process.isRunning { process.terminate() }
+        return true
+      }
+      let result = await group.next() ?? true
+      group.cancelAll()
+      return result
+    }
+
+    let outputData = await readTask.value
+
+    guard !timedOut, process.terminationStatus == 0 else { return nil }
+
+    guard
+      let envelope = try? JSONDecoder().decode(ResultEnvelope.self, from: outputData)
+    else {
+      return nil
+    }
+
+    return parse(result: envelope.result, now: now())
+  }
 }
