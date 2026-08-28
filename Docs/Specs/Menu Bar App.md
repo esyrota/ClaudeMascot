@@ -205,8 +205,11 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
     flag, so mashing it cannot multiply subprocesses. Its detail is the age of the current
     reading (`Updated 3m ago`, `Updated just now`), and `Refreshing…` while one is running.
   - **Enabled** — checkbox, master switch. Off means: leave the panel alone, ignore state changes, disconnect.
-  - **Send Test Image…** — pick a 32×32 GIF and hold it on the panel (see below).
-  - **Resume Mascot** — shown only while a test image is held.
+  - **Send Test Image…** — pick a 32×32 GIF and hold it on the panel (see below). Hidden
+    unless Option is held as the menu opens: it belongs to the colour work, not to the
+    everyday menu.
+  - **Resume Mascot** — shown only while a test image is held, Option or not, so the
+    panel can always be handed back to the mascot.
   - **Options…** — opens Settings.
   - **Quit**.
 

@@ -65,7 +65,7 @@ Each one cost a wrong diagnosis to find.
 | Colour test card | `art/testcard.py` | diagnostic, keep |
 | Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — nine cards, the on-screen reference, and the photo/video reader (averages video frames; the panel is scan-driven) |
 | Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
-| Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
+| Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Option-held → Send Test Image…; the only way anything but a clip reaches the panel |
 | Status overlay | `Overlay.swift` + `UsageRail.swift` | **shipped** — a layer behind the mascot; row 0 carries the 5-hour usage rail |
 | GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 41 clips pixel-exact |
 | Compositor | `Compositor.swift` | **shipped** — overlay behind, mascot in front, mandatory 1px knockout halo. **No overlay = byte-identical passthrough** |

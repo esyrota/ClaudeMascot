@@ -345,8 +345,9 @@ and **believe its landmark line before its numbers** — an alignment that was o
 cell once inverted a whole reading and looked entirely plausible doing it.
 
 **Nothing in this repo can send them by itself.** The Python daemon that used to
-is retired, so a card reaches the panel only through the app: menu bar →
-**Send Test Image…**, which holds it until **Resume Mascot** (see [[Menu Bar App]]).
+is retired, so a card reaches the panel only through the app: menu bar with Option
+held → **Send Test Image…**, which holds it until **Resume Mascot** (see
+[[Menu Bar App]]).
 
 **Put the reference in the same frame.** The phone's own processing — Smart HDR,
 auto white balance, Photographic Styles — is not defeatable by settings alone, and

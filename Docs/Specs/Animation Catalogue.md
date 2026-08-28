@@ -90,9 +90,9 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 **idle** — four variants, the richest set because idle is on screen most.
 
-|                               |                                 |                                     |                                     |
-| ----------------------------- | ------------------------------- | ----------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+|                               |                                                  |                                     |                                     |
+| ----------------------------- | ------------------------------------------------ | ----------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif)                  | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
 | **idle** · 7f · 2.56s · w 1.0 | **happy** · 8f · 1.28s · w 0.5<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — two variants, and neither of them mimes thinking.

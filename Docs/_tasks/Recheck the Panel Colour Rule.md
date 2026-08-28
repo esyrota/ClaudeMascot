@@ -52,7 +52,8 @@ has checked, and an overlay layer's design depends on the answer.
 ### The procedure
 
 1. **The app is the only sender.** `legacy/` is retired, so use the menu bar's
-   **Send Test Image…**, which holds the card on the panel until **Resume Mascot**.
+   **Send Test Image…** (Option-held menu), which holds the card on the panel until
+   **Resume Mascot**.
    Brightness stays live on the Settings slider while a card is held.
 2. **Put the reference in the same frame.** Open `art/testcards/reference.html` on the
    Mac and photograph the panel beside the screen. This is the point: the phone's
