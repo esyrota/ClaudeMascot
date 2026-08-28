@@ -122,10 +122,32 @@ enum UsageProbe {
   /// `nonisolated` and captures no `AppModel`/main-actor state — everything
   /// it needs is passed in, matching `UsageSnapshot`'s own discipline, so
   /// this runs off the main actor and is testable without a live app.
-  static func run(claudeURL: URL, now: @escaping () -> Date) async -> UsageSnapshot? {
+  ///
+  /// `workingDirectory` is set as the child's cwd rather than left to
+  /// inherit ours. Left unset, `claude` does its project-workspace
+  /// discovery from whatever directory this app happens to be launched
+  /// with — `/` for a menu-bar app with no working directory of its own —
+  /// and macOS attributes every folder that discovery walks into to this
+  /// process, surfacing as folder-permission prompts for a "scan" this app
+  /// never asked for. A directory this probe owns keeps that discovery
+  /// confined to a place with nothing in it. If the directory cannot be
+  /// created, the probe returns `nil` rather than falling back to the
+  /// inherited cwd — an unrunnable probe is strictly better than one that
+  /// resumes scanning the machine.
+  static func run(claudeURL: URL, workingDirectory: URL, now: @escaping () -> Date) async
+    -> UsageSnapshot?
+  {
+    do {
+      try FileManager.default.createDirectory(
+        at: workingDirectory, withIntermediateDirectories: true)
+    } catch {
+      return nil
+    }
+
     let process = Process()
     process.executableURL = claudeURL
     process.arguments = ["-p", "/usage", "--output-format", "json"]
+    process.currentDirectoryURL = workingDirectory
 
     // Inherit the environment (PATH, HOME) rather than replace it wholesale,
     // and add the guard `relay.sh` keys on so this probe's own

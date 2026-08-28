@@ -114,6 +114,14 @@ final class AppModel: ObservableObject {
   /// `~/Library/Application Support/ClaudeMascot`.
   private let usageCacheURL: URL
 
+  /// Where `UsageProbe.run` sets its subprocess's cwd. Defaults to a
+  /// `probe` subdirectory next to `usageCacheURL`'s file, in Application
+  /// Support; overridable so tests can point it at a temp directory
+  /// instead of the real `~/Library/Application Support/ClaudeMascot`. See
+  /// `UsageProbe.run`'s doc comment for why the probe needs a directory of
+  /// its own rather than inheriting this app's.
+  private let probeWorkingDirectory: URL
+
   /// Latest usage snapshot: loaded from `UsageSnapshotCache` at launch, then
   /// kept current by the `hookServer.$lastUsage` subscription in `init`,
   /// which also persists each new one back to the cache.
@@ -145,6 +153,9 @@ final class AppModel: ObservableObject {
     pluginInstaller: PluginInstaller = PluginInstaller(),
     tickInterval: Duration = .seconds(1),
     usageCacheURL: URL = UsageSnapshotCache.defaultFileURL,
+    probeWorkingDirectory: URL = UsageSnapshotCache.defaultFileURL
+      .deletingLastPathComponent()
+      .appendingPathComponent("probe", isDirectory: true),
     // Lets a test observe uploads: `PanelAdapter` talks to real BLE, and
     // nothing outside `init` can otherwise see whether a code path reached
     // `panel.upload(_:)`. Production never passes this — it always builds
@@ -157,6 +168,7 @@ final class AppModel: ObservableObject {
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
     self.usageCacheURL = usageCacheURL
+    self.probeWorkingDirectory = probeWorkingDirectory
     self.eventLog = EventLog()
     self.sessionTracker = SessionTracker()
     self.sleepWatcher = SleepWatcher()
@@ -529,8 +541,9 @@ final class AppModel: ObservableObject {
     guard let claudeURL = pluginInstaller.locateClaude() else { return }
 
     probeInFlight = true
-    Task { [weak self] in
-      let snapshot = await UsageProbe.run(claudeURL: claudeURL, now: Date.init)
+    Task { [weak self, probeWorkingDirectory] in
+      let snapshot = await UsageProbe.run(
+        claudeURL: claudeURL, workingDirectory: probeWorkingDirectory, now: Date.init)
       guard let self else { return }
       self.probeInFlight = false
       if let snapshot {

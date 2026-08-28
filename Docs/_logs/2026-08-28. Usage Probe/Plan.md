@@ -198,3 +198,33 @@ the full six chunks; chunks 2–6 are unchanged and their briefs are written.
 - **Chunk 6 is the only real test of chunk 2.** The relay guard cannot be verified from
   the Bash tool — it needs the installed app and a live probe. Do not let it be dropped as
   "just validation".
+
+## Feedback round (chunks 8–9)
+
+Eugene's two items after living with the shipped build.
+
+| Item | Fix | File | Chunk |
+|---|---|---|---|
+| The app asked for 4–5 folder permissions (Desktop, etc.) and appears to "scan the machine" | The probe inherits the app's cwd, which is `/`, so `claude` takes the **filesystem root** as its workspace. Give the probe its own empty directory. | `UsageProbe.swift`, `AppModel.swift` | 8 |
+| No coverage of `run` at all | Test it against a stub `claude` script: asserts the cwd, the `CLAUDEMASCOT_PROBE` env var, and the parsed result | `UsageProbeTests.swift` | 8 |
+| Can't tell whether the rail's value is right | Show the 5-hour number and its reset explicitly in the menu | `MenuBarView.swift` | 9 |
+| No way to refresh on demand | A `Refresh` row with a relative "Updated 3m ago" label | `MenuBarView.swift`, `AppModel.swift` | 9 |
+
+### The permission prompts — confirmed diagnosis, not a hypothesis
+
+The app runs with cwd `/` (`lsof -d cwd` on the running process). `UsageProbe.run` never
+sets `currentDirectoryURL`, so every probe launched `claude` with the filesystem root as
+its project directory. The evidence is on disk: `~/.claude/projects/-` — the encoding of
+`/` — held **30 session transcripts written in 26 minutes**, and was the most recently
+modified project directory on the machine.
+
+A Claude Code session does workspace discovery against its project root. Rooted at `/`,
+that walks into `~/Desktop`, `~/Documents` and friends, and because the probe is a child
+of the app, macOS attributes those accesses to ClaudeMascot — which is exactly the
+prompt Eugene saw. **This is a regression introduced by chunk 5 and shipped in PR #16.**
+
+The value itself was never wrong: `usage.json` read 36% at the moment `claude -p "/usage"`
+also read 36%.
+
+Verified before briefing: running the probe from an empty directory still returns real
+subscription percentages, not the `--bare`-style cost fallback.
