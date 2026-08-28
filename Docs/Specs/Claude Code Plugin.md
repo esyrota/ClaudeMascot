@@ -173,9 +173,16 @@ claude -p "/usage" --output-format json
 no model call. It is not costless in every other sense: each run is a ~600ms process spawn
 that leaves ~3.3KB of transcript and a `session-env` directory under `~/.claude`.
 `UsageProbe` parses the result into the same `UsageSnapshot` the statusline wrapper
-produces, and only the two top-line percentages ("Current session", "Current week") are
-used — the breakdown beneath them is explicitly approximate ("local sessions on this
-machine") and is not read. See [[Menu Bar App]] for when the app decides to spawn one.
+produces. Only the "Current session" line is read: the 5-hour window is the one the rail
+shows, the weekly window is out of scope, and the breakdown beneath them is explicitly
+approximate ("local sessions on this machine"). The reset instant is parsed rather than
+computed — the string names an IANA zone but carries no year, so the year is the one that
+places the reset inside the next five hours.
+
+The probe is bounded at 10 seconds and every failure — a missing binary, a non-zero exit,
+unparseable JSON, a timeout — returns `nil` and changes nothing. It is a background
+convenience: it must never clear the rail or surface an error. See [[Menu Bar App]] for
+when the app decides to spawn one.
 
 **`--bare` and `--settings '{"hooks":{}}'` were both tried and both fail.** `--bare`
 suppresses hooks but never reads OAuth, so `/usage` falls back to a local cost summary and
