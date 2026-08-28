@@ -136,3 +136,63 @@ succeed with a default `AnimationLibrary()` will silently no-op rather than fail
 The design survived contact with the implementation, and the two things that would have
 shipped broken — an unenforceable timeout and a spec claiming the probe reads a window it
 ignores — were both caught by reading the work rather than by any green check.
+
+## Feedback round (chunks 8–9)
+
+Eugene came back with two items after living with the shipped build. One was a real
+regression this task introduced.
+
+| Chunk | Model | Est. | Actual | Tools | Wall | Outcome |
+|---|---|---:|---:|---:|---:|---|
+| 8 — Probe runs in its own directory | Sonnet | 110k | 97k | 47 | 5m | ✅ under estimate |
+| 9 — Usage readout and Refresh | Sonnet | 110k | 109k | 18 | 5m | ✅ after 1 fix-up |
+| 9 — fix-up (test littered real app support) | Sonnet | — | 115k | 8 | 1m | ✅ |
+
+### The regression: the probe was scanning the machine
+
+`UsageProbe.run` never set `currentDirectoryURL`, so the child `claude` inherited the
+app's cwd — `/` for a menu-bar app. Claude Code does workspace discovery from its project
+root, so every probe treated the **filesystem root** as its workspace, walked into
+`~/Desktop` and friends, and macOS attributed it to ClaudeMascot as the parent. That is
+the 4–5 folder-permission prompts Eugene saw.
+
+Confirmed on disk before any brief was written: `~/.claude/projects/-` — the encoding of
+`/` — held 30 session transcripts written in 26 minutes and was the most recently modified
+project directory on the machine. It reached 51 before the fixed build replaced it.
+
+Fixed by giving the probe `…/Application Support/ClaudeMascot/probe`, with a hard rule
+that a directory it cannot create means `nil`, never a fallback to the inherited cwd.
+Verified on the real machine after reinstall: the `/` count stayed frozen at 51 while
+three fresh sessions appeared under the probe's own directory.
+
+**What this cost:** the design reviewed cleanly, the tests passed, the specs matched, and
+the guard was verified end-to-end — and the thing that actually hurt the user was a
+property of the process that no one thought to state. `run` had **zero** tests before this
+round; it now has five, including a cwd regression test proven to fail without the fix.
+
+### The value was never wrong
+
+`usage.json` read 58% at the same moment `claude -p "/usage"` read 58%. The complaint was
+legibility: the rail is a quantised bar and the number behind it was invisible. Chunk 9
+adds the readout and a Refresh that bypasses the staleness gate but not the in-flight flag.
+
+### What worked this round
+
+- **Diagnosing before briefing.** The cwd cause was established from `lsof` and
+  `~/.claude/projects` before a single chunk was dispatched, so the brief stated a
+  confirmed fix rather than a hypothesis — and the chunk came in *under* estimate, the
+  only one all day to do so.
+- **Verifying the fix's premise first.** Running the probe from an empty directory and
+  confirming it still returned real percentages took one command and de-risked the whole
+  chunk.
+- **Sabotage proofs, again.** Chunk 8's cwd test was proven to fail without the fix, by
+  both the subagent and the orchestrator independently.
+
+### Still open
+
+- **Litter is confined, not eliminated.** Each probe still leaves a session transcript,
+  now under the probe directory instead of `/`. ~30 sessions per half hour of active use.
+  `~/.claude/projects/-` retains 51 stale transcripts from before the fix.
+- `currentUsage` is not `@Published` (it is computed over `usageBox`), so the menu's
+  readout refreshes on the back of `probeInFlight` toggling rather than on its own. It
+  works, but it is incidental rather than designed.
