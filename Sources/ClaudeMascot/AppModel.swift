@@ -144,7 +144,12 @@ final class AppModel: ObservableObject {
     hookServer: HookServer = HookServer(),
     pluginInstaller: PluginInstaller = PluginInstaller(),
     tickInterval: Duration = .seconds(1),
-    usageCacheURL: URL = UsageSnapshotCache.defaultFileURL
+    usageCacheURL: URL = UsageSnapshotCache.defaultFileURL,
+    // Lets a test observe uploads: `PanelAdapter` talks to real BLE, and
+    // nothing outside `init` can otherwise see whether a code path reached
+    // `panel.upload(_:)`. Production never passes this — it always builds
+    // the real adapter below.
+    panel: PanelDriving? = nil
   ) {
     self.settings = settings
     self.bleClient = bleClient
@@ -164,10 +169,12 @@ final class AppModel: ObservableObject {
     )
 
     let usageBox = self.usageBox
-    let adapter = PanelAdapter(
-      library: animationLibrary, ble: bleClient,
-      overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) }
-    )
+    let adapter: PanelDriving =
+      panel
+      ?? PanelAdapter(
+        library: animationLibrary, ble: bleClient,
+        overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) }
+      )
     // Walks the pose graph instead of looking states up 1:1. Built from
     // whatever manifest the library loaded (an empty one when none did, so
     // resolution simply returns `nil` everywhere rather than crashing).

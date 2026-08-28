@@ -113,16 +113,35 @@ private func makeDisconnectedSettings() -> AppSettings {
 
 /// Builds an `AppModel` wired to a fresh temp socket and a fresh temp usage
 /// cache, with `autoConnect` off so construction never touches Bluetooth.
+/// `panel`, when supplied, replaces the real `PanelAdapter` so a test can
+/// observe uploads (chunk 7's seam) — `nil` keeps every existing call site
+/// unchanged.
 @MainActor
 private func makeAppModel(
   socketURL: URL = makeTempSocketURL(),
-  cacheURL: URL = makeTempCacheURL()
+  cacheURL: URL = makeTempCacheURL(),
+  panel: PanelDriving? = nil
 ) -> AppModel {
   AppModel(
     settings: makeDisconnectedSettings(),
     hookServer: HookServer(socketURL: socketURL),
-    usageCacheURL: cacheURL
+    usageCacheURL: cacheURL,
+    panel: panel
   )
+}
+
+/// Counts calls to `upload(_:)`, the one signal chunk 7's assertion cares
+/// about. `setPower`/`setBrightness` are no-ops — nothing here exercises
+/// power state.
+@MainActor
+private final class PanelUploadSpy: PanelDriving {
+  private(set) var uploadCount = 0
+
+  func setPower(on: Bool) async throws {}
+  func setBrightness(_ percent: Int) async throws {}
+  func upload(_ clip: Clip) async throws {
+    uploadCount += 1
+  }
 }
 
 @Test @MainActor
@@ -230,4 +249,104 @@ func stalenessThresholdIsExhaustiveAcrossAllNineCases() {
   #expect(AppModel.stalenessThreshold(for: .done) == 120)
   #expect(AppModel.stalenessThreshold(for: .away) == 120)
   #expect(AppModel.stalenessThreshold(for: .off) == 120)
+}
+
+/// Points `AnimationLibrary` at the real bundled resources directly, the
+/// same way
+/// `AnimationLibraryTests.testRealBundledManifestLoadsAndReportsStartingMotion`
+/// does: `swift test` never puts this package's bundled resources on
+/// `Bundle.main`, so a bare `AnimationLibrary()`'s manifest loads empty and
+/// `PanelController`'s `resolve` closure can never produce a clip. Both
+/// tests below need a clip that actually resolves — one to prove `tick()`
+/// can upload at all, the other to prove `applyUsage` deliberately never
+/// reaches that same `tick()`.
+@MainActor
+private func libraryWithRealBundledClips() -> AnimationLibrary {
+  let library = AnimationLibrary()
+  let resourcesDir = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("Sources/ClaudeMascot/Resources")
+  library.bundleOverride = Bundle(path: resourcesDir.path)
+  return library
+}
+
+/// The core separation the whole usage-probe design rests on: applying a
+/// usage snapshot must never itself cause a panel upload. Mirrors
+/// `newUsageSnapshotIsPersistedToTheCache`'s delivery of a usage line over
+/// the socket, but asserts on the upload spy instead of the cache.
+///
+/// Built with `libraryWithRealBundledClips()`, not the default
+/// `AnimationLibrary()`: with an empty manifest `PanelController.resolve`
+/// always returns `nil`, so an upload would never happen regardless of
+/// whether `applyUsage` is guilty — the zero count would prove nothing.
+@Test @MainActor
+func applyingAUsageSnapshotNeverUploadsToThePanel() async throws {
+  let socketURL = makeTempSocketURL()
+  let spy = PanelUploadSpy()
+  let model = AppModel(
+    settings: makeDisconnectedSettings(),
+    animationLibrary: libraryWithRealBundledClips(),
+    hookServer: HookServer(socketURL: socketURL),
+    usageCacheURL: makeTempCacheURL(),
+    panel: spy
+  )
+  defer {
+    model.hookServer.stop()
+    try? FileManager.default.removeItem(at: socketURL.deletingLastPathComponent())
+  }
+
+  SocketClient.send(
+    "{\"event\":\"Usage\",\"usedPercent\":55,\"resetsAt\":4100000000}\n",
+    to: socketURL.path)
+  await waitUntil { model.currentUsage != nil }
+
+  #expect(spy.uploadCount == 0)
+}
+
+/// The contrast that stops the assertion above being vacuous: a real panel
+/// state change *does* reach `panel.upload(_:)`.
+///
+/// This does not deliver the change over the socket the way the test above
+/// delivers usage: `AppModel`'s hook-event sink only reduces an event once
+/// `enabled` is true, and `enabled` starts `false` here on purpose — every
+/// test in this file forces `settings.autoConnect` off specifically so
+/// `init` never calls `BLEClient.start()`, which constructs a real
+/// `CBCentralManager` and is exactly what
+/// `Docs/Reference/macOS Bluetooth TCC.md` says a bare `swift test` process
+/// must never do. Flipping `enabled` to `true` to route a hook event through
+/// the socket would hit that same call.
+///
+/// So this drives `model.panelController` directly instead — the same two
+/// calls (`handle`, then `tick()`) that the hook-event sink itself makes
+/// once `enabled` lets an event through (see `AppModel.swift`'s
+/// `hookServer.$lastEvent` subscription). It exercises the same
+/// `PanelController` → `PanelDriving.upload(_:)` path the socket-delivered
+/// case above deliberately does not reach.
+@Test @MainActor
+func aPanelStateChangeDoesUploadToThePanel() async throws {
+  let socketURL = makeTempSocketURL()
+  let spy = PanelUploadSpy()
+  let model = AppModel(
+    settings: makeDisconnectedSettings(),
+    animationLibrary: libraryWithRealBundledClips(),
+    hookServer: HookServer(socketURL: socketURL),
+    usageCacheURL: makeTempCacheURL(),
+    panel: spy
+  )
+  defer {
+    model.hookServer.stop()
+    try? FileManager.default.removeItem(at: socketURL.deletingLastPathComponent())
+  }
+
+  model.panelController.handle(.starting)
+  // Polled rather than called once: the first call may only begin a phase
+  // transition before the upload lands on a later one. Still deterministic
+  // — a bounded iteration count, no `sleep` used as synchronisation.
+  for _ in 0..<20 {
+    await model.panelController.tick()
+  }
+
+  #expect(spy.uploadCount > 0)
 }
