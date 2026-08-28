@@ -4,6 +4,14 @@
 # this prevents a broken mascot from disturbing a Claude Code session.
 # SessionEnd is synchronous, so this timeout bounds session teardown.
 
+# ClaudeMascot's own usage probe runs `claude -p "/usage"`, which starts a real
+# session and so fires SessionStart/SessionEnd through this relay. Left alone that
+# is a feedback loop, and worse: SessionTracker reads each probe as a new session
+# and re-triggers the entrance animation. Hook processes inherit the spawning
+# environment, so the app sets this variable and we drop the event here, before
+# it costs anything.
+[ -n "$CLAUDEMASCOT_PROBE" ] && exit 0
+
 SOCK="$HOME/Library/Application Support/ClaudeMascot/hook.sock"
 
 # Read the full payload from stdin. Use cat to handle both missing trailing
