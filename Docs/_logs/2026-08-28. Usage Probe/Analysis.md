@@ -1,10 +1,10 @@
 # Usage Probe — Analysis
 
-**Outcome:** ✅ All seven chunks complete. 202 tests pass, zero build warnings, zero lint
+**Outcome:** ✅ All eight chunks complete. 204 tests pass, zero build warnings, zero lint
 findings. The relay guard was verified on the real installed app: a probe session produced
 **0** events in `input.jsonl`.
 
-Run across two sessions: chunk 1 on 2026-08-28 ~01:50 EEST, chunks 2–6 the same day from
+Run across two sessions: chunk 1 on 2026-08-28 ~01:50 EEST, chunks 2–7 the same day from
 14:57 after the 5-hour window reset.
 
 ## Numbers
@@ -19,8 +19,9 @@ Run across two sessions: chunk 1 on 2026-08-28 ~01:50 EEST, chunks 2–6 the sam
 | 5 — fix-up (timeout bug) | Sonnet | — | 95k | 4 | 25s | ✅ |
 | 6a — `AppModel` usage tests | Haiku | 35k | 56k | 12 | 2m | ✅ 1 of 2 tests, gap reported |
 | 6 — Final verification | Haiku | 35k | 43k | 15 | 3m | ✅ |
+| 7 — The no-upload assertion | Sonnet | 90k | 134k | 71 | 9m | ✅ |
 | Spec reconciliation audit | Haiku | — | 68k | 9 | 2m | ✅ 1 contradiction found |
-| **Total** | | **288k** | **623k** | **156** | **~50m** | |
+| **Total** | | **378k** | **757k** | **227** | **~60m** | |
 
 Every chunk overran its estimate — the *smallest* overrun was 1.3×. The estimates in this
 plan were systematically low by roughly 2×, which is the single most useful number to
@@ -34,7 +35,7 @@ carry into the next run.
 | Session window at wrap-up | 23% |
 | Cost of chunks 2–6 + audit | ~21 points of the 5-hour window |
 | Cost of chunk 1 (prior session) | ~10 points (39% → 49%) |
-| Subagent tokens, all chunks | 623k |
+| Subagent tokens, all chunks | 757k |
 
 The 21 points are **not** the subagent tokens alone. A long orchestrator session re-sends
 a large context on every turn, and the two contributions cannot be cleanly separated from
@@ -62,6 +63,9 @@ was near enough, and finishing on the old window would have cut chunk 6 off mid-
   written before the code existed.
 - **A subagent that refused to write a vacuous test.** Chunk 6a reported the missing seam
   rather than faking the assertion — the honest outcome, and the one worth rewarding.
+- **Sabotage as a test of the test.** Chunk 7's brief required deliberately breaking the
+  production code to prove the new assertion could fail. It caught a draft that passed
+  while sabotaged — a green test that proved nothing.
 
 ## What went wrong
 
@@ -79,15 +83,42 @@ was near enough, and finishing on the old window would have cut chunk 6 off mid-
   local zone *is* `Europe/Kiev`. The unknown-zone case proves the zone is read at all, so
   the risk is small, but the strongest assertion in that file is weaker than it looks.
 
+## Chunk 7 — closing the assertion gap
+
+Added after the run, on Eugene's call. `AppModel.init` gained a `panel: PanelDriving? = nil`
+parameter (production always passes `nil` and builds the real `PanelAdapter`), which let a
+counting spy observe uploads. The assertion — a usage snapshot arriving never reaches
+`panel.upload(_:)` — now exists, with a contrast case proving the spy can count.
+
+Two vacuity traps had to be cleared, and only one of them was foreseen:
+
+1. The brief demanded a contrast case, or a spy that counted nothing would have passed.
+2. **The unforeseen one:** `swift test` never puts the package's bundled resources on
+   `Bundle.main`, so a default `AnimationLibrary()` loads an empty manifest and
+   `PanelController.resolve` returns `nil` for everything. The first draft of the test
+   passed *even with `applyUsage` deliberately sabotaged to tick*. Fixed with a
+   `libraryWithRealBundledClips()` helper mirroring the trick `AnimationLibraryTests`
+   already uses.
+
+Both the subagent and the orchestrator ran the sabotage experiment — patch `applyUsage`
+to tick, confirm the new test fails, revert — independently. It fails, so the test asserts
+something.
+
+Cost: 134k tokens, 71 tools, ~9m (est. 90k — 1.5× over, in line with the run's ~2×).
+The contrast case does not travel over the socket: hook events are only reduced when
+`enabled == true`, which every test in the file disables so `init` never constructs a real
+`CBCentralManager` (a bare `swift test` would SIGABRT — see
+[[Reference/macOS Bluetooth TCC]]). It drives `handle(.starting)` + `tick()` instead, the
+same two calls the sink makes.
+
+**New latent trap worth knowing:** any future test expecting `PanelController.resolve` to
+succeed with a default `AnimationLibrary()` will silently no-op rather than fail loudly.
+
 ## Open gaps
 
-1. **No test asserts that applying a usage snapshot doesn't drive the panel.** This is the
-   separation the whole design rests on. It needs an observable seam — e.g. a tick counter
-   on `PanelController` readable under `@testable`. A production change, deliberately not
-   made under a tests-only brief.
-2. **Four pre-existing periphery warnings** in `EventLog.swift`, untouched by this branch.
+1. **Four pre-existing periphery warnings** in `EventLog.swift`, untouched by this branch.
    Not introduced here; the new code adds zero findings.
-3. **The parser depends on an undocumented prose format.** If Claude Code rewords the
+2. **The parser depends on an undocumented prose format.** If Claude Code rewords the
    `/usage` output, `parse` returns `nil` for every input — safe (the rail keeps its last
    value) but silent. No alarm exists for "the probe has been failing for a week".
 
