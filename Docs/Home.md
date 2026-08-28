@@ -55,7 +55,7 @@ Each one cost a wrong diagnosis to find.
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
 | Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling, per-phase play limits (`PhaseLedger.swift`) |
 | Event log | `EventLog.swift` | **shipped** — always-on input + decision JSONL under Application Support |
-| Art generator | `art/generate.py` | working, **40 clips** — 12 loops, 28 one-shots. See [[Animation Catalogue]] |
+| Art generator | `art/generate.py` | working, **41 clips** — 13 loops, 28 one-shots. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Sprite-sheet importer | `art/sheet_import.py` | standalone — nothing imports a sheet any more; kept for a future one |
@@ -67,7 +67,7 @@ Each one cost a wrong diagnosis to find.
 | Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
 | Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
 | Status overlay | `Overlay.swift` + `UsageRail.swift` | **shipped** — a layer behind the mascot; row 0 carries the 5-hour usage rail |
-| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 40 clips pixel-exact |
+| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 41 clips pixel-exact |
 | Compositor | `Compositor.swift` | **shipped** — overlay behind, mascot in front, mandatory 1px knockout halo. **No overlay = byte-identical passthrough** |
 | Usage input | `plugin/hooks/statusline-wrapper.sh` + `UsageSnapshot.swift` | **shipped** — wraps the user's own statusline, tees two fields to the socket |
 

@@ -8,8 +8,8 @@ poses are joined by transition clips. **[[Animation Catalogue]] is the inventory
 clip, its numbers and the pose graph, with a playable image of each. This page covers how
 they are *made*.
 
-Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`), the
-whole of `dozing` (`sleeping` plus both its edges), and the seated pose (`working`,
+Most are drawn programmatically; `starting`/`dancing`/`done` (from `appear.gif`), `happy`,
+the whole of `dozing` (`sleeping` plus both its edges), and the seated pose (`working`,
 `work-look-down`, from the two `work-typing` sources) are imported from hand-drawn art
 instead. **`starting`'s silhouette is the reference the drawn clips are built to match**,
 and the `dozing` sources are drawn on it too. No clip ships from a sprite sheet any
@@ -140,8 +140,9 @@ left rows 0–1 would need authored alpha again.
 `generate.py`'s `imported()` takes each hand-drawn source whole — no crop, and **no frame
 subsampling**: the source durations *are* the animation. What it does do is resample
 each frame to the art's own pixel grid, which is not always the file's, then blow that
-grid up by a whole number of panel pixels and place it. Six sources go through it today:
-`appear.gif`, the three `dozing` sources, and the two `work-typing` sources below.
+grid up by a whole number of panel pixels and place it. Ten sources go through it today:
+`appear.gif`, `happy.gif`, `waiting-question.gif`, `done-flag.gif`, the three `dozing`
+sources, and the three `work-typing`/`work-coffee` sources below.
 `import_gif.py` is the different tool for a different job: art we are importing blind,
 cropped to a power-of-two window and flattened to one colour.
 
@@ -158,6 +159,17 @@ duration unchanged. No motion is lost.
 The last frame is given a long dwell (`APPEAR_TAIL_MS`) so the panel, which loops
 whatever GIF it holds, shows a mascot standing still rather than a restarted entrance
 if the hand-off runs late. The motion length (duration minus tail) is read from `clips.json` at runtime, so no hand-sync is needed.
+
+## The idle rock (`happy.gif`)
+
+Native 32×32, nine frames at 160ms, drawn by the same hand and in the same palette as
+`waiting-question.gif` — one orange family, (255,109,36), against black — so it needs no
+recolour rule of its own and goes through `_body_shade_prop_recolour()` unchanged. It has
+no shaded pixel and no prop; every non-background pixel lands on `MASCOT`.
+
+Its frame 0 *is* the `standing` anchor, pixel for pixel, so the clip needs no leading
+bookend. The last frame is mid-lean, so `happy()` appends `_standing_anchor()` to close
+the loop — the same one-sided repair `waiting` needs, and for the same reason.
 
 ## The seated pose (`work-typing.gif` / `work-typing-look-down.gif`)
 

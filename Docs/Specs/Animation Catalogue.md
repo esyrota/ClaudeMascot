@@ -61,12 +61,12 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### standing
 
-**idle** — three variants, the richest set because idle is on screen most.
+**idle** — four variants, the richest set because idle is on screen most.
 
-|                               |                                     |                                     |
-| ----------------------------- | ----------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
+|                               |                                 |                                     |                                     |
+| ----------------------------- | ------------------------------- | ----------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+| **idle** · 7f · 2.56s · w 1.0 | **happy** · 10f · 1.76s · w 1.0 | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — two variants, and neither of them mimes thinking.
 
@@ -89,6 +89,19 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 | ![done](_animations/done.gif)  | ![done-flag](_animations/done-flag.gif) |
 | **done** · 17f · 3.29s · w 1.0 | **done-flag** · 59f · 10.16s · w 1.0    |
 
+- **`happy` is the fourth idle variant, and it is the one that carries the mood.** The
+  mascot dips, then rocks its whole body right and left with its arms swung out — the
+  broadest motion any standing loop has. It is hand-drawn (`art/sources/happy.gif`,
+  native 32×32, nine frames at 160ms) and given the highest weight in the group alongside
+  `idle` itself, because it is the only variant that reads as an expression rather than as
+  a way of standing still.
+- **`happy` breaks no floor line, but it does lift a foot.** Three of the four feet stay
+  welded to row 31 through every frame; the outermost foot on the leaning side comes up
+  one or two rows and goes back down. That is weight shifting from foot to foot, not the
+  figure leaving the ground, which is the distinction the rule below is actually about.
+  The sway also widens the silhouette past the anchor's 24px — the leading arm reaches
+  x3 and x28 at the extremes — so it is the one standing loop that does not hold the
+  entrance's outline for its whole length.
 - `workout` is the barbell press, and it is an **idle** variant. It was the `thinking`
   clip for as long as this project had four animations and four states to spread them
   over, but lifting weights says nothing about working on a prompt — it is the mascot
@@ -107,8 +120,9 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   smaller creature. `idle-alt` was idle's breath at half speed with a one-pixel lean left
   and right underneath it, and the lean was the only thing distinguishing it: a 24px
   figure sliding a pixel sideways on a 32px panel reads as the whole mascot drifting, not
-  as it shifting its weight. A fourth idle variant should *do* something — play with a
-  ball, say — rather than do idle more slowly. `thinking-pace` walked off one edge and
+  as it shifting its weight. A fourth idle variant had to *do* something — play with a
+  ball, say — rather than do idle more slowly; `happy` is that variant, and its
+  side-to-side rock is a whole-body motion rather than a pixel of lean. `thinking-pace` walked off one edge and
   back in the other, twice, and it broke the mascot's position: every other clip in its
   group is a standing loop that never leaves the panel, so the choreographer can swap out
   at any frame, while this one spent most of its length offscreen or halfway through a
@@ -118,7 +132,7 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `dancing`, `sleeping`, `waiting` and `done-flag` are imported; everything else above
+- `happy`, `dancing`, `sleeping`, `waiting` and `done-flag` are imported; everything else above
   is drawn or assembled in `art/generate.py`.
 - `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
   and fills in a "..." one dot at a time, holds, then retreats the way it came. It was

@@ -137,6 +137,18 @@
       347
     ]
   },
+  "happy": {
+    "gif_bytes": 1968,
+    "crc32": 3473947499,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      457
+    ]
+  },
   "idle": {
     "gif_bytes": 1333,
     "crc32": 1764806760,

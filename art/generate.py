@@ -1166,6 +1166,35 @@ def dancing():
     return out
 
 
+# art/sources/happy.gif -- native 32x32, nine frames at 160ms, the same hand and the
+# same palette as `waiting-question.gif`: one orange family against black, no shade and
+# no prop, so `_body_shade_prop_recolour()` serves it with no rule of its own.
+HAPPY_SRC = SOURCES / "happy.gif"
+# The closing bookend. The source's frame 0 IS the standing anchor pixel for pixel, so
+# only the tail needs repairing -- the last frame is mid-lean, and the anchor contract
+# says a loop may not restart from there. 320ms is idle()'s own frame beat, so the
+# return to standing lands on the cadence the rest of the group breathes at.
+HAPPY_ANCHOR_OUT_MS = 320
+
+
+def happy():
+    """Idle variant: the mascot dips, then rocks its whole body right and left.
+
+    The broadest motion any standing loop has, and the one that carries a mood rather
+    than a way of standing still -- which is exactly what the group was short of: the
+    two variants cut before this one (`idle-alt`, `idle-think`) failed because they did
+    idle more slowly instead of doing something. See [[Animation Catalogue]].
+
+    It shifts weight rather than hopping: three feet stay welded to row 31 throughout
+    and only the outermost foot on the leaning side lifts, so the floor line survives.
+    The sway does widen the silhouette past the anchor's 24px at the extremes, which no
+    other standing loop does.
+    """
+    return imported(HAPPY_SRC, _body_shade_prop_recolour) + [
+        (_standing_anchor(), HAPPY_ANCHOR_OUT_MS)
+    ]
+
+
 def wave_off():
     """
     Transition: goodbye wave with placeholder pixels, to be replaced by hand-drawn art.
@@ -1806,6 +1835,7 @@ STATES = {
     "starting": appear,
     "idle": idle,
     "dancing": dancing,
+    "happy": happy,
     "sleeping": sleeping,
     "thinking": thinking,
     "thinking-alt": thinking_alt,
@@ -1859,11 +1889,20 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 1.0,
     },
+    "happy": {
+        # The idle variant that carries a mood: a whole-body rock, hand-drawn. Weighted
+        # level with `idle` itself -- the highest in the group -- at the user's request
+        # and because it is the only variant that reads as an expression.
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        "weight": 1.0,
+    },
     "dancing": {
-        # A fourth "idle" variant: appear.gif's own second half, which used to be
-        # stranded at the tail of the entrance where it played once a session. It is
-        # the most characterful idle art there is, so it carries the highest weight
-        # of the variants -- see dancing()'s docstring.
+        # An "idle" variant: appear.gif's own second half, which used to be stranded
+        # at the tail of the entrance where it played once a session. It outweighs
+        # `workout` for being the more characterful of the two, and sits below `idle`
+        # and `happy` -- see dancing()'s docstring.
         "loops": True,
         "pose": "standing",
         "variantGroup": "idle",

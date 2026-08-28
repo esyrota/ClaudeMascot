@@ -79,6 +79,16 @@
       "fromPose": "standing",
       "toPose": "standing"
     },
+    "happy": {
+      "file": "happy.gif",
+      "frameCount": 10,
+      "durationMs": 1760,
+      "motionMs": 1760,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "idle",
+      "weight": 1.0
+    },
     "idle": {
       "file": "idle.gif",
       "frameCount": 7,
