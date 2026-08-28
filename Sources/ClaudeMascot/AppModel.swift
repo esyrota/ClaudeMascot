@@ -141,9 +141,11 @@ final class AppModel: ObservableObject {
   /// Set while a `UsageProbe.run` subprocess is in flight. `.working`
   /// produces the densest bursts of hook events, so without this a single
   /// stale window would spawn one subprocess per event instead of one per
-  /// threshold window. Cleared on every path out of `maybeProbeUsage`'s
-  /// spawned `Task`.
-  private var probeInFlight = false
+  /// threshold window. Cleared on every path out of `spawnProbe`'s `Task`.
+  /// Published (but settable only from inside `AppModel`) so the menu's
+  /// Refresh row can disable itself and show a "Refreshing…" state while a
+  /// probe is running.
+  @Published private(set) var probeInFlight = false
 
   init(
     settings: AppSettings = AppSettings(),
@@ -527,17 +529,37 @@ final class AppModel: ObservableObject {
   }
 
   /// Spawns a `UsageProbe.run` subprocess when `currentUsage` is missing or
-  /// stale for `currentState`, and none is already in flight. The `claude`
-  /// URL is resolved here, on the main actor, via `pluginInstaller` — never
-  /// from the background task itself, since `PluginInstaller.locateClaude()`
-  /// is `@MainActor`-only. The probe then runs off the main actor and its
-  /// result, if any, is applied back via `applyUsage`.
+  /// stale for `currentState`, and none is already in flight. Delegates the
+  /// actual spawn to `spawnProbe()`, adding only the staleness check —
+  /// `refreshUsageNow()` below shares that same spawn path and skips just
+  /// this check, so there is exactly one place that ever starts a probe
+  /// `Task`.
   private func maybeProbeUsage() {
     guard !probeInFlight else { return }
     let threshold = Self.stalenessThreshold(for: currentState)
     if let usage = currentUsage, Date().timeIntervalSince(usage.receivedAt) <= threshold {
       return
     }
+    spawnProbe()
+  }
+
+  /// Probes now, bypassing the staleness gate — what the menu's Refresh row
+  /// calls. Still respects `probeInFlight`: a user mashing Refresh is
+  /// exactly the burst that flag exists to collapse into one subprocess,
+  /// same as a dense run of hook events does for `maybeProbeUsage()`.
+  func refreshUsageNow() {
+    guard !probeInFlight else { return }
+    spawnProbe()
+  }
+
+  /// The one place a `UsageProbe.run` subprocess is started, shared by
+  /// `maybeProbeUsage()` and `refreshUsageNow()` so neither duplicates the
+  /// spawn/`applyUsage` plumbing. The `claude` URL is resolved here, on the
+  /// main actor, via `pluginInstaller` — never from the background task
+  /// itself, since `PluginInstaller.locateClaude()` is `@MainActor`-only.
+  /// The probe then runs off the main actor and its result, if any, is
+  /// applied back via `applyUsage`.
+  private func spawnProbe() {
     guard let claudeURL = pluginInstaller.locateClaude() else { return }
 
     probeInFlight = true

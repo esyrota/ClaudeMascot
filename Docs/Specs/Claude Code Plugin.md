@@ -179,6 +179,15 @@ approximate ("local sessions on this machine"). The reset instant is parsed rath
 computed — the string names an IANA zone but carries no year, so the year is the one that
 places the reset inside the next five hours.
 
+**The probe runs in a directory of its own** — `…/Application Support/ClaudeMascot/probe` —
+and never inherits the app's. A menu-bar app's cwd is `/`, and `claude` does its
+project-workspace discovery from wherever it is started, so an inherited cwd made every
+probe treat the filesystem root as its workspace: discovery walked into `~/Desktop` and
+friends, macOS attributed those accesses to ClaudeMascot as the parent process, and the
+user got folder-permission prompts for a scan the app never intended. If the directory
+cannot be created the probe returns `nil` rather than falling back to the inherited cwd —
+an unrunnable probe beats one that scans the machine.
+
 The probe is bounded at 10 seconds and every failure — a missing binary, a non-zero exit,
 unparseable JSON, a timeout — returns `nil` and changes nothing. It is a background
 convenience: it must never clear the rail or surface an error. See [[Menu Bar App]] for

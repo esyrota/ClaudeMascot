@@ -191,6 +191,12 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
 
 - Status icon near the clock, reflecting state at a glance: distinct look for disconnected / connected-idle / active.
 - Menu items:
+  - **5-hour limit** — the current window as a number, `NN% · resets Xh`, or `no reading
+    yet` when none has arrived. Not clickable; the rail is a quantised bar, so this row is
+    the only place the actual figure is legible.
+  - **Refresh** — forces a probe now, bypassing the staleness gate but not the in-flight
+    flag, so mashing it cannot multiply subprocesses. Its detail is the age of the current
+    reading (`Updated 3m ago`, `Updated just now`), and `Refreshing…` while one is running.
   - **Enabled** — checkbox, master switch. Off means: leave the panel alone, ignore state changes, disconnect.
   - **Send Test Image…** — pick a 32×32 GIF and hold it on the panel (see below).
   - **Resume Mascot** — shown only while a test image is held.

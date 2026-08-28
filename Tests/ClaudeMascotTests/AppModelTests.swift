@@ -85,6 +85,19 @@ private func makeTempCacheURL() -> URL {
     .appendingPathComponent("usage.json")
 }
 
+/// A unique temp directory for `UsageProbe.run`'s subprocess cwd, never the
+/// real `~/Library/Application Support/ClaudeMascot/probe`. Without this,
+/// any test that lets a probe actually spawn (a stale/absent `currentUsage`
+/// plus a locatable `claude`) would run a real `claude` session against the
+/// user's own Application Support directory — exactly the uncontrolled
+/// side effect Chunk 8 exists to keep out of production code, which a test
+/// suite doing it by accident is no better than.
+private func makeTempProbeDirectory() -> URL {
+  let short = UUID().uuidString.prefix(8)
+  return FileManager.default.temporaryDirectory
+    .appendingPathComponent("amt-probe-\(short)", isDirectory: true)
+}
+
 /// Polls `condition` in short steps rather than a fixed `Task.sleep`, so
 /// passing tests finish quickly and failing ones do not hang indefinitely.
 /// Mirrors `HookServerTests.swift`'s helper of the same name (also
@@ -120,12 +133,14 @@ private func makeDisconnectedSettings() -> AppSettings {
 private func makeAppModel(
   socketURL: URL = makeTempSocketURL(),
   cacheURL: URL = makeTempCacheURL(),
+  probeWorkingDirectory: URL = makeTempProbeDirectory(),
   panel: PanelDriving? = nil
 ) -> AppModel {
   AppModel(
     settings: makeDisconnectedSettings(),
     hookServer: HookServer(socketURL: socketURL),
     usageCacheURL: cacheURL,
+    probeWorkingDirectory: probeWorkingDirectory,
     panel: panel
   )
 }
@@ -349,4 +364,98 @@ func aPanelStateChangeDoesUploadToThePanel() async throws {
   }
 
   #expect(spy.uploadCount > 0)
+}
+
+// MARK: - Chunk 9: refreshUsageNow and menu formatting
+
+/// The anti-mashing guarantee: `refreshUsageNow()` must not start a second
+/// probe while one is already in flight, the same guard `maybeProbeUsage()`
+/// gets for free by sharing `spawnProbe()`.
+///
+/// What this test actually proves, stated plainly: it spawns exactly ONE
+/// real `claude` subprocess (there is no injection seam for
+/// `pluginInstaller.locateClaude()` — `PluginInstaller` is a `final class`,
+/// and this chunk may only touch `AppModel.swift`, `MenuBarView.swift`, and
+/// this file), then asserts that a second, immediate call to
+/// `refreshUsageNow()` leaves `probeInFlight` exactly as the first call left
+/// it rather than resetting it or racing a second subprocess. It does not,
+/// and cannot, count subprocesses directly — the assertion is on the flag's
+/// behaviour, which is what the guard in `AppModel.swift` actually is. The
+/// test is therefore environment-dependent: on a machine with no `claude`
+/// binary discoverable, the guard is never exercised and there is nothing
+/// meaningful to assert, so the test returns early rather than passing
+/// vacuously either way. The one subprocess it does spawn runs with its cwd
+/// pointed at a throwaway temp directory (`makeTempProbeDirectory()`), never
+/// the user's real `~/Library/Application Support/ClaudeMascot/probe` —
+/// removed again once the probe has finished, so the test leaves nothing
+/// behind on disk.
+@Test @MainActor
+func refreshUsageNowDoesNothingWhileAProbeIsAlreadyInFlight() async throws {
+  let probeWorkingDirectory = makeTempProbeDirectory()
+  defer { try? FileManager.default.removeItem(at: probeWorkingDirectory) }
+
+  let model = makeAppModel(probeWorkingDirectory: probeWorkingDirectory)
+  guard model.pluginInstaller.locateClaude() != nil else { return }
+
+  #expect(model.probeInFlight == false)
+
+  model.refreshUsageNow()
+  #expect(model.probeInFlight == true)
+
+  // Called again before the first probe's `Task` has had a chance to run
+  // (no `await` has happened yet on this actor) — this must see
+  // `probeInFlight` already true and do nothing, not reset it or start a
+  // second subprocess.
+  model.refreshUsageNow()
+  #expect(model.probeInFlight == true)
+
+  // Let the one legitimate probe finish so the test doesn't leak a running
+  // subprocess past its own scope.
+  await waitUntil(timeout: .seconds(10)) { model.probeInFlight == false }
+}
+
+/// `usageDetailText(usage:now:)` covers the 5-hour readout row: percentage
+/// rounding, the hour/minute reset-relative split, and the `nil` case.
+@Test
+func usageDetailTextFormatsThePercentAndTheRelativeReset() {
+  let now = Date(timeIntervalSince1970: 0)
+
+  // 36% resetting in 4h07m: hours away, so minutes are dropped.
+  let fourHoursSeven = UsageSnapshot(
+    usedPercent: 36, resetsAt: now.addingTimeInterval(4 * 3600 + 7 * 60), receivedAt: now)
+  #expect(MenuBarView.usageDetailText(usage: fourHoursSeven, now: now) == "36% · resets 4h")
+
+  // Under an hour away: minutes, not hours.
+  let twelveMinutes = UsageSnapshot(
+    usedPercent: 8.6, resetsAt: now.addingTimeInterval(12 * 60), receivedAt: now)
+  #expect(MenuBarView.usageDetailText(usage: twelveMinutes, now: now) == "9% · resets 12m")
+
+  // No reading yet: the row stays legible rather than disappearing.
+  #expect(MenuBarView.usageDetailText(usage: nil, now: now) == "no reading yet")
+}
+
+/// `refreshDetailText(usage:now:)` covers the Refresh row: under a minute,
+/// minutes, past an hour, and the `nil` case (no detail at all).
+@Test
+func refreshDetailTextFormatsTheAgeOfTheReading() {
+  let now = Date(timeIntervalSince1970: 1_000_000)
+
+  // 40 seconds ago: under a minute.
+  let fortySecondsAgo = UsageSnapshot(
+    usedPercent: 10, resetsAt: now, receivedAt: now.addingTimeInterval(-40))
+  #expect(MenuBarView.refreshDetailText(usage: fortySecondsAgo, now: now) == "Updated just now")
+
+  // 3 minutes ago.
+  let threeMinutesAgo = UsageSnapshot(
+    usedPercent: 10, resetsAt: now, receivedAt: now.addingTimeInterval(-3 * 60))
+  #expect(MenuBarView.refreshDetailText(usage: threeMinutesAgo, now: now) == "Updated 3m ago")
+
+  // 75 minutes ago: past an hour, so hours not minutes.
+  let seventyFiveMinutesAgo = UsageSnapshot(
+    usedPercent: 10, resetsAt: now, receivedAt: now.addingTimeInterval(-75 * 60))
+  #expect(
+    MenuBarView.refreshDetailText(usage: seventyFiveMinutesAgo, now: now) == "Updated 1h ago")
+
+  // No reading at all: no detail.
+  #expect(MenuBarView.refreshDetailText(usage: nil, now: now) == nil)
 }
