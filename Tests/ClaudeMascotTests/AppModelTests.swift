@@ -212,3 +212,22 @@ func newUsageSnapshotIsPersistedToTheCache() async throws {
 
   #expect(UsageSnapshotCache.load(from: cacheURL)?.usedPercent == 12)
 }
+
+@Test @MainActor
+func stalenessThresholdIsExhaustiveAcrossAllNineCases() {
+  // Assert the threshold for all nine `PanelState` cases by name, not derived.
+  // This ensures that a future change to the production switch fails the test.
+
+  // 30 seconds for .working and .thinking
+  #expect(AppModel.stalenessThreshold(for: .working) == 30)
+  #expect(AppModel.stalenessThreshold(for: .thinking) == 30)
+
+  // 120 seconds for all others
+  #expect(AppModel.stalenessThreshold(for: .starting) == 120)
+  #expect(AppModel.stalenessThreshold(for: .idle) == 120)
+  #expect(AppModel.stalenessThreshold(for: .sleeping) == 120)
+  #expect(AppModel.stalenessThreshold(for: .waiting) == 120)
+  #expect(AppModel.stalenessThreshold(for: .done) == 120)
+  #expect(AppModel.stalenessThreshold(for: .away) == 120)
+  #expect(AppModel.stalenessThreshold(for: .off) == 120)
+}
