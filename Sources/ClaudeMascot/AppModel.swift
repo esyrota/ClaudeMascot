@@ -114,6 +114,14 @@ final class AppModel: ObservableObject {
   /// `~/Library/Application Support/ClaudeMascot`.
   private let usageCacheURL: URL
 
+  /// Where `UsageProbe.run` sets its subprocess's cwd. Defaults to a
+  /// `probe` subdirectory next to `usageCacheURL`'s file, in Application
+  /// Support; overridable so tests can point it at a temp directory
+  /// instead of the real `~/Library/Application Support/ClaudeMascot`. See
+  /// `UsageProbe.run`'s doc comment for why the probe needs a directory of
+  /// its own rather than inheriting this app's.
+  private let probeWorkingDirectory: URL
+
   /// Latest usage snapshot: loaded from `UsageSnapshotCache` at launch, then
   /// kept current by the `hookServer.$lastUsage` subscription in `init`,
   /// which also persists each new one back to the cache.
@@ -130,6 +138,15 @@ final class AppModel: ObservableObject {
     renderCurrentOverlay(usageBox)
   }
 
+  /// Set while a `UsageProbe.run` subprocess is in flight. `.working`
+  /// produces the densest bursts of hook events, so without this a single
+  /// stale window would spawn one subprocess per event instead of one per
+  /// threshold window. Cleared on every path out of `spawnProbe`'s `Task`.
+  /// Published (but settable only from inside `AppModel`) so the menu's
+  /// Refresh row can disable itself and show a "Refreshing…" state while a
+  /// probe is running.
+  @Published private(set) var probeInFlight = false
+
   init(
     settings: AppSettings = AppSettings(),
     bleClient: BLEClient = BLEClient(),
@@ -137,7 +154,15 @@ final class AppModel: ObservableObject {
     hookServer: HookServer = HookServer(),
     pluginInstaller: PluginInstaller = PluginInstaller(),
     tickInterval: Duration = .seconds(1),
-    usageCacheURL: URL = UsageSnapshotCache.defaultFileURL
+    usageCacheURL: URL = UsageSnapshotCache.defaultFileURL,
+    probeWorkingDirectory: URL = UsageSnapshotCache.defaultFileURL
+      .deletingLastPathComponent()
+      .appendingPathComponent("probe", isDirectory: true),
+    // Lets a test observe uploads: `PanelAdapter` talks to real BLE, and
+    // nothing outside `init` can otherwise see whether a code path reached
+    // `panel.upload(_:)`. Production never passes this — it always builds
+    // the real adapter below.
+    panel: PanelDriving? = nil
   ) {
     self.settings = settings
     self.bleClient = bleClient
@@ -145,6 +170,7 @@ final class AppModel: ObservableObject {
     self.pluginInstaller = pluginInstaller
     self.tickInterval = tickInterval
     self.usageCacheURL = usageCacheURL
+    self.probeWorkingDirectory = probeWorkingDirectory
     self.eventLog = EventLog()
     self.sessionTracker = SessionTracker()
     self.sleepWatcher = SleepWatcher()
@@ -157,10 +183,12 @@ final class AppModel: ObservableObject {
     )
 
     let usageBox = self.usageBox
-    let adapter = PanelAdapter(
-      library: animationLibrary, ble: bleClient,
-      overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) }
-    )
+    let adapter: PanelDriving =
+      panel
+      ?? PanelAdapter(
+        library: animationLibrary, ble: bleClient,
+        overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) }
+      )
     // Walks the pose graph instead of looking states up 1:1. Built from
     // whatever manifest the library loaded (an empty one when none did, so
     // resolution simply returns `nil` everywhere rather than crashing).
@@ -271,6 +299,11 @@ final class AppModel: ObservableObject {
         }
 
         Task { await self.panelController.tick() }
+
+        // Opportunistically refresh the usage rail off the back of this hook
+        // event, after `currentState` reflects whatever the event just
+        // produced — `maybeProbeUsage` reads it to pick the threshold.
+        self.maybeProbeUsage()
       }
       .store(in: &cancellables)
 
@@ -282,8 +315,7 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] usage in
         guard let self, let usage else { return }
-        self.currentUsage = usage
-        UsageSnapshotCache.save(usage, to: self.usageCacheURL)
+        self.applyUsage(usage)
       }
       .store(in: &cancellables)
 
@@ -460,6 +492,86 @@ final class AppModel: ObservableObject {
     currentState = derivedState
     panelController.handle(derivedState)
     Task { await panelController.tick() }
+  }
+
+  // MARK: - Usage probe
+
+  /// The one application point for a `UsageSnapshot`, regardless of source —
+  /// the hook-relayed statusline payload via `hookServer.$lastUsage`, or
+  /// `UsageProbe.run`'s background subprocess below. Assigns `currentUsage`
+  /// and persists it to `usageCacheURL` so the rail survives the next app
+  /// restart.
+  ///
+  /// Deliberately does **not** call `panelController.tick()` — that
+  /// asymmetry with the hook-event sink above it is the separation between
+  /// the usage cycle and the upload cycle; a tick here would let probe
+  /// cadence drive panel traffic, which this design must not do.
+  private func applyUsage(_ usage: UsageSnapshot) {
+    currentUsage = usage
+    UsageSnapshotCache.save(usage, to: usageCacheURL)
+  }
+
+  /// How old `currentUsage` must be, for the panel's current state, before a
+  /// probe is worth spawning. `.working`/`.thinking` produce hook events
+  /// dense enough that the rail can otherwise lag noticeably behind reality;
+  /// every other state is quiet enough that a slower refresh is unnoticed.
+  /// A pure static function (rather than a branch buried in the sink) so it
+  /// is independently testable, and switches exhaustively so a new
+  /// `PanelState` case forces a decision here instead of silently falling
+  /// into a default.
+  static func stalenessThreshold(for state: PanelState) -> TimeInterval {
+    switch state {
+    case .working, .thinking:
+      return 30
+    case .starting, .idle, .sleeping, .waiting, .done, .away, .off:
+      return 120
+    }
+  }
+
+  /// Spawns a `UsageProbe.run` subprocess when `currentUsage` is missing or
+  /// stale for `currentState`, and none is already in flight. Delegates the
+  /// actual spawn to `spawnProbe()`, adding only the staleness check —
+  /// `refreshUsageNow()` below shares that same spawn path and skips just
+  /// this check, so there is exactly one place that ever starts a probe
+  /// `Task`.
+  private func maybeProbeUsage() {
+    guard !probeInFlight else { return }
+    let threshold = Self.stalenessThreshold(for: currentState)
+    if let usage = currentUsage, Date().timeIntervalSince(usage.receivedAt) <= threshold {
+      return
+    }
+    spawnProbe()
+  }
+
+  /// Probes now, bypassing the staleness gate — what the menu's Refresh row
+  /// calls. Still respects `probeInFlight`: a user mashing Refresh is
+  /// exactly the burst that flag exists to collapse into one subprocess,
+  /// same as a dense run of hook events does for `maybeProbeUsage()`.
+  func refreshUsageNow() {
+    guard !probeInFlight else { return }
+    spawnProbe()
+  }
+
+  /// The one place a `UsageProbe.run` subprocess is started, shared by
+  /// `maybeProbeUsage()` and `refreshUsageNow()` so neither duplicates the
+  /// spawn/`applyUsage` plumbing. The `claude` URL is resolved here, on the
+  /// main actor, via `pluginInstaller` — never from the background task
+  /// itself, since `PluginInstaller.locateClaude()` is `@MainActor`-only.
+  /// The probe then runs off the main actor and its result, if any, is
+  /// applied back via `applyUsage`.
+  private func spawnProbe() {
+    guard let claudeURL = pluginInstaller.locateClaude() else { return }
+
+    probeInFlight = true
+    Task { [weak self, probeWorkingDirectory] in
+      let snapshot = await UsageProbe.run(
+        claudeURL: claudeURL, workingDirectory: probeWorkingDirectory, now: Date.init)
+      guard let self else { return }
+      self.probeInFlight = false
+      if let snapshot {
+        self.applyUsage(snapshot)
+      }
+    }
   }
 
   // MARK: - Timer

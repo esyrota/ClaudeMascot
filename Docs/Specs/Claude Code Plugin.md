@@ -139,6 +139,14 @@ the terminal's status line reads exactly as it would without the wrapper install
 connection, a payload that fails to parse — because a broken wrapper must never blank
 the user's status line.
 
+Where the user had **no** `statusLine` configured before installing, there is no command
+to pass through. The installer still has to write *something* as the wrapped argument so
+that uninstall can tell "restore an empty command" from "remove the key that never
+existed", so it writes the sentinel `__claudemascot_no_prior_statusline__`
+(`StatuslineInstaller.noPriorCommandSentinel`). The wrapper recognises that exact string
+and exits silently instead of trying to run it — otherwise every prompt on a fresh
+install prints `sh: __claudemascot_no_prior_statusline__: command not found`.
+
 **The wrapper only runs where a status line is actually rendered**, which is not
 everywhere the hooks run. The nine hook events above fire on tool use in any Claude Code
 client; the statusline command fires only when a client draws a terminal status line. In a
@@ -151,3 +159,49 @@ It is installed and removed independently of the plugin above: the first-run flo
 it as its own, separately declinable step alongside the plugin offer (see
 [[Menu Bar App]]), and it can be installed or uninstalled from Settings without
 touching plugin state either way.
+
+## Usage probe
+
+A third, independent input, for clients the statusline wrapper above never reaches (see
+[[Statusline Coverage]]): the app can ask the `claude` CLI directly with
+
+```
+claude -p "/usage" --output-format json
+```
+
+`/usage` resolves client-side, so this costs nothing against the rate limit — zero tokens,
+no model call. It is not costless in every other sense: each run is a ~600ms process spawn
+that leaves ~3.3KB of transcript and a `session-env` directory under `~/.claude`.
+`UsageProbe` parses the result into the same `UsageSnapshot` the statusline wrapper
+produces. Only the "Current session" line is read: the 5-hour window is the one the rail
+shows, the weekly window is out of scope, and the breakdown beneath them is explicitly
+approximate ("local sessions on this machine"). The reset instant is parsed rather than
+computed — the string names an IANA zone but carries no year, so the year is the one that
+places the reset inside the next five hours.
+
+**The probe runs in a directory of its own** — `…/Application Support/ClaudeMascot/probe` —
+and never inherits the app's. A menu-bar app's cwd is `/`, and `claude` does its
+project-workspace discovery from wherever it is started, so an inherited cwd made every
+probe treat the filesystem root as its workspace: discovery walked into `~/Desktop` and
+friends, macOS attributed those accesses to ClaudeMascot as the parent process, and the
+user got folder-permission prompts for a scan the app never intended. If the directory
+cannot be created the probe returns `nil` rather than falling back to the inherited cwd —
+an unrunnable probe beats one that scans the machine.
+
+The probe is bounded at 10 seconds and every failure — a missing binary, a non-zero exit,
+unparseable JSON, a timeout — returns `nil` and changes nothing. It is a background
+convenience: it must never clear the rail or surface an error. See [[Menu Bar App]] for
+when the app decides to spawn one.
+
+**`--bare` and `--settings '{"hooks":{}}'` were both tried and both fail.** `--bare`
+suppresses hooks but never reads OAuth, so `/usage` falls back to a local cost summary and
+the subscription percentages vanish entirely. `--settings '{"hooks":{}}'` merges rather than
+replaces, so hooks still fire. Neither gets hook-free output with real numbers.
+
+**`claude -p` starts a real session**, so a probe fires its own `SessionStart` and
+`SessionEnd` through `relay.sh` like any other session — measured, not theorised. Left
+alone this both feeds the probe's own events back into `hook.sock` and, worse,
+re-triggers the entrance animation on every probe. `relay.sh` therefore gains an env
+guard: the app spawns the probe with `CLAUDEMASCOT_PROBE=1` in its environment, and the
+relay exits before forwarding anything when that variable is set. Hook processes inherit
+the spawning environment, so this is sufficient — confirmed directly, not assumed.

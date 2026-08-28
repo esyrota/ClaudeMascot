@@ -29,8 +29,16 @@ The cheap checks, in the order that isolates fastest:
 1. **Are hook events arriving?** `tail ~/Library/Application Support/ClaudeMascot/logs/input.jsonl`.
    Recent entries prove the socket, the relay and the app's listener are all fine, so
    anything still wrong is specific to the usage path.
-2. **Are `Usage` events among them?** `grep Usage` the same file. Hooks arriving *without*
-   `Usage` is this exact situation.
+2. **Has a `Usage` line arrived recently?** Check `usage.json`'s *mtime*, not the event log —
+   `AppModel` records only hook events to `input.jsonl`, so `Usage` lines never appear there
+   and grepping for them always comes up empty, working or not. `usage.json` is rewritten on
+   every `Usage` line, so its mtime is the arrival time of the last one.
+
+   ```sh
+   stat -f "%Sm" -t "%F %T" ~/Library/Application\ Support/ClaudeMascot/usage.json
+   ```
+
+   An mtime older than your last prompt in a terminal session is this exact situation.
 3. **Is the stored snapshot stale?** `cat .../usage.json` and compare `resetsAt` to now. Past
    it means the rail is refusing to draw on purpose.
 4. **Does the relay still work?** Feed the wrapper a synthetic payload directly (below). If
@@ -50,18 +58,22 @@ if the number was not true.
 
 ## Confirming it, when it matters
 
-Run a prompt in an interactive terminal session and watch the file:
-
-```sh
-stat -f "%Sm" ~/Library/Application\ Support/ClaudeMascot/usage.json
-```
-
-A timestamp that jumps confirms coverage; one that does not, in a terminal session, points
+Run a prompt in an interactive terminal session and watch the same file as step 2. A
+timestamp that jumps confirms coverage; one that does not, in a terminal session, points
 at the payload shape instead.
 
-## The durable fix, if the rail should be present everywhere
+## The fix that was actually built
 
-Derive usage from something that reaches the socket in every client rather than from the
-status line alone. Hook events already do. Nothing in the overlay's design (see [[Menu Bar App]] → Overlay) depends on
-the number arriving via the statusline specifically — only that a `Usage` line reaches
-`hook.sock` — so this is a change of source, not of architecture. Not built.
+This page once proposed deriving usage from hook events, on the theory that hook events
+already reach the socket in every client. **That premise is false.** Hook payloads carry
+only `hook_event_name`, `tool_name`, `session_id`, `cwd` and the tool's input/response —
+no rate limits, ever. Every transcript under `~/.claude/projects` was checked too, and
+none carries a real `rate_limits` object either. Hook events were never a usable source
+for this number.
+
+The fix that shipped instead asks for the number directly: `claude -p "/usage"
+--output-format json`, run as a fallback whenever the stored snapshot goes stale — see
+[[_logs/2026-08-28. Usage Probe/Task]] for why that surface was chosen and
+[[Claude Code Plugin]] and [[Menu Bar App]] for the resulting design. The diagnostic
+steps above are unaffected: they still isolate a coverage gap from a real fault, and a
+probe now closes the gap step 1 would otherwise reveal.

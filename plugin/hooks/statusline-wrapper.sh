@@ -38,6 +38,12 @@ fi
 CMD="$1"
 [ -z "$CMD" ] && exit 0
 
+# The installer writes this sentinel (StatuslineInstaller.noPriorCommandSentinel)
+# when the user had no `statusLine` configured at all, so that uninstall can tell
+# "restore an empty command" from "remove the key that never existed". It is a
+# marker, not a command: running it prints `command not found` on every prompt.
+[ "$CMD" = "__claudemascot_no_prior_statusline__" ] && exit 0
+
 # Replace this process with the real statusline command, feeding it the same
 # stdin this script read — the terminal sees exactly what it would without
 # the wrapper installed. This runs unconditionally, including when the

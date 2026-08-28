@@ -154,6 +154,34 @@ now, only) use is a 5-hour usage rail; see [[Status Overlay]] for the design and
   (see Holding a diagnostic image, below), so a measurement card on the panel is always
   exactly the bytes chosen — overlay or not.
 
+### Keeping the usage rail fed
+
+The statusline wrapper only runs where a terminal status line is drawn (see
+[[Claude Code Plugin]] → Statusline wrapper), so `AppModel` also carries a `UsageProbe` as
+a fallback source for `currentUsage`, feeding the same `UsageSnapshot` the wrapper
+produces. It is triggered off hook events, not a timer: on each hook event, once
+`SessionTracker` has updated `currentState`, the app spawns a probe if none is already
+in flight and `currentUsage` is nil or its `receivedAt` is older than
+`stalenessThreshold(for: currentState)` — 30s while `currentState` is `.working` or
+`.thinking`, 120s otherwise. A single in-flight flag serializes probes, since hook events
+arrive in bursts well inside the ~600ms a probe takes. Where a terminal status line is
+being drawn, the wrapper keeps `receivedAt` inside the threshold and the probe never
+spawns; it exists purely for clients the wrapper never reaches.
+
+The menu's **Refresh** row (see Menu bar, below) is the one other way a probe starts. It
+skips the staleness check and nothing else — the in-flight flag still applies, so holding
+the menu open and clicking repeatedly cannot multiply subprocesses. Both entry points share
+one spawn path rather than each carrying their own copy.
+
+**The usage cycle and the upload cycle are separate.** Applying a `UsageSnapshot` —
+`applyUsage(_:)`, called from both the wrapper's socket line and the probe — assigns
+`currentUsage` and saves the cache, and deliberately never calls `panelController.tick()`.
+The overlay only re-uploads on a changed *quantised* key, read lazily at drive time
+(`overlayKey()`, `PanelController.swift:395`), and even then waits for a clip boundary
+(`PanelController.swift:406-420`, see Overlay, above). So probe cadence cannot change
+upload cadence: it can only shorten the delay before the panel notices a bucket it was
+already going to cross.
+
 ## Observability
 
 `BLEClient` logs every connection-state transition, `PanelController` every upload, wake and power-off, and `AppModel` every hook event with the state it maps to. All under one subsystem, so a dark panel is diagnosable without a debugger:
@@ -168,6 +196,12 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
 
 - Status icon near the clock, reflecting state at a glance: distinct look for disconnected / connected-idle / active.
 - Menu items:
+  - **5-hour limit** — the current window as a number, `NN% · resets Xh`, or `no reading
+    yet` when none has arrived. Not clickable; the rail is a quantised bar, so this row is
+    the only place the actual figure is legible.
+  - **Refresh** — forces a probe now, bypassing the staleness gate but not the in-flight
+    flag, so mashing it cannot multiply subprocesses. Its detail is the age of the current
+    reading (`Updated 3m ago`, `Updated just now`), and `Refreshing…` while one is running.
   - **Enabled** — checkbox, master switch. Off means: leave the panel alone, ignore state changes, disconnect.
   - **Send Test Image…** — pick a 32×32 GIF and hold it on the panel (see below).
   - **Resume Mascot** — shown only while a test image is held.
