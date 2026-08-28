@@ -56,7 +56,7 @@ authored as a cycle of eight and its frame 0 was an intro, not part of the rhyth
 in or out moves **fewer pixels than the clip's own frames do every 160ms**, at well under half
 the sit-edge gap. There is nothing here for the contract to prevent: no resize, no drift, and
 a cut smaller than the motion already on screen. What the anchor bought — and it is a real
-loss — was a seam of exactly zero; what it cost was 320ms of a 1.6s clip spent standing
+loss — was a seam of exactly zero; what it cost was a quarter of a 1.28s clip spent standing
 still, which broke the rhythm of the one loop whose whole character is that it does not.
 
 **This is not a licence to skip the anchor.** It is an exception that had to be measured to
