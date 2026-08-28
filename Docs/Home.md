@@ -65,7 +65,7 @@ Each one cost a wrong diagnosis to find.
 | Colour test card | `art/testcard.py` | diagnostic, keep |
 | Colour characterisation | `art/testcards.py` + `art/read_panel_photo.py` | **shipped** — nine cards, the on-screen reference, and the photo/video reader (averages video frames; the panel is scan-driven) |
 | Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
-| Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Send Test Image…; the only way anything but a clip reaches the panel |
+| Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Option-held → Send Test Image…; the only way anything but a clip reaches the panel |
 | Status overlay | `Overlay.swift` + `UsageRail.swift` | **shipped** — a layer behind the mascot; row 0 carries the 5-hour usage rail |
 | GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 41 clips pixel-exact |
 | Compositor | `Compositor.swift` | **shipped** — overlay behind, mascot in front, mandatory 1px knockout halo. **No overlay = byte-identical passthrough** |
@@ -98,7 +98,8 @@ plugin on first launch, and the repo is no longer a marketplace.
   piece, and the three scheduling fields it needed (`maxPerPhase`, `maxRepeats`,
   `interruptible`) with a phase ledger owned by `PanelController`. Its [[Analysis]] records
   two defects that every green Run Report and all 190 tests were blind to, both found only
-  by reading the produced frames back.
+  by reading the produced frames back. A third surfaced later and only in the logs: the
+  clip's own cap evicted it 1.5s in, so nobody had ever seen the Pac-Man.
 - `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
   against an on-screen reference in the same frame, and the colour rules rewritten around
   it. See its [[Findings]] for the evidence, the method, and the alignment error that

@@ -162,12 +162,23 @@ final class PanelController: ObservableObject {
 
   /// The overlay key that was on the panel the last time `displayed` was
   /// uploaded. Part of the same invariant as `displayed` and
-  /// `clipStartedAt` — now a triple, not a pair: all three are `nil`
-  /// together, set together on a successful upload, and cleared together on
-  /// power-off and in `invalidateDisplay()`. What "already showing the
+  /// `clipStartedAt` — with `displayedPhase` below they are a quadruple, not
+  /// a pair: all four are `nil` together, set together on a successful
+  /// upload, and cleared together on power-off and in `invalidateDisplay()`. What "already showing the
   /// target" means now depends on this alongside the clip id, since a
   /// changed overlay behind an unchanged clip is a different picture.
   private var displayedOverlayKey: Int?
+
+  /// The phase `displayed` was uploaded under — `ledger.group` at that
+  /// moment, which is the target state's raw value.
+  ///
+  /// Only `interruptible` reads it, and only to answer "is the swap being
+  /// asked for a *reaction*?". Cutting a set piece is worth it when the
+  /// mascot has to wake now; it is never worth it for a swap resolved inside
+  /// the same phase, which is the group's own loop coming back around or an
+  /// overlay refresh. `nil` means the clip belongs to no phase (`wave-off`),
+  /// which reads as "anything may cut it".
+  private var displayedPhase: String?
 
   /// When the entrance animation currently playing is due to finish. `nil`
   /// whenever the mascot is not appearing, including once the hold has
@@ -338,6 +349,7 @@ final class PanelController: ObservableObject {
       do {
         try await panel.upload(waveClip)
         displayed = waveClip
+        displayedPhase = nil  // `wave-off` belongs to no phase — see `ledger`.
         clipStartedAt = clock()
         displayedOverlayKey = overlayKey()
         logDecision(
@@ -410,7 +422,9 @@ final class PanelController: ObservableObject {
       return
     }
 
-    let boundary = nextBoundary(after: currentlyDisplayed, startedAt: clipStartedAt, now: now)
+    let boundary = nextBoundary(
+      after: currentlyDisplayed, startedAt: clipStartedAt, now: now,
+      crossesPhase: displayedPhase != targetState.rawValue)
     if now >= boundary {
       await attemptUpload(targetClip, overlayKey: currentOverlayKey)
     } else {
@@ -489,15 +503,22 @@ final class PanelController: ObservableObject {
 
   /// The next moment `clip` (the thing currently on the panel, started at
   /// `startedAt`) reaches a seam a swap may land on.
-  private func nextBoundary(after clip: Clip, startedAt: TimeInterval, now: TimeInterval)
+  private func nextBoundary(
+    after clip: Clip, startedAt: TimeInterval, now: TimeInterval, crossesPhase: Bool
+  )
     -> TimeInterval
   {
     guard clip.loops else {
-      // An interruptible clip has no seam worth waiting for: making the user
-      // watch out a set piece before the mascot reacts costs more than the cut
-      // does. `driveTowards` short-circuits a same-id swap before reaching
-      // here, so this cannot make a clip interrupt itself.
-      if clip.interruptible { return now }
+      // An interruptible clip has no seam worth waiting for *when something
+      // has actually happened*: making the user watch out a set piece before
+      // the mascot reacts costs more than the cut does. Inside its own phase
+      // there is no reaction to make, and cutting is pure loss — a capped
+      // fidget would evict itself one tick after starting, since recording
+      // its one allowed play is exactly what makes the resolver fall back to
+      // the group's loop. That shipped, and cost `doze-dream` all but the
+      // first 1.5s of its 15.6s. `driveTowards` short-circuits a same-id swap
+      // before reaching here, so this cannot make a clip interrupt itself.
+      if clip.interruptible && crossesPhase { return now }
       // Non-looping (transition) clips hand off at `motion`, not `duration`.
       // A transition clip ends on a long dwell frame so the panel has
       // something to loop while it waits to be told what's next; waiting out
@@ -551,6 +572,7 @@ final class PanelController: ObservableObject {
       displayed = nil
       clipStartedAt = nil
       displayedOverlayKey = nil
+      displayedPhase = nil
       nextRetryAt = nil
       Self.log.notice("panel off (desired \(self.desired.rawValue, privacy: .public))")
       logDecision(
@@ -593,6 +615,7 @@ final class PanelController: ObservableObject {
       try await panel.upload(targetClip)
       isPanelOff = false
       displayed = targetClip
+      displayedPhase = ledger.group
       // `displayed` and the ledger advance together, here as in
       // `attemptUpload`. This path uploads inline rather than through it, so
       // it carries its own `record` — without it a capped clip resolved by a
@@ -620,12 +643,14 @@ final class PanelController: ObservableObject {
   /// The caller is the diagnostics path in `AppModel`: a test card is written
   /// straight to `BLEClient`, behind this machine's back, so afterwards
   /// `displayed` is a claim about a mascot that is no longer on screen.
-  /// Clearing `clipStartedAt` and `displayedOverlayKey` alongside it keeps
-  /// the triple's invariant — all three are `nil` together or set together.
+  /// Clearing `clipStartedAt`, `displayedOverlayKey` and `displayedPhase`
+  /// alongside it keeps the invariant — all four are `nil` together or set
+  /// together.
   func invalidateDisplay() {
     displayed = nil
     clipStartedAt = nil
     displayedOverlayKey = nil
+    displayedPhase = nil
   }
 
   private func attemptUpload(_ target: Clip, overlayKey: Int?) async {
@@ -633,6 +658,7 @@ final class PanelController: ObservableObject {
     do {
       try await panel.upload(target)
       displayed = target
+      displayedPhase = ledger.group
       // The ledger's one write site: recorded only once the panel actually
       // shows `target`, never speculatively — see `Choreographer`'s doc
       // comment for why a call that uploads nothing must not advance it.

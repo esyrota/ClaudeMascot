@@ -657,6 +657,71 @@ func interruptibleNonLoopingClipSwapsImmediately() async {
 }
 
 @Test @MainActor
+func interruptibleClipIsNotCutBySwapsInsideItsOwnPhase() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  // `doze-dream` in miniature: a long interruptible set piece that the
+  // resolver offers once and then stops offering, exactly as `maxPerPhase: 1`
+  // makes it stop the moment the ledger records the play. What follows is the
+  // group's own loop -- the same phase, so nothing has happened that is worth
+  // cutting a set piece for. Shipped the other way once and cost the dream all
+  // but its first second and a half.
+  let dream = testClip(.sleeping, loops: false, duration: 16, motion: 13, interruptible: true)
+  // A distinct id from `dream`, or `driveTowards`'s same-id short-circuit
+  // would hold the panel for reasons that have nothing to do with the rule
+  // under test -- and the test would pass against the bug it exists to catch.
+  let loop = Clip(
+    id: "sleeping-loop", file: "sleeping-loop.gif", frameCount: 1, duration: 1, motion: 1,
+    loops: true, pose: PanelState.sleeping.pose, variantGroup: nil, fidgetGroup: nil, weight: 1,
+    fromPose: nil, toPose: nil, maxPerPhase: nil, maxRepeats: nil, interruptible: false,
+    minCycles: nil)
+  var offered = false
+  let controller = makeController(
+    panel: panel, clock: clock,
+    resolve: { state, _, _ in
+      guard state == .sleeping else { return defaultTestClips[state] }
+      if offered { return loop }
+      offered = true
+      return dream
+    })
+
+  controller.handle(.sleeping)
+  await controller.tick()
+  #expect(controller.displayed?.id == dream.id)
+
+  clock.advance(1.5)  // a tick and a bit into a 13s motion
+  await controller.tick()
+  #expect(controller.displayed?.id == dream.id)  // held: same phase, no reaction
+  #expect(panel.uploadCount == 1)
+
+  clock.advance(11.5)  // 13s total: the motion is out
+  await controller.tick()
+  #expect(controller.displayed?.id == loop.id)  // now the seam has arrived
+}
+
+@Test @MainActor
+func interruptibleClipIsStillCutByASwapThatCrossesPhases() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  // The other half of the rule above: a real state change still cuts in at
+  // any frame, which is the whole point of `interruptible`.
+  let dream = testClip(.sleeping, loops: false, duration: 16, motion: 13, interruptible: true)
+  var clips = defaultTestClips
+  clips[.sleeping] = dream
+  let controller = makeController(
+    panel: panel, clock: clock, resolve: { state, _, _ in clips[state] })
+
+  controller.handle(.sleeping)
+  await controller.tick()
+  #expect(controller.displayed?.id == dream.id)
+
+  controller.handle(.working)
+  clock.advance(1.5)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+}
+
+@Test @MainActor
 func nonInterruptibleNonLoopingClipStillDefersToMotion() async {
   let clock = FakeClock()
   let panel = MockPanel()

@@ -90,9 +90,9 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 **idle** — four variants, the richest set because idle is on screen most.
 
-|                               |                                 |                                     |                                     |
-| ----------------------------- | ------------------------------- | ----------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
+|                               |                                                  |                                     |                                     |
+| ----------------------------- | ------------------------------------------------ | ----------------------------------- | ----------------------------------- |
+| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif)                  | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
 | **idle** · 7f · 2.56s · w 1.0 | **happy** · 8f · 1.28s · w 0.5<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — two variants, and neither of them mimes thinking.
@@ -309,7 +309,11 @@ and 140ms a frame) and keep their own.
 | **doze-dream**<br>dozing → dozing, non-looping, 34f · 15.62s (motion 13.12s)<br>`fidgetGroup: "sleeping"` · `maxPerPhase: 1` · `interruptible: true` |
 
 **`doze-dream` is a `dozing` self-edge with `fidgetGroup: "sleeping"`, `maxPerPhase: 1`, and
-`interruptible: true`.** The nine beats: he sleeps while bubbles drift, the largest bubble
+`interruptible: true`.** Those last two are what a set piece needs and what nearly killed
+it: `interruptible` only ever meant *a waking may cut in*, and a same-phase swap must not —
+see Boundary scheduling in [[Menu Bar App]].
+
+The nine beats: he sleeps while bubbles drift, the largest bubble
 grows instead of popping — a hollow circle, 1px white stroke around a black fill, swallowing
 the mascot and then passing off the panel entirely, which is what leaves the screen dark — he walks in from the left and looks back the way he came — left, toward the corner the Pac-Man will enter from, since a glance the other way makes the startle a reaction to nothing, he startles without
 rising using frames 4–5 from `starting`, walks off right, a yellow Pac-Man chases left to

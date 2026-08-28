@@ -14,6 +14,9 @@ struct MenuBarView: View {
 
   var body: some View {
     let now = Date()
+    // Read once as the menu opens: the diagnostic row is for the colour work in
+    // Panel Quirks, not for everyday use, so it is behind Option.
+    let optionHeld = NSEvent.modifierFlags.contains(.option)
 
     VStack(alignment: .leading, spacing: 0) {
       Text(statusLine)
@@ -43,14 +46,17 @@ struct MenuBarView: View {
         appModel.enabled.toggle()
       }
 
-      Divider()
-        .padding(.vertical, 4)
-
       if appModel.diagnosticImage != nil {
+        Divider()
+          .padding(.vertical, 4)
+
         MenuRow(title: "Resume Mascot") {
           appModel.endDiagnosticImage()
         }
-      } else {
+      } else if optionHeld {
+        Divider()
+          .padding(.vertical, 4)
+
         MenuRow(title: "Send Test Image…") {
           if let url = chooseImage() {
             Task { await appModel.sendDiagnosticImage(at: url) }
