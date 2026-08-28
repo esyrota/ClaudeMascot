@@ -309,7 +309,8 @@ func neverFidgetsDuringATransitionOrForOff() {
   // `toPose` matches the target's pose. Even though a fidget for this pose
   // exists and fidgetChance forces it "due", arriving must not be mistaken
   // for a fidget opportunity.
-  let justArrivedAtStanding = choreographer.clip(for: .idle, displayed: sitStand, ledger: PhaseLedger())
+  let justArrivedAtStanding = choreographer.clip(
+    for: .idle, displayed: sitStand, ledger: PhaseLedger())
   #expect(justArrivedAtStanding?.id != "blink")
 
   // `.off` never fidgets, even with a matching pose and a forced-due roll.
@@ -330,8 +331,11 @@ func aGroupedFidgetOnlyFiresForItsOwnGroup() {
   let choreographer = Choreographer(
     manifest: manifest([idle, waiting, wander]), clock: { clock() }, fidgetChance: 1)
 
-  #expect(choreographer.clip(for: .idle, displayed: idle, ledger: PhaseLedger())?.id == "wander-off-left-in-right")
-  #expect(choreographer.clip(for: .waiting, displayed: waiting, ledger: PhaseLedger())?.id == "waiting")
+  #expect(
+    choreographer.clip(for: .idle, displayed: idle, ledger: PhaseLedger())?.id
+      == "wander-off-left-in-right")
+  #expect(
+    choreographer.clip(for: .waiting, displayed: waiting, ledger: PhaseLedger())?.id == "waiting")
 }
 
 @Test @MainActor
@@ -378,7 +382,9 @@ func waveOffNeverLeaksIntoAStandingFidget() {
   ]
   for _ in 0..<400 {
     for (state, displayed) in targets {
-      #expect(choreographer.clip(for: state, displayed: displayed, ledger: PhaseLedger())?.id != "wave-off")
+      #expect(
+        choreographer.clip(for: state, displayed: displayed, ledger: PhaseLedger())?.id
+          != "wave-off")
     }
     clock.advance(rotationPeriod)
   }
@@ -535,10 +541,13 @@ func theEntranceStillPlaysFromOffScreen() {
     manifest: manifest([idle, starting, walkInLeft, walkOffLeft]), clock: { clock() })
 
   // Nothing on screen at all (a dark panel, or a fresh launch): rise.
-  #expect(choreographer.clip(for: .starting, displayed: nil, ledger: PhaseLedger())?.id == "starting")
+  #expect(
+    choreographer.clip(for: .starting, displayed: nil, ledger: PhaseLedger())?.id == "starting")
   // Off to one side, because it walked off: come back the way it went, not up
   // through the floor.
-  #expect(choreographer.clip(for: .starting, displayed: walkOffLeft, ledger: PhaseLedger())?.id == "walk-in-left")
+  #expect(
+    choreographer.clip(for: .starting, displayed: walkOffLeft, ledger: PhaseLedger())?.id
+      == "walk-in-left")
 }
 
 @Test @MainActor
@@ -567,7 +576,9 @@ func leavingFromDozingStandsUpFirst() {
 
   // One edge at a time: the mascot has to get up before it can walk anywhere,
   // and the route is found without anything spelling it out.
-  #expect(choreographer.clip(for: .away, displayed: sleeping, ledger: PhaseLedger())?.id == "doze-to-stand")
+  #expect(
+    choreographer.clip(for: .away, displayed: sleeping, ledger: PhaseLedger())?.id
+      == "doze-to-stand")
 }
 
 @Test @MainActor
@@ -607,8 +618,10 @@ func sitAndStandRouteThroughTheSitEdges() {
     manifest: manifest([idle, working, standToSit, sitToStand]), clock: { clock() })
 
   // Standing, wants to be sitting: the drawn sit edge, not a direct swap onto `working`.
-  #expect(choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())?.id == "stand-to-sit")
+  #expect(
+    choreographer.clip(for: .working, displayed: idle, ledger: PhaseLedger())?.id == "stand-to-sit")
 
   // Seated, wants to be standing: the reverse edge.
-  #expect(choreographer.clip(for: .idle, displayed: working, ledger: PhaseLedger())?.id == "sit-to-stand")
+  #expect(
+    choreographer.clip(for: .idle, displayed: working, ledger: PhaseLedger())?.id == "sit-to-stand")
 }
