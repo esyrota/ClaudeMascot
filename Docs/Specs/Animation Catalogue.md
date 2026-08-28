@@ -36,15 +36,32 @@ pose at each end. `idle` frame 0 defines `standing`, `sleeping` frame 0 defines 
 `working` frame 0 defines `sitting`, and an offscreen anchor is an empty frame. Break this
 once and every swap visibly jumps.
 
-**One clip is an argued exception, and only at one end.** `happy` closes on the `standing`
-anchor and opens on the dip that follows it, because the source's own opening frame *is* that
-anchor and keeping both held the mascot still for 480ms across the seam of a 1.6s clip whose
-whole character is that it does not stand still. What the contract exists to prevent does not
-happen: the loop seam is anchor → dip, the source's own frames 0 → 1, and a swap in lands on
-the same pair, because swaps land on boundaries and the outgoing loop is therefore showing its
-own closing anchor. No resize, no drift, no flicker. **This is not a licence to skip the
-leading anchor** — it is an exception that had to earn its way past the rule, and every other
-loop still satisfies both ends.
+**One clip is an argued exception, at both ends, and the numbers are why.** `happy` carries
+no anchor frame at all: its source's opening anchor was dropped and no closing one is
+appended. Every seam it creates was measured against the anchor, in pixels of 1024:
+
+| Seam | Pixels moved |
+| --- | --- |
+| `happy`'s own loop, last frame → first | **130** |
+| An ordinary beat inside `happy`, frames 3 → 4 | **131** |
+| Swapping *out* of `happy` (its last frame → any anchor) | **77** |
+| Swapping *into* `happy` (any anchor → its first frame) | **109** |
+| The sit-edge pop, which this page calls a defect | **293** |
+
+Measured on the shipped GIFs, not on the generator's frames — `pad_palette()` nudges a few
+body pixels per frame, so the pre-encode counts run five or six lower.
+
+The loop seam is *the same 130 pixels as an ordinary beat of the animation* — the source was
+authored as a cycle of eight and its frame 0 was an intro, not part of the rhythm. And a swap
+in or out moves **fewer pixels than the clip's own frames do every 160ms**, at well under half
+the sit-edge gap. There is nothing here for the contract to prevent: no resize, no drift, and
+a cut smaller than the motion already on screen. What the anchor bought — and it is a real
+loss — was a seam of exactly zero; what it cost was 320ms of a 1.6s clip spent standing
+still, which broke the rhythm of the one loop whose whole character is that it does not.
+
+**This is not a licence to skip the anchor.** It is an exception that had to be measured to
+earn its way past the rule, and it only clears because this clip's poses sit close to the
+anchor to begin with. Every other loop still satisfies both ends.
 
 **Every other clip in the manifest satisfies it outright.** The last holdout was the flag wave
 that used to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
@@ -76,7 +93,7 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 |                               |                                 |                                     |                                     |
 | ----------------------------- | ------------------------------- | ----------------------------------- | ----------------------------------- |
 | ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **happy** · 9f · 1.6s · w 1.0<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
+| **idle** · 7f · 2.56s · w 1.0 | **happy** · 8f · 1.28s · w 0.5<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — two variants, and neither of them mimes thinking.
 
@@ -101,22 +118,31 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 - **`happy` is the fourth idle variant, and it is the one that carries the mood.** The
   mascot dips, then rocks its whole body right and left with its arms swung out — the
-  broadest motion any standing loop has. It is hand-drawn (`art/sources/happy.gif`,
-  native 32×32, nine frames at 160ms) and given the highest weight in the group alongside
-  `idle` itself, because it is the only variant that reads as an expression rather than as
-  a way of standing still.
+  broadest motion any standing loop has. Hand-drawn (`art/sources/happy.gif`, native 32×32,
+  nine frames at 160ms), and the only variant that reads as an expression rather than as a
+  way of standing still.
+- **`happy` ships as eight of its source's nine frames, and carries no anchor.** The source
+  is authored intro / cycle: frame 0 *is* the `standing` anchor and frames 1–8 are the rock
+  itself — dip, three right, dip, three left. Shipping frame 0 put a still pose in a loop
+  whose whole character is that it does not stand still, and appending a closing anchor
+  doubled it: 480ms of the mascot standing to attention in a 1.9s clip. Both are gone. What
+  is left loops 1 → 8 → 1 as one continuous wave, and the seam that creates is measurably
+  indistinguishable from any other beat in it — see the anchor contract above for the
+  pixel counts, and why the cut into and out of this clip is *smaller* than the motion it
+  makes every 160ms.
+- **Weights are shares of the group, not probabilities.** `w 1.0` is not "always"; the
+  choreographer sums the group's weights and draws in proportion, excluding whatever is on
+  screen. At the shipped weights — `idle` 1.0, `happy` 0.5, `dancing` 0.5, `workout` 0.4 —
+  the long-run split is **idle 34%, happy 23%, dancing 23%, workout 20%**. `happy` sat at
+  1.0 for one revision, which bought it 32% and pushed `workout` down to 17%: more presence
+  than a mood clip wants, and not the point of having four.
 - **`happy` is the only clip that sets `minCycles`, and it is the reason the field exists.**
-  At 1.6s a single pass is over before the eye has read it, and any swap request — an epoch
+  At 1.28s a single pass is over before the eye has read it, and any swap request — an epoch
   roll, a fidget, even a usage-rail update, which restarts the loop like any other upload —
-  could land after one. `minCycles: 8` holds it on the panel for 12.8s. **That is bought with
+  could land after one. `minCycles: 8` holds it on the panel for 10.24s. **That is bought with
   reaction lag:** a real state change (you send a prompt, the mascot should think) is deferred
-  by up to those 12.8s, the same order as the 10.16s a single cycle of `done-flag` already
+  by up to those 10.24s, the same order as the 10.16s a single cycle of `done-flag` already
   costs. Turn this one number down if the panel starts feeling slow to answer.
-- **`happy` drops its source's first frame**, which is why it is the one loop that does not
-  open on the `standing` anchor — see the exception recorded under the anchor contract above.
-  With both the source's opening anchor and the appended closing one, the mascot stood still
-  for 480ms of every 1.9s; now the anchor appears once per cycle, at the end, and the rest
-  goes straight into the dip.
 - **`happy` breaks no floor line, but it does lift a foot.** Three of the four feet stay
   welded to row 31 through every frame; the outermost foot on the leaning side comes up
   one or two rows and goes back down. That is weight shifting from foot to foot, not the

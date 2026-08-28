@@ -1170,21 +1170,22 @@ def dancing():
 # same palette as `waiting-question.gif`: one orange family against black, no shade and
 # no prop, so `_body_shade_prop_recolour()` serves it with no rule of its own.
 HAPPY_SRC = SOURCES / "happy.gif"
-# The closing bookend. The last drawn frame is mid-lean, and the anchor contract says a
-# loop may not rest there. 320ms is idle()'s own frame beat, so the return to standing
-# lands on the cadence the rest of the group breathes at.
-HAPPY_ANCHOR_OUT_MS = 320
-# The source's frame 0 IS the standing anchor pixel for pixel, and it is DROPPED. Keeping
-# it alongside the bookend above held the mascot still for 480ms -- 320 of bookend then
-# 160 of the source's own opener -- across the seam of a clip whose whole character is that
-# it does not stand still. Dropping it leaves the anchor in the cycle once, at the end.
+# The source is authored intro / cycle: frame 0 IS the standing anchor and 1-8 are the
+# rock itself -- dip, three right, dip, three left, which loops on its own. So the clip
+# is that slice and nothing else: no leading anchor, and no closing bookend either.
 #
-# This costs the LEADING half of the anchor contract: `happy` is the only loop that does
-# not open on its pose's anchor. Argued, not overlooked -- the seam the panel loops is
-# anchor -> dip, which is the source's own frames 0 -> 1, and a swap in lands on the same
-# pair because swaps land on boundaries, so the outgoing loop is showing its own closing
-# anchor. See [[Animation Catalogue]], which records this as the contract's one exception.
-HAPPY_DROP_LEADING_ANCHOR = 1
+# Both were tried. The pair held the mascot still for 480ms of every 1.9s, and the
+# closing one alone still put a beat of standing to attention into the one loop whose
+# whole character is that it does not stand still.
+#
+# This costs the anchor contract at BOTH ends -- `happy` is the only loop here that
+# carries no anchor frame. Measured, not waved through (pixels of 1024, against the
+# anchor, on the SHIPPED gif): the loop seam moves 130, which is what an ordinary beat
+# inside the clip moves (131); a swap out moves 77 and a swap in 109, both FEWER
+# than the clip's own frames move every 160ms, against the 293 of the sit-edge pop this
+# project calls a defect. See [[Animation Catalogue]], which records the exception and
+# the numbers beside the rule.
+HAPPY_CYCLE = slice(1, None)
 
 
 def happy():
@@ -1199,10 +1200,11 @@ def happy():
     and only the outermost foot on the leaning side lifts, so the floor line survives.
     The sway does widen the silhouette past the anchor's 24px at the extremes, which no
     other standing loop does.
+
+    The one loop clip that is a plain slice of its source, no anchor frame at either end
+    -- see `HAPPY_CYCLE` above for what that costs and why it is worth it.
     """
-    return imported(HAPPY_SRC, _body_shade_prop_recolour)[HAPPY_DROP_LEADING_ANCHOR:] + [
-        (_standing_anchor(), HAPPY_ANCHOR_OUT_MS)
-    ]
+    return imported(HAPPY_SRC, _body_shade_prop_recolour)[HAPPY_CYCLE]
 
 
 def wave_off():
@@ -1900,24 +1902,29 @@ CLIP_METADATA = {
         "weight": 1.0,
     },
     "happy": {
-        # The idle variant that carries a mood: a whole-body rock, hand-drawn. Weighted
-        # level with `idle` itself -- the highest in the group -- at the user's request
-        # and because it is the only variant that reads as an expression.
+        # The idle variant that carries a mood: a whole-body rock, hand-drawn. The
+        # only variant that reads as an expression rather than as a way of standing
+        # still.
         "loops": True,
         "pose": "standing",
         "variantGroup": "idle",
-        "weight": 1.0,
-        # At 1.6s a single pass is over before the eye has read it, and any swap
+        # Weights are shares of the group, not probabilities: the choreographer sums
+        # them and draws in proportion, excluding whatever is on screen. At 0.5 this
+        # runs 23% of turns, level with `dancing`, against `idle`'s 34%. It sat at 1.0
+        # for one revision, which bought it 32% and pushed `workout` down to 17% --
+        # more presence than a mood clip wants.
+        "weight": 0.5,
+        # At 1.28s a single pass is over before the eye has read it, and any swap
         # request -- an epoch roll, a fidget, even a usage-rail update -- could land
-        # after one. Eight cycles is 12.8s on the panel, paid for in up to 12.8s of
+        # after one. Eight cycles is 10.24s on the panel, paid for in up to 10.24s of
         # reaction lag on a real state change. See [[Menu Bar App]].
         "minCycles": 8,
     },
     "dancing": {
         # An "idle" variant: appear.gif's own second half, which used to be stranded
         # at the tail of the entrance where it played once a session. It outweighs
-        # `workout` for being the more characterful of the two, and sits below `idle`
-        # and `happy` -- see dancing()'s docstring.
+        # `workout` for being the more characterful of the two, and is level with
+        # `happy` and below `idle` -- see dancing()'s docstring.
         "loops": True,
         "pose": "standing",
         "variantGroup": "idle",
