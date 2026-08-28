@@ -13,7 +13,7 @@ private func fidgetClip(
     id: id, file: "\(id).gif", frameCount: 1, duration: 1, motion: 1, loops: false,
     pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1,
     fromPose: .sitting, toPose: .sitting, maxPerPhase: maxPerPhase, maxRepeats: maxRepeats,
-    interruptible: false)
+    interruptible: false, minCycles: nil)
 }
 
 /// A looping clip at `.sitting` — the group's own variant, used to prove a
@@ -22,7 +22,8 @@ private func loopingClip(_ id: String) -> Clip {
   Clip(
     id: id, file: "\(id).gif", frameCount: 1, duration: 1, motion: 1, loops: true,
     pose: .sitting, variantGroup: "sitting", fidgetGroup: nil, weight: 1,
-    fromPose: nil, toPose: nil, maxPerPhase: nil, maxRepeats: nil, interruptible: false)
+    fromPose: nil, toPose: nil, maxPerPhase: nil, maxRepeats: nil, interruptible: false,
+    minCycles: nil)
 }
 
 @Test("a fresh ledger allows everything, including capped clips")

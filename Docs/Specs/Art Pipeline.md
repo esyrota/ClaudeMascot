@@ -48,7 +48,7 @@ own override folder, is `AnimationLibrary.swift`.
 
 The choreographer keys off three clip shapes; declaring one wrong fails silently.
 
-- **Looping variant** — loops indefinitely, shares a `variantGroup` (e.g. "idle", "thinking"), has a `weight` for selection against other variants in the group. Multiple variants at one pose are rotated by the choreographer, deterministically from time, never the same twice in a row. The loop begins and ends on the anchor frame.
+- **Looping variant** — loops indefinitely, shares a `variantGroup` (e.g. "idle", "thinking"), has a `weight` for selection against other variants in the group. Multiple variants at one pose are rotated by the choreographer, deterministically from time, never the same twice in a row. The loop begins and ends on the anchor frame — `happy` is the one argued exception, see below. An optional `minCycles` says how many full cycles must play before any swap may land (`nil` means 1); it is the only clip field that buys a short loop time on the panel, and it is paid for in reaction lag — see [[Menu Bar App]] → Boundary scheduling.
 - **Fidget** — non-looping, self-edge (`fromPose == toPose`), id does *not* end in `-enter`. Blinks, look-arounds, a stretch — motion with no cause, injected at randomised intervals during long holds to separate "animated" from "alive". Selection is by **pose**, so a fidget fires in every state at that pose; an optional `fidgetGroup` (and `weight`) narrows it to one state, which is what keeps the wander clips to `idle` and the five `work-*` clips to `sitting`. `fidgetGroup` is a separate field from `variantGroup` on purpose — a variant pool for loops and a fidget scope for one-shots are different questions.
 - **Entrance one-shot** — id ends in `-enter` (e.g. `done-enter`). Plays exactly once when arriving at a pose, if present in the manifest. The only way to re-entrance is to leave the pose and return. Declaring one wrong is silent, so test coverage is essential.
 
@@ -167,9 +167,26 @@ Native 32×32, nine frames at 160ms, drawn by the same hand and in the same pale
 recolour rule of its own and goes through `_body_shade_prop_recolour()` unchanged. It has
 no shaded pixel and no prop; every non-background pixel lands on `MASCOT`.
 
-Its frame 0 *is* the `standing` anchor, pixel for pixel, so the clip needs no leading
-bookend. The last frame is mid-lean, so `happy()` appends `_standing_anchor()` to close
-the loop — the same one-sided repair `waiting` needs, and for the same reason.
+**The source's frame 0 is dropped, and that is what makes the loop read.** Frame 0 *is* the
+`standing` anchor pixel for pixel, and `happy()` also appends `_standing_anchor()` to close
+the loop (the last drawn frame is mid-lean, where the contract says a loop may not rest).
+Keeping both put 480ms of held-still anchor across the loop seam — 320ms of bookend
+followed immediately by 160ms of the source's own opening frame — on a clip whose whole
+character is that it does not stand still. Dropping the source's frame 0 leaves the anchor
+in the cycle exactly once, at the end, and the mascot goes straight from that rest into the
+dip.
+
+The price is the **leading half of the anchor contract**: `happy` is the only loop that does
+not open on its pose's anchor. Nothing it exists to prevent actually happens here. The seam
+the panel itself loops is anchor → dip, which is the source's own frames 0 → 1 — an authored
+beat, no resize and no drift. A swap in lands the same way, because swaps land on boundaries:
+the outgoing loop has just finished a cycle and is therefore showing its own closing anchor,
+so the cut is again anchor → dip. See [[Animation Catalogue]], where the contract records this
+as its one exception.
+
+`minCycles: 8` is set here rather than anywhere else because the clip is 1.6s: without it a
+single pass is over before the eye has read it, and a usage-rail update alone could restart
+it that often.
 
 ## The seated pose (`work-typing.gif` / `work-typing-look-down.gif`)
 

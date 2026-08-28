@@ -38,7 +38,7 @@ private func makeClip(id: String, file: String) -> Clip {
   Clip(
     id: id, file: file, frameCount: 1, duration: 1, motion: 1, loops: true,
     pose: nil, variantGroup: nil, fidgetGroup: nil, weight: 1, fromPose: nil, toPose: nil,
-    maxPerPhase: nil, maxRepeats: nil, interruptible: false)
+    maxPerPhase: nil, maxRepeats: nil, interruptible: false, minCycles: nil)
 }
 
 @MainActor

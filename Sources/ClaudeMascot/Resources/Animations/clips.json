@@ -81,13 +81,14 @@
     },
     "happy": {
       "file": "happy.gif",
-      "frameCount": 10,
-      "durationMs": 1760,
-      "motionMs": 1760,
+      "frameCount": 9,
+      "durationMs": 1600,
+      "motionMs": 1600,
       "loops": true,
       "pose": "standing",
       "variantGroup": "idle",
-      "weight": 1.0
+      "weight": 1.0,
+      "minCycles": 8
     },
     "idle": {
       "file": "idle.gif",

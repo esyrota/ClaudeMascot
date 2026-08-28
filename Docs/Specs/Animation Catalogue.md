@@ -36,8 +36,18 @@ pose at each end. `idle` frame 0 defines `standing`, `sleeping` frame 0 defines 
 `working` frame 0 defines `sitting`, and an offscreen anchor is an empty frame. Break this
 once and every swap visibly jumps.
 
-**Every clip in the manifest satisfies it.** The last holdout was the flag wave that used
-to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
+**One clip is an argued exception, and only at one end.** `happy` closes on the `standing`
+anchor and opens on the dip that follows it, because the source's own opening frame *is* that
+anchor and keeping both held the mascot still for 480ms across the seam of a 1.6s clip whose
+whole character is that it does not stand still. What the contract exists to prevent does not
+happen: the loop seam is anchor → dip, the source's own frames 0 → 1, and a swap in lands on
+the same pair, because swaps land on boundaries and the outgoing loop is therefore showing its
+own closing anchor. No resize, no drift, no flicker. **This is not a licence to skip the
+leading anchor** — it is an exception that had to earn its way past the rule, and every other
+loop still satisfies both ends.
+
+**Every other clip in the manifest satisfies it outright.** The last holdout was the flag wave
+that used to be `waiting`: it opened and closed mid-gesture, so a swap into it snapped the arm up
 four rows and conjured the flag in one frame, and it took a half-raised frame invented at
 each end to fix. The question mark that replaced it needs almost no such repair — its
 source opens *on* the anchor — see the `waiting` notes below for why hand-drawn art
@@ -66,7 +76,7 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 |                               |                                 |                                     |                                     |
 | ----------------------------- | ------------------------------- | ----------------------------------- | ----------------------------------- |
 | ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif) | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **happy** · 10f · 1.76s · w 1.0 | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
+| **idle** · 7f · 2.56s · w 1.0 | **happy** · 9f · 1.6s · w 1.0<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
 
 **thinking** — two variants, and neither of them mimes thinking.
 
@@ -95,6 +105,18 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   native 32×32, nine frames at 160ms) and given the highest weight in the group alongside
   `idle` itself, because it is the only variant that reads as an expression rather than as
   a way of standing still.
+- **`happy` is the only clip that sets `minCycles`, and it is the reason the field exists.**
+  At 1.6s a single pass is over before the eye has read it, and any swap request — an epoch
+  roll, a fidget, even a usage-rail update, which restarts the loop like any other upload —
+  could land after one. `minCycles: 8` holds it on the panel for 12.8s. **That is bought with
+  reaction lag:** a real state change (you send a prompt, the mascot should think) is deferred
+  by up to those 12.8s, the same order as the 10.16s a single cycle of `done-flag` already
+  costs. Turn this one number down if the panel starts feeling slow to answer.
+- **`happy` drops its source's first frame**, which is why it is the one loop that does not
+  open on the `standing` anchor — see the exception recorded under the anchor contract above.
+  With both the source's opening anchor and the appended closing one, the mascot stood still
+  for 480ms of every 1.9s; now the anchor appears once per cycle, at the end, and the rest
+  goes straight into the dip.
 - **`happy` breaks no floor line, but it does lift a foot.** Three of the four feet stay
   welded to row 31 through every frame; the outermost foot on the leaning side comes up
   one or two rows and goes back down. That is weight shifting from foot to foot, not the
@@ -458,10 +480,10 @@ same numbers.
 
 ### Self-edges — fidgets and one-shots
 
-| | | |
-|---|---|---|
-| ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif) |
-| **fidget-stretch**<br>standing, 7f · 0.77s | **fidget-look**<br>standing, 5f · 0.78s | **done-enter**<br>standing, 15f · motion 2.45s |
+|                                                   |                                             |                                                |
+| ------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- |
+| ![fidget-stretch](_animations/fidget-stretch.gif) | ![fidget-look](_animations/fidget-look.gif) | ![done-enter](_animations/done-enter.gif)      |
+| **fidget-stretch**<br>standing, 7f · 0.77s        | **fidget-look**<br>standing, 5f · 0.78s     | **done-enter**<br>standing, 15f · motion 2.45s |
 
 |                                   |
 | --------------------------------- |

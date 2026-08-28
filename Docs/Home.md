@@ -53,7 +53,7 @@ Each one cost a wrong diagnosis to find.
 | Menu bar app | `Sources/ClaudeMascot/` | **shipped** — socket transport, first-run installer, single-instance guard |
 | Plugin (relay) | `plugin/` | **shipped** — v2.0.0, nine events, frozen by design |
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
-| Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling, per-phase play limits (`PhaseLedger.swift`) |
+| Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling, per-phase play limits (`PhaseLedger.swift`), per-clip minimum loop cycles |
 | Event log | `EventLog.swift` | **shipped** — always-on input + decision JSONL under Application Support |
 | Art generator | `art/generate.py` | working, **41 clips** — 13 loops, 28 one-shots. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |

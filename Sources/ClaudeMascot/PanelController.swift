@@ -527,8 +527,17 @@ final class PanelController: ObservableObject {
     // loop finished yet? If so, the last seam is behind us and the swap may
     // land now — at most one loop after it was requested, which is the
     // "never interrupt mid-animation" rule this whole machine exists for.
+    //
+    // `minCycles` raises the floor for one clip at a time: a short loop can be
+    // over before the eye has read it, and every swap request -- an epoch roll,
+    // a fidget, a usage-rail update -- would otherwise land after a single
+    // pass. Absent, it is 1, which is the rule above unchanged. The cost is
+    // reaction lag on a real state change, bounded by `minCycles * duration`;
+    // power transitions bypass this function entirely, so wake and power-off
+    // stay immediate. See `Clip.minCycles`.
+    let floorCycles = Double(max(clip.minCycles ?? 1, 1))
     let cyclesElapsed = (elapsed / clip.duration).rounded(.down)
-    guard cyclesElapsed >= 1 else { return startedAt + clip.duration }
+    guard cyclesElapsed >= floorCycles else { return startedAt + clip.duration * floorCycles }
     return startedAt + clip.duration * cyclesElapsed
   }
 

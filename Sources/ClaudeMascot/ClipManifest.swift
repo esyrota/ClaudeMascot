@@ -65,6 +65,7 @@ private struct ClipDTO: Decodable {
   let maxPerPhase: Int?
   let maxRepeats: Int?
   let interruptible: Bool?
+  let minCycles: Int?
 
   func makeClip(id: String) -> Clip {
     Clip(
@@ -82,7 +83,8 @@ private struct ClipDTO: Decodable {
       toPose: toPose,
       maxPerPhase: maxPerPhase,
       maxRepeats: maxRepeats,
-      interruptible: interruptible ?? false
+      interruptible: interruptible ?? false,
+      minCycles: minCycles
     )
   }
 }

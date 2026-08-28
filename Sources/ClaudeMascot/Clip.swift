@@ -33,6 +33,21 @@ struct Clip: Sendable, Equatable, Identifiable {
   /// `motion`. False for everything but the long set pieces, where making the
   /// user wait out the animation costs more than the seam is worth.
   let interruptible: Bool
+  /// Loop clips only: how many full cycles must play before a swap may land.
+  /// `nil` means one — the ordinary rule, and what every loop but `happy`
+  /// wants. `happy` sets 8 because at 1.6s a single pass is over before the
+  /// eye has read it.
+  ///
+  /// The mirror of `interruptible`, not of `maxPerPhase`: both are answers to
+  /// "when does this clip reach a seam a swap may land on", which is
+  /// `PanelController.nextBoundary`'s question. The phase ledger cannot
+  /// express a minimum at all — it filters candidates, and no filter can
+  /// force a clip to be re-picked.
+  ///
+  /// Paid for in reaction lag: a real state change waits up to
+  /// `minCycles * duration`. Power transitions bypass boundary gating
+  /// entirely, so wake and power-off stay immediate.
+  let minCycles: Int?
 
   /// Where this clip leaves the mascot: its own pose if it loops at one,
   /// otherwise the pose its edge ends at.

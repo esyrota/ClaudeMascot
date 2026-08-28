@@ -1170,11 +1170,21 @@ def dancing():
 # same palette as `waiting-question.gif`: one orange family against black, no shade and
 # no prop, so `_body_shade_prop_recolour()` serves it with no rule of its own.
 HAPPY_SRC = SOURCES / "happy.gif"
-# The closing bookend. The source's frame 0 IS the standing anchor pixel for pixel, so
-# only the tail needs repairing -- the last frame is mid-lean, and the anchor contract
-# says a loop may not restart from there. 320ms is idle()'s own frame beat, so the
-# return to standing lands on the cadence the rest of the group breathes at.
+# The closing bookend. The last drawn frame is mid-lean, and the anchor contract says a
+# loop may not rest there. 320ms is idle()'s own frame beat, so the return to standing
+# lands on the cadence the rest of the group breathes at.
 HAPPY_ANCHOR_OUT_MS = 320
+# The source's frame 0 IS the standing anchor pixel for pixel, and it is DROPPED. Keeping
+# it alongside the bookend above held the mascot still for 480ms -- 320 of bookend then
+# 160 of the source's own opener -- across the seam of a clip whose whole character is that
+# it does not stand still. Dropping it leaves the anchor in the cycle once, at the end.
+#
+# This costs the LEADING half of the anchor contract: `happy` is the only loop that does
+# not open on its pose's anchor. Argued, not overlooked -- the seam the panel loops is
+# anchor -> dip, which is the source's own frames 0 -> 1, and a swap in lands on the same
+# pair because swaps land on boundaries, so the outgoing loop is showing its own closing
+# anchor. See [[Animation Catalogue]], which records this as the contract's one exception.
+HAPPY_DROP_LEADING_ANCHOR = 1
 
 
 def happy():
@@ -1190,7 +1200,7 @@ def happy():
     The sway does widen the silhouette past the anchor's 24px at the extremes, which no
     other standing loop does.
     """
-    return imported(HAPPY_SRC, _body_shade_prop_recolour) + [
+    return imported(HAPPY_SRC, _body_shade_prop_recolour)[HAPPY_DROP_LEADING_ANCHOR:] + [
         (_standing_anchor(), HAPPY_ANCHOR_OUT_MS)
     ]
 
@@ -1897,6 +1907,11 @@ CLIP_METADATA = {
         "pose": "standing",
         "variantGroup": "idle",
         "weight": 1.0,
+        # At 1.6s a single pass is over before the eye has read it, and any swap
+        # request -- an epoch roll, a fidget, even a usage-rail update -- could land
+        # after one. Eight cycles is 12.8s on the panel, paid for in up to 12.8s of
+        # reaction lag on a real state change. See [[Menu Bar App]].
+        "minCycles": 8,
     },
     "dancing": {
         # An "idle" variant: appear.gif's own second half, which used to be stranded
@@ -2285,6 +2300,10 @@ if __name__ == "__main__":
             clip_entry["pose"] = CLIP_METADATA[name]["pose"]
             clip_entry["variantGroup"] = CLIP_METADATA[name]["variantGroup"]
             clip_entry["weight"] = CLIP_METADATA[name]["weight"]
+            # Optional on a loop: how many full cycles must play before a swap may
+            # land. Absent means one, which is what every other loop wants.
+            if "minCycles" in CLIP_METADATA[name]:
+                clip_entry["minCycles"] = CLIP_METADATA[name]["minCycles"]
         else:
             clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
