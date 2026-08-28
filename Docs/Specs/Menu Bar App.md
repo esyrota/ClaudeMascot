@@ -168,6 +168,11 @@ arrive in bursts well inside the ~600ms a probe takes. Where a terminal status l
 being drawn, the wrapper keeps `receivedAt` inside the threshold and the probe never
 spawns; it exists purely for clients the wrapper never reaches.
 
+The menu's **Refresh** row (see Menu bar, below) is the one other way a probe starts. It
+skips the staleness check and nothing else — the in-flight flag still applies, so holding
+the menu open and clicking repeatedly cannot multiply subprocesses. Both entry points share
+one spawn path rather than each carrying their own copy.
+
 **The usage cycle and the upload cycle are separate.** Applying a `UsageSnapshot` —
 `applyUsage(_:)`, called from both the wrapper's socket line and the probe — assigns
 `currentUsage` and saves the cache, and deliberately never calls `panelController.tick()`.
