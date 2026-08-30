@@ -39,6 +39,17 @@ struct MenuBarView: View {
         action: appModel.probeInFlight ? nil : { appModel.refreshUsageNow() }
       )
 
+      // The usage screen is otherwise only reachable by leaving the mascot
+      // alone for four minutes, which is a poor way to find out it exists.
+      // Disabled rather than hidden when there is nothing to draw, so the row
+      // still says the feature is there — see `PanelController.showUsageNow`.
+      MenuRow(
+        title: appModel.isShowingUsage ? "Hide Usage on Panel" : "Show Usage on Panel",
+        action: appModel.currentUsage == nil
+          ? nil
+          : (appModel.isShowingUsage ? { appModel.endUsageNow() } : { appModel.showUsageNow() })
+      )
+
       Divider()
         .padding(.vertical, 4)
 

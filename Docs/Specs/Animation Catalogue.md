@@ -20,6 +20,13 @@ venv/bin/python art/export_docs.py
 How the clips are *chosen* is [[Menu Bar App]]; how they are *authored* is
 [[Art Pipeline]]. This page is the inventory.
 
+**One thing on the panel is not in this inventory and cannot be**: the usage screen, which
+is generated at runtime from live numbers rather than authored to a file. It has no
+`clips.json` entry, no golden fixture, and no image here, because there is no fixed
+picture to catalogue — see [[Menu Bar App]] → The usage screen. Its font *is* authored
+art, though: `PixelFont.swift` carries `art/sources/usage.gif`'s 3×5 glyphs recovered
+pixel-for-pixel, and that GIF is the design of record for the screen's composition.
+
 ## The two kinds of clip
 
 **Loop clips** live *at* a pose and play forever until something swaps them. They carry a
@@ -88,19 +95,19 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
 
 ### standing
 
-**idle** — four variants, the richest set because idle is on screen most.
+**idle** — five variants, the richest set because idle is on screen most.
 
-|                               |                                                  |                                     |                                     |
-| ----------------------------- | ------------------------------------------------ | ----------------------------------- | ----------------------------------- |
-| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif)                  | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) |
-| **idle** · 7f · 2.56s · w 1.0 | **happy** · 8f · 1.28s · w 0.5<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    |
+|                               |                                                  |                                     |                                     |                                                          |
+| ----------------------------- | ------------------------------------------------ | ----------------------------------- | ----------------------------------- | -------------------------------------------------------- |
+| ![idle](_animations/idle.gif) | ![happy](_animations/happy.gif)                  | ![dancing](_animations/dancing.gif) | ![workout](_animations/workout.gif) | ![look-down](_animations/look-down.gif)                  |
+| **idle** · 7f · 2.56s · w 1.0 | **happy** · 8f · 1.28s · w 0.5<br>`minCycles: 8` | **dancing** · 18f · 3.71s · w 0.5   | **workout** · 7f · 1.72s · w 0.4    | **look-down** · 8f · 9.24s · w 0.5<br>`interruptible` |
 
-**thinking** — two variants, and neither of them mimes thinking.
+**thinking** — two variants: the thought, and the one it turns into.
 
-|                                       |                                               |
-| ------------------------------------- | --------------------------------------------- |
-| ![thinking](_animations/thinking.gif) | ![thinking-alt](_animations/thinking-alt.gif) |
-| **thinking** · 5f · 3.6s · w 1.0      | **thinking-alt** · 14f · 6.06s · w 0.5        |
+|                                       |                               |
+| ------------------------------------- | ----------------------------- |
+| ![thinking](_animations/thinking.gif) | ![idea](_animations/idea.gif) |
+| **thinking** · 14f · 6.06s · w 1.0    | **idea** · 19f · 2.28s · w 0.5 |
 
 **waiting** — one, and it asks the question out loud.
 
@@ -154,14 +161,23 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   clip for as long as this project had four animations and four states to spread them
   over, but lifting weights says nothing about working on a prompt — it is the mascot
   doing something while nothing is happening, which is what idle means.
-- **The `thinking` group barely performs at all.** `thinking` itself stands and breathes,
-  slower than idle does, with one brow up; only `thinking-alt` shows a thought. Thinking
-  is mostly not visible from outside, and a mascot that always mimes it has nothing left
-  to say when the thought is a hard one.
+- **The `thinking` group is a thought and its payoff.** `thinking` shows a bubble filling
+  with a "..." and retreating — a thought that goes nowhere, which is what most of them
+  do; `idea` is the one that arrives. The weights carry that order and are not a taste
+  call: at 1.0 against 0.5, the panel shows twice as much thinking as arriving, because
+  an idea is what a thought *becomes*. At parity the mascot would look like it solved
+  something every other loop, which spends the beat that is meant to be the reward.
+- **A third variant, also called `thinking`, was cut when `idea` arrived.** It stood and
+  breathed at half idle's speed with one brow raised, on the argument that thinking is
+  mostly not visible from outside and a mascot that always mimes it has nothing left to
+  say when the thought is hard. The argument was sound and the clip still lost: what it
+  actually put on the panel was `idle` at half speed with one pixel moved, and a group
+  whose base clip is indistinguishable from another group's base clip never reads as
+  itself. Reviving it needs a different answer to "how does standing still look like
+  concentration", not the same one again.
   Now that a session with a tool call underway sits rather than stands (see
-  [[Menu Bar App]]), standing `thinking` is honest for a narrower stretch than before — the
-  moment before the first tool call, where nothing has started yet — which is exactly when
-  performing nothing is most correct.
+  [[Menu Bar App]]), the standing `thinking` group covers a narrower stretch than before —
+  the moment before the first tool call, where nothing has started yet.
 - **Three standing variants have been cut, each for a different reason, and none is
   coming back as-is.** `idle-think` was sliced out of the thinking sheet and carried that
   sheet's ~87% silhouette (the same problem `working-alt` had, below), so it read as a
@@ -180,9 +196,33 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   the panel's bottom row; the breath is a torso squash, not a lift of the whole figure.
   `idle` used to bob a pixel upward and read as a slow hop. Only a clip that
   *means* to leave the ground — the jump, the walks — may break it.
-- `happy`, `dancing`, `sleeping`, `waiting` and `done-flag` are imported; everything else above
-  is drawn or assembled in `art/generate.py`.
-- `thinking-alt` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
+- `happy`, `dancing`, `sleeping`, `waiting`, `done-flag`, `look-down` and `idea` are
+  imported; everything else above is drawn or assembled in `art/generate.py`.
+- **`look-down` is the longest loop in the manifest, and half of it is two holds.** The
+  head dips, he studies the floor for 3.6s, lifts, holds again, and comes back up — 9.24s
+  in total. The source draws those holds as runs of identical frames and the encoder
+  merges them, summing the durations, so the shipped file is 8 frames and 9240ms where
+  the source is 28 and 9240ms: the same animation, differently numbered. **The hold is
+  the beat, not redundancy** — collapsing it further, or retiming it shorter, is what
+  would remove the clip's character. It is the only idle variant whose subject is
+  attention rather than motion.
+  It is also **the only loop clip carrying `interruptible`**, and it has to: boundary
+  gating would otherwise make a real state change wait up to 9.24s. The flag only lets a
+  swap cut when it crosses a phase, so the hold still plays in full against a variant
+  rotation inside `idle` — every swap that is not a reaction.
+- **`idea` is the only clip with a colour of its own.** The bulb's glass ships at
+  `BULB = (255, 200, 0)`, deliberately the same value as the dream's `PACMAN`: `B = 0` is
+  compulsory for a warm colour here and the panel's response above green 96 is flat, so
+  there is no second warm yellow to be had — two constants at different values would be
+  one colour on the panel. Its filament and screw base are `PROP` white. The glass cannot
+  be separated from the body by chroma or by value (both are saturated warm colours), so
+  `_idea_recolour` splits them by **green**: body 88–110, glass 195–220, threshold at 150
+  in an 85-wide empty gap.
+- **`look-down` and `idea` are the only imports that keep the anchor contract for free.**
+  Both open and close pixel-identically on `_standing_anchor()` — checked, not assumed —
+  because they were drawn on this project's own standing geometry. `happy`, by contrast,
+  had to give the contract up at *both* ends to keep its rhythm.
+- `thinking` is the long one: an eye lifts, a tail of puffs trails up, a bubble swells
   and fills in a "..." one dot at a time, holds, then retreats the way it came. It was
   sliced out of the 36-frame thinking sheet until that cost it three things at once — the
   sheet's figure is 21×14 against the anchor's 24×16, so the mascot shrank for the length
@@ -190,11 +230,6 @@ drawn or imported front-on in every clip, so neither actually turns — see the 
   juddered side to side; and the whole beat ran in 2.1s, too quick to read as thought.
   Only the last of those is a timing problem, so it was re-authored on the standard
   geometry instead. The body breathes underneath with idle's own torso squash.
-- **`thinking` raises the other brow.** One eye up a pixel — the left, mirroring the right
-  eye `thinking-alt` opens on — is the only expression this face can carry, and it is the
-  whole difference between the clip and `idle` standing still. It is off on the first and
-  last frames because those two are the bare `standing` anchor and the anchor contract is
-  pixel-identical, brow included.
 - **`waiting` is the question mark, and it replaced a flag wave and both its variants.**
   It means Claude is asking *you* for something, so it has two jobs: be seen from across
   a room, and say what it wants once it has been. The flag did only the first — `waiting`
@@ -413,11 +448,11 @@ a frame — thinking at the desk is a beat on top of `working`, not a state of i
 **Neither `work-coffee` nor `work-look` turns the mascot to face the viewer.** This mascot
 is drawn — and, for the seated pose, imported — front-on in every clip, so there is no
 away-facing pose to turn from — the turned-head rule above does not apply to either. The
-attention shift in both is the way `thinking-alt` draws its own eye lift, applied to the
+attention shift in both is the way `thinking` draws its own eye lift, applied to the
 imported art instead of a `mascot()` draw: paint over and redraw with the eyes higher (or,
 for `work-look-down`, imported already lower) in the head. `work-look` lifts both eyes,
 symmetric, to keep it visually distinct from the single-eye quizzical lift `work-idea` and
-`thinking-alt` use.
+`thinking` use.
 
 **Two edges connect `sitting` to `standing`**: `stand-to-sit` (he lowers himself, the desk
 comes in) and `sit-to-stand` (the desk recedes, he stands), both pixel-exact on the anchor
@@ -436,7 +471,7 @@ route to a genuine `done` instead plays `sit-to-stand` (close the lid, get up) a
 stands, and only when the turn actually finished.
 
 **`working-alt` is retired.** The sprite sheet it was cut from stays in `art/sources` as
-reference art, the way the thinking sheet already does after `thinking-alt` was
+reference art, the way the thinking sheet already does after `thinking` was
 re-authored off it — a record of where the art came from, not a clip that ships.
 
 **The broom sweep is retired outright.** It was `working` in name only: `pose: sitting` on

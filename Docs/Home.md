@@ -55,7 +55,7 @@ Each one cost a wrong diagnosis to find.
 | Plugin bundling | `make-app.sh` + `packaging/` | bundled into the `.app` and sealed by the signature |
 | Choreography | `SessionTracker` + `Choreographer` | **shipped** — multi-session reduction, pose graph, variants, fidgets, boundary scheduling, per-phase play limits (`PhaseLedger.swift`), per-clip minimum loop cycles |
 | Event log | `EventLog.swift` | **shipped** — always-on input + decision JSONL under Application Support |
-| Art generator | `art/generate.py` | working, **41 clips** — 13 loops, 28 one-shots. See [[Animation Catalogue]] |
+| Art generator | `art/generate.py` | working, **42 clips** — 13 loops, 29 one-shots. See [[Animation Catalogue]] |
 | App icon | `art/make_icon.py` | working — builds `AppIcon.icns` from `art/sources/logo.gif`, run by hand |
 | GIF importer | `art/import_gif.py` | working — for oversized source art only |
 | Sprite-sheet importer | `art/sheet_import.py` | standalone — nothing imports a sheet any more; kept for a future one |
@@ -67,9 +67,10 @@ Each one cost a wrong diagnosis to find.
 | Panel colour model | `art/panel_colour.py` | **shipped** — the tone curve, for brightness ramps and previews. **Never applied to the art**; see [[Panel Quirks]] |
 | Diagnostic image hold | `AppModel.sendDiagnosticImage` | **shipped** — menu bar → Option-held → Send Test Image…; the only way anything but a clip reaches the panel |
 | Status overlay | `Overlay.swift` + `UsageRail.swift` | **shipped** — a layer behind the mascot; row 0 carries the 5-hour usage rail |
-| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 41 clips pixel-exact |
+| GIF codec | `GifImage.swift` + `GifEncoder.swift` | **shipped** — decode/encode in Swift, no ImageIO (it colour-manages). Round-trips all 42 clips pixel-exact |
 | Compositor | `Compositor.swift` | **shipped** — overlay behind, mascot in front, mandatory 1px knockout halo. **No overlay = byte-identical passthrough** |
-| Usage input | `plugin/hooks/statusline-wrapper.sh` + `UsageSnapshot.swift` | **shipped** — wraps the user's own statusline, tees two fields to the socket |
+| Usage input | `plugin/hooks/statusline-wrapper.sh` + `UsageSnapshot.swift` | **shipped** — wraps the user's own statusline, tees the 5-hour and weekly windows to the socket; cost is deliberately never forwarded |
+| Usage screen | `UsageScreen.swift` + `PixelFont.swift` + `UsageScreenSource.swift` | **shipped** — two panes of live numbers (the 5-hour and weekly windows), generated at runtime, shown after the mascot walks off. The only art in the project not authored by `art/generate.py`; the font is recovered pixel-for-pixel from `art/sources/usage.gif` |
 
 Installation is now a single step: build and run the app. It offers to install the
 plugin on first launch, and the repo is no longer a marketplace.
@@ -100,6 +101,12 @@ plugin on first launch, and the repo is no longer a marketplace.
   two defects that every green Run Report and all 190 tests were blind to, both found only
   by reading the produced frames back. A third surfaced later and only in the logs: the
   clip's own cap evicted it 1.5s in, so nobody had ever seen the Pac-Man.
+- `_logs/2026-08-29. Usage Screen/` — **shipped**: the doze shortened to 2m in and 2m
+  long, and the panel given something to say once the mascot has gone. Reproduces
+  `art/sources/usage.gif` — including recovering its 3×5 font glyph by glyph — with the
+  loop closed, the dwell frames collapsed from 177 to 16 by using per-frame GIF delays,
+  and the palette re-authored against [[Panel Quirks]]' mixture table. Its third pane was
+  built and then cut: see Deferred.
 - `_logs/2026-08-26. Panel Colour Characterisation/` — the panel's tone curve measured
   against an on-screen reference in the same frame, and the colour rules rewritten around
   it. See its [[Findings]] for the evidence, the method, and the alignment error that
@@ -135,3 +142,12 @@ open item is now `doze-dream`.)
 - Per-tool animations. The relay already forwards `tool_name`, so this needs no plugin
   change — only artwork and a policy edit.
 - Retuning the choreography constants against the accumulated `decision.jsonl`.
+- **The usage screen has two panes where its mockup had three.** The third showed
+  `$3.52 / bal. $20`, and there is no cost to put in it: `/usage` prints none on a
+  subscription, and the statusline payload's `cost.total_cost_usd` is kept off the socket
+  by the relay's privacy rule. A 7-day request count was built in its place and then
+  removed — a count has no quota, so it could only be scaled against a high-water mark of
+  itself, which is a number wearing a progress bar rather than being one. **The one real
+  candidate for a third pane is the Opus-only weekly window**, which the payload's
+  `rate_limits` already carries as `seven_day_opus`; it is a genuine budget with a
+  genuine denominator. Worth doing if it turns out to be reported reliably.

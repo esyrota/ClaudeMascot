@@ -175,12 +175,38 @@ private let waveOffClip = Clip(
   minCycles: nil
 )
 
+/// A stand-in for what `UsageScreenSource` produces: a looping, offscreen,
+/// interruptible clip whose id carries a content hash. `content` is what a
+/// test varies to make the screen "change".
+@MainActor
+private func usageScreenClip(pose: Pose?, content: String = "a") -> Clip {
+  Clip(
+    id: UsageScreenSource.idPrefix + content,
+    file: "",
+    frameCount: 0,
+    duration: 14,
+    motion: 14,
+    loops: true,
+    pose: pose,
+    variantGroup: nil,
+    fidgetGroup: nil,
+    weight: 1,
+    fromPose: nil,
+    toPose: nil,
+    maxPerPhase: nil,
+    maxRepeats: nil,
+    interruptible: true,
+    minCycles: nil
+  )
+}
+
 @MainActor
 private func makeController(
   panel: MockPanel,
   timings: PanelTimings = PanelTimings(doneHold: 30, sleepAfter: 300, offAfter: 600),
   clock: FakeClock,
   clipByID: @escaping (String) -> Clip? = { _ in nil },
+  usageClip: @escaping (Pose?) -> Clip? = { _ in nil },
   sleeper: @escaping (TimeInterval) async -> Void = { _ in },
   resolve: @escaping (PanelState, Clip?, PhaseLedger) -> Clip? = { state, _, _ in
     defaultTestClips[state]
@@ -191,6 +217,7 @@ private func makeController(
     panel: panel,
     resolve: resolve,
     clipByID: clipByID,
+    usageClip: usageClip,
     timings: timings,
     brightness: { 40 },
     clock: { clock() },
@@ -1158,4 +1185,437 @@ func invalidateDisplayForcesAnUploadEvenWithAnUnchangedOverlayKey() async {
   await controller.tick()
   #expect(panel.uploadCount == 2)
   #expect(controller.displayed?.id == PanelState.working.rawValue)
+}
+
+// MARK: - The usage screen
+
+/// The whole escalation, end to end: idle → doze → walk off → usage screen →
+/// dark. The one test that pins the *order*; everything below picks at one
+/// joint of it.
+@Test @MainActor
+func idleEscalationShowsTheUsageScreenBeforeGoingDark() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()  // idle
+  clock.advance(120)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.sleeping.rawValue, "2m idle nods off")
+
+  clock.advance(120)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.away.rawValue, "2m of dozing walks him off")
+
+  // `away` ends offscreen with `motion: 0`, so he is gone on the next tick.
+  await controller.tick()
+  #expect(controller.displayed?.id.hasPrefix(UsageScreenSource.idPrefix) == true)
+  #expect(!controller.isPanelOff, "the panel must not go dark under the screen")
+
+  clock.advance(899)
+  await controller.tick()
+  #expect(!controller.isPanelOff, "still inside the hold")
+
+  clock.advance(1)
+  await controller.tick()
+  #expect(controller.isPanelOff)
+}
+
+/// The screen carries the mascot's pose forward, which is what lets him walk
+/// back in from the side he left by rather than rising through the floor.
+@Test @MainActor
+func theUsageScreenClaimsThePoseTheMascotLeftAt() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var posesAskedFor: [Pose?] = []
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in
+      posesAskedFor.append(pose)
+      return usageScreenClip(pose: pose)
+    }
+  )
+
+  await controller.tick()
+  clock.advance(240)
+  await controller.tick()  // sleeping
+  await controller.tick()  // away
+  await controller.tick()  // usage screen
+
+  #expect(posesAskedFor.first == .offLeft, "the pose the departure clip ended at")
+  #expect(controller.displayed?.endPose == .offLeft)
+}
+
+/// A departure with no screen to show behaves exactly as this machine did
+/// before the screen existed.
+@Test @MainActor
+func noUsageScreenMeansTheOldStraightToDarkBehaviour() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { _ in nil }  // no snapshot yet
+  )
+
+  await controller.tick()
+  clock.advance(240)
+  await controller.tick()
+  await controller.tick()
+  await controller.tick()
+  #expect(controller.isPanelOff)
+}
+
+/// `usageFor: 0` is how the state machine spells "there is no screen at all",
+/// which is what every test written before it existed relies on.
+@Test @MainActor
+func usageForZeroDisablesTheScreenEvenWhenOneIsAvailable() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 0),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()
+  clock.advance(240)
+  await controller.tick()
+  await controller.tick()
+  await controller.tick()
+  #expect(controller.isPanelOff)
+}
+
+/// The screen loops for ~14s with nobody on the panel; a user who starts
+/// typing must not have to watch it finish. This is what `interruptible` on a
+/// *looping* clip buys, and the one place it is exercised.
+@Test @MainActor
+func activityCutsTheUsageScreenWithoutWaitingForItsLoop() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()
+  clock.advance(240)
+  await controller.tick()
+  await controller.tick()
+  await controller.tick()
+  #expect(controller.displayed?.id.hasPrefix(UsageScreenSource.idPrefix) == true)
+
+  // 2s into a 14s loop: nowhere near a seam.
+  clock.advance(2)
+  controller.handle(.working)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+}
+
+/// A number that moved re-uploads; one that did not costs nothing. And the
+/// refresh waits out the loop it lands in — unlike the mascot's return above,
+/// which cuts it. `nextBoundary`'s seam is "has a full cycle finished yet",
+/// so the wait is bounded by one cycle and no longer.
+@Test @MainActor
+func changedNumbersRefreshTheScreenOnlyOnceItsLoopHasComeRound() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var content = "a"
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose, content: content) }
+  )
+
+  await controller.tick()
+  clock.advance(240)
+  await controller.tick()  // away
+  await controller.tick()  // usage screen
+  let uploadsAfterFirstScreen = panel.uploadCount
+  #expect(controller.displayed?.id == UsageScreenSource.idPrefix + "a")
+
+  // Unchanged content, many ticks across many loops: nothing is re-sent.
+  clock.advance(40)
+  await controller.tick()
+  await controller.tick()
+  #expect(panel.uploadCount == uploadsAfterFirstScreen)
+
+  // A number moves five seconds into a fresh cycle: the swap is legitimate
+  // but has to wait out the loop it is standing in.
+  clock.advance(2)  // 42s in: three whole cycles, so the screen restarts here
+  content = "b"
+  await controller.tick()
+  #expect(panel.uploadCount == uploadsAfterFirstScreen + 1)
+  content = "c"
+  clock.advance(5)
+  await controller.tick()
+  #expect(panel.uploadCount == uploadsAfterFirstScreen + 1, "mid-loop refresh must wait")
+  clock.advance(9)  // a full 14s cycle of the "b" screen has now finished
+  await controller.tick()
+  #expect(panel.uploadCount == uploadsAfterFirstScreen + 2)
+  #expect(controller.displayed?.id == UsageScreenSource.idPrefix + "c")
+}
+
+/// A refresh must not restart the hold, or a screen whose numbers move every
+/// few minutes would never let the panel go dark.
+@Test @MainActor
+func refreshingTheScreenDoesNotRestartItsHold() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  var content = "a"
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 600),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose, content: content) }
+  )
+
+  await controller.tick()
+  clock.advance(240)
+  await controller.tick()
+  await controller.tick()
+  await controller.tick()
+
+  // Refresh repeatedly across the whole hold.
+  for step in 1...5 {
+    clock.advance(100)
+    content = "step\(step)"
+    await controller.tick()
+  }
+  clock.advance(100)  // 600s since the screen first appeared
+  await controller.tick()
+  #expect(controller.isPanelOff, "the hold is measured from the first screen, not the last")
+}
+
+/// System sleep and quit hold an OS resource open and spin on `isPanelOff`.
+/// A screen that kept the panel lit would spend the whole deadline.
+@Test @MainActor
+func departSkipsTheUsageScreenAndGoesStraightDark() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) },
+    sleeper: { clock.advance($0) }
+  )
+
+  await controller.tick()
+  await controller.depart(withWave: false, deadline: clock() + 5)
+  #expect(controller.isPanelOff)
+  #expect(
+    !panel.calls.contains { call in
+      if case .upload(let clip) = call { return clip.id.hasPrefix(UsageScreenSource.idPrefix) }
+      return false
+    })
+}
+
+/// The suppression is for one departure, not forever: a Mac that wakes back
+/// up gets its screen again.
+@Test @MainActor
+func wakingAfterASuppressedDepartureRestoresTheScreen() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(doneHold: 30, sleepAfter: 120, offAfter: 240, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) },
+    sleeper: { clock.advance($0) }
+  )
+
+  await controller.tick()
+  await controller.depart(withWave: false, deadline: clock() + 5)
+  #expect(controller.isPanelOff)
+
+  controller.handle(.working)
+  await controller.tick()  // wakes
+  clock.advance(1)
+  controller.handle(.idle)
+  clock.advance(240)
+  await controller.tick()  // sleeping
+  await controller.tick()  // away
+  await controller.tick()  // usage screen, not dark
+  #expect(controller.displayed?.id.hasPrefix(UsageScreenSource.idPrefix) == true)
+}
+
+/// The menu's "Show Usage on Panel". A request is not a `PanelState` — it
+/// rides beside the machine and forces `shouldBeOff`, so the ordinary
+/// departure carries it out.
+@Test @MainActor
+func showUsageNowWalksHimOffAndBringsTheScreenUp() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(
+      doneHold: 30, sleepAfter: 120, offAfter: 240, requestedUsageHold: 60, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()
+  controller.handle(.working)
+  clock.advance(1)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+
+  #expect(controller.showUsageNow())
+  clock.advance(1)
+  await controller.tick()  // away
+  await controller.tick()  // the screen
+  #expect(controller.isShowingUsage)
+  #expect(controller.displayed?.id.hasPrefix(UsageScreenSource.idPrefix) == true)
+}
+
+/// It is a look, not a state: it lapses on its own, and the mascot comes back
+/// to whatever the session is actually doing.
+@Test @MainActor
+func aRequestedScreenLapsesAndTheMascotReturns() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(
+      doneHold: 30, sleepAfter: 120, offAfter: 240, requestedUsageHold: 60, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()
+  controller.handle(.working)
+  clock.advance(1)
+  await controller.tick()
+  controller.showUsageNow()
+  clock.advance(1)
+  await controller.tick()
+  await controller.tick()
+  #expect(controller.isShowingUsage)
+
+  clock.advance(60)
+  await controller.tick()
+  #expect(!controller.isShowingUsage)
+  #expect(controller.displayed?.id != nil)
+  #expect(controller.displayed?.id.hasPrefix(UsageScreenSource.idPrefix) == false)
+  #expect(!controller.isPanelOff, "a lapsed look returns the mascot, it does not go dark")
+}
+
+/// `usageFor` must not cut a requested look short — and it is settable to
+/// "Never" (`.greatestFiniteMagnitude`), which must not strand the mascot
+/// behind the screen either.
+@Test @MainActor
+func aRequestedScreenIsBoundedByItsOwnHoldNotByUsageFor() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(
+      doneHold: 30, sleepAfter: 120, offAfter: 240, requestedUsageHold: 60,
+      usageFor: .greatestFiniteMagnitude),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()
+  controller.handle(.working)
+  clock.advance(1)
+  await controller.tick()
+  controller.showUsageNow()
+  clock.advance(1)
+  await controller.tick()
+  await controller.tick()
+
+  clock.advance(30)
+  await controller.tick()
+  #expect(controller.isShowingUsage, "half way through its own hold")
+  clock.advance(31)
+  await controller.tick()
+  #expect(!controller.isShowingUsage)
+  #expect(!controller.isPanelOff)
+}
+
+@Test @MainActor
+func theMenuCanEndARequestedScreenEarly() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(
+      doneHold: 30, sleepAfter: 120, offAfter: 240, requestedUsageHold: 60, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) }
+  )
+
+  await controller.tick()
+  controller.handle(.working)
+  clock.advance(1)
+  await controller.tick()
+  controller.showUsageNow()
+  clock.advance(1)
+  await controller.tick()
+  await controller.tick()
+  #expect(controller.isShowingUsage)
+
+  controller.endRequestedUsage()
+  clock.advance(1)
+  await controller.tick()
+  #expect(!controller.isShowingUsage)
+}
+
+/// Walking him off to reveal nothing is strictly worse than ignoring the
+/// click, so a request with no screen behind it does not happen at all.
+@Test @MainActor
+func showUsageNowDoesNothingWithNoScreenToShow() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(
+      doneHold: 30, sleepAfter: 120, offAfter: 240, requestedUsageHold: 60, usageFor: 900),
+    clock: clock,
+    usageClip: { _ in nil }
+  )
+
+  await controller.tick()
+  controller.handle(.working)
+  clock.advance(1)
+  await controller.tick()
+  #expect(!controller.showUsageNow())
+  clock.advance(1)
+  await controller.tick()
+  #expect(controller.displayed?.id == PanelState.working.rawValue)
+  #expect(!controller.isPanelOff)
+}
+
+/// The lid is closing: a live request must not spend the sleep deadline.
+@Test @MainActor
+func departCancelsARequestedScreen() async {
+  let clock = FakeClock()
+  let panel = MockPanel()
+  let controller = makeController(
+    panel: panel,
+    timings: PanelTimings(
+      doneHold: 30, sleepAfter: 120, offAfter: 240, requestedUsageHold: 60, usageFor: 900),
+    clock: clock,
+    usageClip: { pose in usageScreenClip(pose: pose) },
+    sleeper: { clock.advance($0) }
+  )
+
+  await controller.tick()
+  controller.showUsageNow()
+  await controller.depart(withWave: false, deadline: clock() + 5)
+  #expect(controller.isPanelOff)
 }

@@ -19,6 +19,32 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
   /// after an app restart rather than reading as fresh forever.
   let receivedAt: Date
 
+  /// How far through the **weekly** (all-models) window usage has burned,
+  /// 0...100, and when that window resets. Both optional and both filled
+  /// from the same source at the same time: `UsageProbe` reads them off
+  /// `/usage`'s second line, and the statusline wrapper tees them from
+  /// `rate_limits.seven_day`. `nil` from an older cache file, or from any
+  /// source that reports only the 5-hour window.
+  ///
+  /// The rail never reads these — it draws one row and that row is the
+  /// 5-hour budget. They exist for the usage screen's second pane.
+  var weekUsedPercent: Double?
+  var weekResetsAt: Date?
+
+  /// Memberwise init spelled out because the two fields above are `var`s
+  /// with no defaults in the synthesised one, and every existing call site
+  /// constructs a snapshot with the first three arguments only.
+  init(
+    usedPercent: Double, resetsAt: Date, receivedAt: Date,
+    weekUsedPercent: Double? = nil, weekResetsAt: Date? = nil
+  ) {
+    self.usedPercent = usedPercent
+    self.resetsAt = resetsAt
+    self.receivedAt = receivedAt
+    self.weekUsedPercent = weekUsedPercent
+    self.weekResetsAt = weekResetsAt
+  }
+
   /// The window's length. Fixed by Claude Code's product, not configurable.
   private static let windowLength: TimeInterval = 5 * 60 * 60
 
@@ -30,11 +56,20 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
     let event: String
     let usedPercent: Double
     let resetsAt: Date
+    /// Optional on the wire, not merely optional in Swift: an older wrapper
+    /// (or a Claude Code whose payload has no `seven_day` object) sends the
+    /// two-field line this decoder has always accepted, and must keep
+    /// working. A weekly field that fails to appear costs the usage screen
+    /// its second pane and nothing else.
+    let weekUsedPercent: Double?
+    let weekResetsAt: Date?
 
     enum CodingKeys: String, CodingKey {
       case event
       case usedPercent
       case resetsAt
+      case weekUsedPercent
+      case weekResetsAt
     }
 
     init(from decoder: Decoder) throws {
@@ -43,6 +78,10 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
       self.usedPercent = try container.decode(Double.self, forKey: .usedPercent)
       let timestamp = try container.decode(TimeInterval.self, forKey: .resetsAt)
       self.resetsAt = Date(timeIntervalSince1970: timestamp)
+      self.weekUsedPercent = try container.decodeIfPresent(
+        Double.self, forKey: .weekUsedPercent)
+      self.weekResetsAt = try container.decodeIfPresent(
+        TimeInterval.self, forKey: .weekResetsAt).map(Date.init(timeIntervalSince1970:))
     }
   }
 
@@ -54,7 +93,30 @@ struct UsageSnapshot: Codable, Sendable, Equatable {
     guard let wire = try? decoder.decode(Wire.self, from: line), wire.event == "Usage" else {
       return nil
     }
-    return UsageSnapshot(usedPercent: wire.usedPercent, resetsAt: wire.resetsAt, receivedAt: now)
+    return UsageSnapshot(
+      usedPercent: wire.usedPercent, resetsAt: wire.resetsAt, receivedAt: now,
+      weekUsedPercent: wire.weekUsedPercent, weekResetsAt: wire.weekResetsAt)
+  }
+
+  /// This reading with every field it does not carry filled in from
+  /// `previous`.
+  ///
+  /// **Three sources feed this type and they do not all carry every field.**
+  /// `UsageProbe` and a current statusline wrapper report the 5-hour and
+  /// weekly windows; a wrapper from before the weekly fields existed, or a
+  /// Claude Code whose payload has no `seven_day` object, reports only the
+  /// 5-hour one. Assigning such a reading straight over the previous value
+  /// would blank the usage screen's second pane — a field going missing is
+  /// "this source doesn't know", never "this value is now nothing".
+  ///
+  /// The 5-hour window is the exception and is always taken from `self`: it
+  /// is the field every source reports, and it is the one this snapshot
+  /// exists to be a *reading* of.
+  func carryingForward(from previous: UsageSnapshot?) -> UsageSnapshot {
+    var merged = self
+    merged.weekUsedPercent = weekUsedPercent ?? previous?.weekUsedPercent
+    merged.weekResetsAt = weekResetsAt ?? previous?.weekResetsAt
+    return merged
   }
 
   /// How far through the window the wall clock is at `now`, 0...1.

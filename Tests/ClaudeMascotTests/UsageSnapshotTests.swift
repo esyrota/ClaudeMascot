@@ -112,3 +112,89 @@ func cacheGracefullyHandlesFormatChange() {
 
   #expect(UsageSnapshotCache.load(from: fileURL) == nil)
 }
+
+// MARK: - Merging two sources
+
+/// Two sources feed `UsageSnapshot` and they carry different fields: the
+/// statusline wrapper reports the 5-hour and weekly windows, `UsageProbe`
+/// those plus the 7-day activity. A field going missing means "this source
+/// doesn't know", never "this value is now nothing".
+@Suite("UsageSnapshot: carrying fields forward")
+struct UsageSnapshotMergeTests {
+  let now = Date(timeIntervalSince1970: 1_788_026_400)
+
+  /// A source that knows both windows: `UsageProbe`, or a current wrapper.
+  private func fullReading() -> UsageSnapshot {
+    UsageSnapshot(
+      usedPercent: 4, resetsAt: now.addingTimeInterval(3600), receivedAt: now,
+      weekUsedPercent: 66, weekResetsAt: now.addingTimeInterval(50_000))
+  }
+
+  /// A source that knows only the 5-hour window: a wrapper from before the
+  /// weekly fields existed, or a payload with no `seven_day` object.
+  private func fiveHourOnlyReading(usedPercent: Double = 9) -> UsageSnapshot {
+    UsageSnapshot(
+      usedPercent: usedPercent, resetsAt: now.addingTimeInterval(3600), receivedAt: now)
+  }
+
+  /// The bug this exists to prevent: the usage screen's second pane vanishing
+  /// every time the user's status line redrew.
+  @Test
+  func aFiveHourOnlyLineDoesNotBlankTheWeeklyWindow() {
+    let merged = fiveHourOnlyReading().carryingForward(from: fullReading())
+    #expect(merged.weekUsedPercent == 66)
+    #expect(merged.weekResetsAt == now.addingTimeInterval(50_000))
+  }
+
+  /// The 5-hour window is always taken from the new reading — it is the field
+  /// every source reports, and the one a snapshot exists to be a reading of.
+  @Test
+  func theNewReadingWinsWhereBothSourcesKnow() {
+    var newer = fullReading()
+    newer.weekUsedPercent = 67
+    let merged = newer.carryingForward(from: fullReading())
+    #expect(merged.usedPercent == 4)
+    #expect(merged.weekUsedPercent == 67)
+  }
+
+  @Test
+  func mergingOntoNothingIsTheReadingItself() {
+    let merged = fullReading().carryingForward(from: nil)
+    #expect(merged == fullReading())
+  }
+
+  /// An older cache file has none of the new keys; decoding it must still
+  /// produce a usable snapshot rather than failing and losing the rail.
+  @Test
+  func anOldCacheFileWithoutTheNewFieldsStillDecodes() throws {
+    let json = """
+      {"usedPercent":32,"resetsAt":"2026-08-29T20:50:00Z","receivedAt":"2026-08-29T18:00:00Z"}
+      """
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    let snapshot = try decoder.decode(UsageSnapshot.self, from: Data(json.utf8))
+    #expect(snapshot.usedPercent == 32)
+    #expect(snapshot.weekUsedPercent == nil)
+    #expect(snapshot.weekResetsAt == nil)
+  }
+
+  /// And an older wrapper still sends the two-field line this decoder has
+  /// always accepted.
+  @Test
+  func aWireLineWithoutTheWeeklyFieldsStillDecodes() throws {
+    let line = Data(#"{"event":"Usage","usedPercent":32,"resetsAt":1788040200}"#.utf8)
+    let snapshot = try #require(UsageSnapshot.decode(line: line, now: now))
+    #expect(snapshot.usedPercent == 32)
+    #expect(snapshot.weekUsedPercent == nil)
+  }
+
+  @Test
+  func aWireLineWithTheWeeklyFieldsCarriesThem() throws {
+    let line = Data(
+      #"{"event":"Usage","usedPercent":32,"resetsAt":1788040200,"weekUsedPercent":66,"weekResetsAt":1788076400}"#
+        .utf8)
+    let snapshot = try #require(UsageSnapshot.decode(line: line, now: now))
+    #expect(snapshot.weekUsedPercent == 66)
+    #expect(snapshot.weekResetsAt == Date(timeIntervalSince1970: 1_788_076_400))
+  }
+}

@@ -54,7 +54,7 @@ The user must restart Claude Code after installation so the hooks load.
 - **Auto-load / auto-connect** — toggle; when off, the app stays resident but does not connect until explicitly enabled
 - **Brightness** — slider, 5–100 (default 35)
 - **Device** — shows connection status ("Connected" / "Scanning…" / "Connecting…" / "Not connected") and offers Rescan. Never the panel identifier: it is a per-host CoreBluetooth UUID, so it is neither stable across machines nor meaningful to the user
-- **Idle timings** — sleep after (default 5m), panel off after (default 10m)
+- **Idle timings** — dim after (default 2m), send the mascot away after (default 4m), then show usage for (default 15m) before the panel goes dark. A usage screen asked for from the menu is bounded separately, at a fixed 60s — see The usage screen, below. The three are ordered, and the pickers enforce it: the away menu offers nothing below the dim value, so a configuration where the mascot leaves before it has dozed cannot be selected
 - **Plugin** — install status is probed from `~/.claude/plugins/installed_plugins.json` at `PluginInstaller.init` and each time the Settings window appears, with Install or Uninstall buttons matching the probed state, plus a re-register prompt when the app has moved since install
 - **Statusline wrapper** — its own status row beside Plugin, probed the same way, with its own Install / Uninstall; installing or uninstalling it never touches the plugin's state
 
@@ -92,7 +92,16 @@ Clips are either looping (variant loops at their pose, eligible for fidgets) or 
   cut mid-motion — but only by a clip resolved for a *different phase*, which is what a
   reaction is: the mascot must wake now, not in eleven seconds. A swap resolved inside the
   same phase (the group's own loop, an overlay refresh) waits out `motion` like any other
-  non-looping clip. Without that distinction a capped set piece evicts itself: recording
+  non-looping clip.
+- **A *looping* clip may carry it too, and two do.** The flag started as a transitions-only
+  field, on the assumption that a loop has no motion worth protecting — a loop reaches a
+  seam every cycle, so the wait is bounded by its own duration. That holds until the
+  duration is long. `look-down` is 9.24s, half of it two deliberate holds that *are* the
+  beat, and the usage screen is ~9s with nobody on the panel at all; in both cases waiting
+  out a cycle to react is the whole cost the flag exists to remove. The phase test is what
+  keeps this safe: `look-down` still plays in full against a variant rotation inside
+  `idle`, and the usage screen still refreshes its own numbers only at a seam. Emitted for
+  loops by `art/generate.py` since this change. Without that distinction a capped set piece evicts itself: recording
   `doze-dream`'s one allowed play makes `ledger.allows` reject it on the very next tick, the
   choreographer falls through to the `sleeping` loop, and `interruptible` lands that swap
   immediately — 1.5s into a 15.6s clip, before anything the dream is *for* is on screen.
@@ -129,9 +138,11 @@ Both are always on, size-capped, and rotated; tool input is never logged, matchi
 - **The entrance plays only when the mascot is actually off screen** — app launch, a wake from a dark panel, or a `SessionStart` that finds it gone. A `SessionStart` on a mascot standing right there does nothing visible, because the alternative is removing it in order to bring it back. It is never sat in: `PanelController` holds it for `startingHold` (the motion length of `starting.gif`, read from clips.json) and then hands off to the state actually wanted.
 - **Which entrance is a matter of where it left from**, and falls out of the pose graph for free: nothing on screen rises through the floor (`starting`), a mascot that walked off left comes back in from the left (`walk-in-left`).
 - `done` is a one-shot celebration (`done-enter`), followed by a satisfied-idle loop, held for a minimum of **30s** before reverting to `idle`, unless another state arrives first.
-- Idle escalation is physical: `idle` → nod off (`stand-to-doze`) → `sleeping` → wake up (`doze-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **panel off**. The timings come from settings: default 5m to sleeping, 10m to off.
+- Idle escalation is physical: `idle` → nod off (`stand-to-doze`) → `sleeping` → wake up (`doze-to-stand`) → walk off (`walk-off-left`/`walk-off-right`) → **the usage screen** → **panel off**. The timings come from settings: default **2m to sleeping, 4m to the walk-off** (so a doze lasts 2m), then **15m of usage screen** before the power is cut.
+- **The doze is short on purpose.** It used to be 5m in and 5m long, which put the mascot's best set piece (`doze-dream`) behind ten minutes of waiting and left the panel with nothing to say for the rest of the hour. The screen it walks off to is the payoff for going away — see The usage screen, below.
 - **The panel never goes dark under a mascot that is still standing on it.** Every route to off targets `away` first and cuts power only once the mascot has left; the panel blinking out from wherever it stood read as the hardware failing rather than as the mascot going away. The walk itself is boundary-gated like any other swap — starting it mid-loop would break the anchor contract — but the power cut is not, so it lands on the tick that notices.
-- `off` (`SessionEnd`) skips the idle *timers*, not the departure: it walks off at the next seam rather than waiting out `offAfter`.
+- `off` (`SessionEnd`) skips the idle *timers*, not the departure and not the usage screen: it walks off at the next seam rather than waiting out `offAfter`, and then shows usage like any other departure. Finishing a session is exactly when the numbers are worth reading.
+- **System sleep and app quit are the exception: they go dark.** `depart(withWave:deadline:)` sets a suppression flag before `handle(.off)`, because both callers are holding a scarce OS resource open and waiting for `isPanelOff` — a usage screen that held the panel lit would spend the whole deadline and then be cut off mid-frame anyway. The flag clears on the next non-`off` state.
 - **The mascot leaves before system sleep and before the app quits**, via held APIs that block the OS until the departure is done. Sleep holds for a maximum of **8s** (via IOKit's `IOAllowPowerChange`), quit/restart/shutdown hold for a maximum of **2.5s** (via `applicationShouldTerminate` returning `.terminateLater`), and both always release the hold on every path — success, error, or timeout. **Sleep adds a wave-on-departure**, a one-shot goodbye from `standing`; **quit walks off without waving**. Nothing connected means no hold at all — holding a Mac awake for 8s to animate a panel that is not there would be the kind of thing blamed on the OS. **Hitting either deadline cuts power** rather than stranding the mascot mid-walk; the existing `departureExpired` path handles it.
 - **The quit half is not live yet.** `AppModel` installs `onTerminate` by casting `NSApp.delegate`, and at its init the `@NSApplicationDelegateAdaptor`'s delegate is not on `NSApp` yet, so the cast fails and the closure is never installed — the log line `NSApp.delegate is not AppDelegate` is emitted on every launch. Sleep works; Cmd-Q, restart and shutdown still leave the mascot where he stands. The fix is a `static weak var shared` on `AppDelegate` set in its own `init`, replacing the cast and the timing assumption with it.
 - **Display sleep, screen lock and the screensaver do not take the mascot away** — only whole-machine sleep does, signalled via IOKit's `kIOMessageSystemWillSleep` which fires only when the *machine* sleeps, never on display-only sleep or lock. This is worth stating explicitly because `NSWorkspace.screensDidSleepNotification` fires on plain display sleep too, and a future "improvement" reaching for that notification would break the negative case.
@@ -195,6 +206,126 @@ The overlay only re-uploads on a changed *quantised* key, read lazily at drive t
 upload cadence: it can only shorten the delay before the panel notices a bucket it was
 already going to cross.
 
+## The usage screen
+
+When the mascot has walked off the panel, the panel does not go dark straight away: it
+shows a **usage screen** — two panes of real numbers, cycling on a loop — for
+`usageForMinutes` (default 15) before the power is cut.
+
+This is the one thing on the panel that is **generated at runtime rather than authored**
+by `art/generate.py`. The numbers change, so the pixels have to; everything else this
+project draws is a file on disk. `UsageScreen.swift` builds the frames, `GifEncoder`
+turns them into the same GIF89a bytes an authored clip would be, and they reach the panel
+down the identical path — see [[BLE Protocol]].
+
+### The two panes
+
+Each pane names one budget and shows its bar full height, with the other parked as a thin
+rule. The bars are a **stack you scroll through**: a budget *above* the focused one sits
+at the top as a 1px rule, one *below* it sits at the bottom as a 2px rule, and the focused
+one carries the two lines of text. The scheme is written to hold three or more; it is the
+data that stops at two.
+
+| Pane | Text | Bar | Source |
+|---|---|---|---|
+| 1 | `5h limit` / `till HH:MM` | 5-hour window used | statusline wrapper, or `UsageProbe` |
+| 2 | `Wk RESET` / `in Nd Nh` | weekly window used | `UsageProbe`, or the wrapper's `seven_day` |
+
+**A pane is dropped, not blanked, when its data is missing.** A machine running a wrapper
+from before the weekly fields existed, and no probe, shows one pane — the honest picture,
+rather than a second empty bar.
+
+**The mockup had a third pane and this does not, twice over.** It showed `$3.52 / bal.
+$20`; `claude -p "/usage"` prints no cost at all on a subscription, and the statusline
+payload's `cost.total_cost_usd` is deliberately not forwarded, since [[Claude Code
+Plugin]]'s privacy rule keeps cost off the socket. A 7-day request count was then built in
+its place and cut: a count has **no quota to be a fraction of**, so its bar could only be
+scaled against a high-water mark of itself — a number wearing a progress bar rather than
+being one. **Every bar on this screen is a real fraction of a real ceiling**, and that is
+the rule a third pane would have to meet. See [[Home]] → Deferred for the one candidate
+that does.
+
+### Why the labels never tick
+
+Every value on the screen is **absolute or coarse** — `till 23:45`, not `in 4h 12m`; `in
+2d 14h`, not a live countdown. This is a rendering-cost decision, not a style one: the
+screen's identity is a hash of its own text and bar columns (`UsageScreen.contentKey`),
+and `PanelController` treats a changed identity as staleness and re-uploads. A ticking
+minute would rebuild and re-transmit the whole GIF every 60s for a digit nobody is
+watching. Coarse labels mean the screen is uploaded once and then simply loops.
+
+### Frame budget
+
+Dwells are **one frame with a long delay**, not many identical frames — the panel honours
+per-frame GIF delays (`sleeping.gif` is authored at 1000ms a frame). Two 40s dwells plus
+two 7-frame transitions is **16 frames, ~81s a loop, 2.3KB**, against 59 frames and
+12.8KB for the largest authored clip. The design mockup used 177 flat 130ms frames, which
+would have been a ~40KB upload.
+
+**A pane holds for 40s, not the 4s it first shipped with.** This screen is what sits on
+the panel while nobody is at the machine, which makes it peripheral furniture rather than
+something being read — and the eye catches movement whether or not it wants the number.
+Cycling every few seconds read as distracting. Long dwells with quick transitions between
+them make the motion punctuation rather than content. Because a dwell is a single frame,
+lengthening it is free: same frame count, same bytes, a longer `duration`.
+
+Transitions do not cross-fade the text; they **dim it out, morph the bar rectangles, and
+dim the next pane's text in**. Bar rects interpolate linearly in `y` and height between
+the two pane layouts.
+
+### Colours
+
+Authored from [[Panel Quirks]]' mixture table, not from the mockup, which was drawn on a
+screen:
+
+- **Every warm colour ends in `B = 0`** — the rule the whole project runs on.
+- **The track is frankly blue** (`(0,0,32)`), which is the one place a blue is wanted
+  rather than tolerated: blue is the panel's over-driven channel, so a low value is
+  visibly lit while still reading as background, and it can never be confused with the
+  green/amber/red fill ramp in front of it. The mockup's purple was chosen for the same
+  role; this is that choice made panel-safe.
+- **The label is a warm amber, not a white.** Every white measured on this panel comes
+  back blue.
+- **These are brighter than `UsageRail`'s.** That rail is a background layer under a
+  mascot and is authored at the dimmest lit values the panel has; this screen *is* the
+  subject, with nothing in front of it. Same hues, same `B = 0` discipline, higher values.
+- Dimming for the fades scales channels together — what the tone curve is actually good
+  for — and clamps any lit channel to **at least 8**, because below that a channel beside
+  a saturated one contributes nothing.
+
+### Seeing it on demand
+
+The escalation is the only way the screen appears on its own, which means finding out it
+exists costs four minutes of leaving the mascot alone. The menu's **Show Usage on Panel**
+row (beside the 5-hour readout and Refresh) puts it up now: the mascot walks off at the
+next seam, the numbers come up for **60s**, and he walks back in to whatever the session
+is actually doing. The row becomes **Hide Usage on Panel** while it is up, and is
+disabled when there is no snapshot to draw.
+
+- **A request is not a `PanelState`.** The mascot is not `away`, the session is not over,
+  and nothing about the world has changed — someone wants to read the numbers. So it
+  rides beside the state machine (`usageRequestedAt`) and forces `shouldBeOff` for as
+  long as it lasts, letting the ordinary departure path carry it out. No new route to the
+  panel, and no new way to be stranded on it.
+- **It is bounded by its own hold, not by `usageForMinutes`.** That setting is for the
+  idle escalation and can be set to "Never"; a look that inherited it could park the
+  mascot behind the screen indefinitely. 60s is several passes of a ~9s loop.
+- **Walking him off to reveal nothing is worse than ignoring the click**, so
+  `showUsageNow()` returns false and does nothing at all when there is no screen to show.
+- **`depart` cancels a live request** along with suppressing the screen, or a sleeping Mac
+  would spend its whole deadline waiting out somebody's look.
+
+### How it reaches the panel
+
+`PanelController` does not learn what a usage screen is. It asks an injected
+`usageClip: () -> Clip?` for one when a departure has finished, and drives it through the
+ordinary boundary-gated upload path. The `Clip` it gets back is **synthetic**: its `id`
+carries the content hash (`usage#<hash>`), its `pose` is the pose the departing clip left
+the mascot at — so the choreographer still knows he is off to the left or the right and
+walks him back in from the correct side — and its `file` is empty. `PanelAdapter`
+recognises the id prefix and renders the frames instead of reading a file, and skips the
+overlay: the screen owns all 32 rows, including the two the rail reserves.
+
 ## Observability
 
 `BLEClient` logs every connection-state transition, `PanelController` every upload, wake and power-off, and `AppModel` every hook event with the state it maps to. All under one subsystem, so a dark panel is diagnosable without a debugger:
@@ -215,6 +346,11 @@ Categories: `ble`, `panel`, `events`, `instance`. **Silence from `ble` is itself
   - **Refresh** — forces a probe now, bypassing the staleness gate but not the in-flight
     flag, so mashing it cannot multiply subprocesses. Its detail is the age of the current
     reading (`Updated 3m ago`, `Updated just now`), and `Refreshing…` while one is running.
+  - **Show Usage on Panel** — puts the usage screen up now for 60s, rather than waiting
+    out four minutes of idle to see it; becomes **Hide Usage on Panel** while it is
+    showing, and is disabled with no reading to draw. Not behind Option, unlike the test
+    image: this one is for everyday use, and a feature only reachable by walking away
+    from the machine is a feature nobody finds.
   - **Enabled** — checkbox, master switch. Off means: leave the panel alone, ignore state changes, disconnect.
   - **Send Test Image…** — pick a 32×32 GIF and hold it on the panel (see below). Hidden
     unless Option is held as the menu opens: it belongs to the colour work, not to the
@@ -298,7 +434,9 @@ Every file below is under `Sources/ClaudeMascot/`. Each carries its own doc comm
 | `Compositor.swift` | The background mask by border flood fill, the overlay composited beneath the clip's opaque pixels, the mandatory knockout halo, the resulting palette |
 | `Overlay.swift` | The overlay bitmap, the rows-0–1 reserved region, and its quantised key |
 | `UsageRail.swift` | The one shipped widget: fill, clock marker, colour ramp |
-| `UsageSnapshot.swift` | The wrapper's payload decoded, cached to disk, and clocked forward between app launches |
+| `UsageScreen.swift` | The runtime-generated usage GIF: three panes, their layouts, the transitions between them, and the content key that makes a changed number staleness |
+| `PixelFont.swift` | The 3×5 proportional bitmap font the usage screen draws with, recovered pixel-for-pixel from `art/sources/usage.gif` |
+| `UsageSnapshot.swift` | The wrapper's payload decoded, cached to disk, and clocked forward between app launches; carries the weekly window the usage screen's second pane needs, and merges readings from sources that know different fields |
 | `SingleInstance.swift` | Newest-launch-wins duplicate guard |
 | `SleepWatcher.swift` | IOKit power-management registration; holds sleep and always releases |
 | `AppDelegate.swift` | `applicationShouldTerminate` → `.terminateLater`; the one API Cmd-Q, logout, restart and shutdown all route through |

@@ -89,6 +89,12 @@ PROP = (255, 255, 255)
 # this panel photographs as pink or magenta, and yellow satisfies B = 0 on its own --
 # there is nothing here to "fix" by adding blue back in for a truer yellow.
 PACMAN = (255, 200, 0)
+# The idea bulb's glass. Deliberately the SAME value as PACMAN rather than a second,
+# subtly different yellow: B = 0 is compulsory for a warm colour here, and [[Panel
+# Quirks]] measures everything from green 96 up as landing within 20% of maximum, so
+# there is no second warm yellow to be had. Two constants at different values would be
+# one colour on the panel and a lie in the source.
+BULB = (255, 200, 0)
 CONFETTI = [
     (255, 209, 102),
     (120, 255, 160),
@@ -280,38 +286,14 @@ def workout():
     return [(_standing_anchor(), 200)] + out + [(_standing_anchor(), 400)]
 
 
-def thinking():
-    """Thinking: standing still and breathing, one brow raised.
-
-    The plainest clip in the manifest, on purpose. Thinking is mostly *not* visible
-    from outside, and a mascot that always performs its thinking has nothing left to
-    say when the thought is a hard one. Slower than idle()'s breath -- 600ms a frame
-    against 320 -- so held stillness reads as concentration rather than as idle with
-    the label changed.
-
-    The one thing it does perform is a raised brow: the left eye goes up a pixel and
-    stays there for the body of the clip, the same asymmetry `thinking_alt()` opens
-    with on the right eye and the only expression this face can carry. It is enough
-    to separate the clip from `idle` standing still, and it costs no silhouette.
-    `mascot()` has no per-eye offset -- nothing else needs one -- so the eye is
-    painted over in body colour and redrawn a row higher.
-
-    The lift is off on the first and last frames, not held throughout: those two are
-    the bare `standing` anchor, and the anchor contract every standing loop keeps is
-    pixel-identical, brow included.
-    """
-    out = []
-    # (torso squash, eye lift). Anchor, brow up, breathe, brow down, anchor.
-    for breath, lift in ((0, 0), (0, 1), (1, 1), (1, 1), (0, 1), (0, 0)):
-        im = frame()
-        d = ImageDraw.Draw(im)
-        mascot(d, HOME_Y, squash=breath)
-        if lift:
-            eye_y = HOME_Y + breath + EYE_TOP
-            rect(d, EYE_XS[0], eye_y, EYE_W, EYE_H, MASCOT)      # erase the drawn eye
-            rect(d, EYE_XS[0], eye_y - lift, EYE_W, EYE_H, EYE)  # and lift it
-        out.append((im, 600))
-    return out
+# `thinking` used to be a second clip here: standing still and breathing with one
+# brow raised, on the argument that thinking is mostly not visible from outside and a
+# mascot that always performs it has nothing left to say when the thought is a hard
+# one. It was cut when `idea` arrived. The argument was sound and the clip still lost:
+# what it actually put on the panel was `idle` at half speed with one pixel moved, and
+# a group whose base clip is indistinguishable from another group's base clip is a
+# group that never reads as itself. `thinking` (the bubble) now carries the group at
+# weight 1.0 and `idea` is the payoff -- see their entries in CLIP_METADATA.
 
 
 # `thinking_pace` used to live here: two laps off the right edge and back in from the
@@ -504,6 +486,34 @@ def _body_shade_prop_recolour(rgb):
         return BG
     if max(rgb) - min(rgb) < TYPING_CHROMA_MIN:
         return PROP
+    return MASCOT if max(rgb) >= SHADED_BODY_MIN else MASCOT_DARK
+
+
+# The bulb's glass against the mascot's body: both are saturated warm colours, so the
+# chroma test above cannot separate them and the value test would call the glass body.
+# GREEN separates them cleanly and by a wide margin -- measured across every frame of
+# idea.gif, the body's green is 88-110 and the glass's is 195-220, so this threshold
+# sits in an 85-wide empty gap rather than on a guess. Same discipline as every other
+# threshold in this file.
+BULB_MIN_GREEN = 150
+
+
+def _idea_recolour(rgb):
+    """`_body_shade_prop_recolour` plus one question ahead of the body test: is this
+    the bulb's glass?
+
+    Only `idea.gif` needs it, because it is the only source with a second saturated
+    warm colour in it. Everything else is unchanged and in the same order, so the
+    mascot in this clip is recoloured pixel-for-pixel as it is in every other import:
+    the bulb's white filament and screw base are already props by chroma, and the body
+    still splits into `MASCOT`/`MASCOT_DARK` by value.
+    """
+    if max(rgb) < SHADE_MIN:
+        return BG
+    if max(rgb) - min(rgb) < TYPING_CHROMA_MIN:
+        return PROP
+    if rgb[1] >= BULB_MIN_GREEN:
+        return BULB
     return MASCOT if max(rgb) >= SHADED_BODY_MIN else MASCOT_DARK
 
 
@@ -1207,6 +1217,49 @@ def happy():
     return imported(HAPPY_SRC, _body_shade_prop_recolour)[HAPPY_CYCLE]
 
 
+# art/sources/look-down.gif and art/sources/idea.gif -- both native 32x32, both drawn
+# on this project's own standing geometry, and both **opening and closing pixel-identically
+# on `_standing_anchor()`** (checked, not assumed: 0 pixels differ at either end). They
+# are therefore the only imported loops that need no bookend frames added here, unlike
+# `happy`, which had to give the anchor contract up at both ends to keep its rhythm.
+LOOK_DOWN_SRC = SOURCES / "look-down.gif"
+IDEA_SRC = SOURCES / "idea.gif"
+
+
+def look_down():
+    """Idle variant: the head dips, the mascot studies the floor for a while, and it
+    comes back up.
+
+    **Imported whole -- every frame, at the source's own 330ms, nothing coalesced.**
+    That is a deliberate exception to the habit elsewhere in this file of collapsing
+    repeated frames: what looks like nine identical frames in the middle of this clip
+    is the beat, not redundancy. The hold is how long he looks, and a hold is a
+    performance -- collapse it to one long frame and the timing survives while the
+    reason for it stops being legible in the source. Do not "optimise" it.
+
+    A quiet beat next to `happy`'s rock and `dancing`, and the only idle variant whose
+    subject is attention rather than motion.
+    """
+    return imported(LOOK_DOWN_SRC, _body_shade_prop_recolour)
+
+
+def idea():
+    """Thinking variant: an arm goes up, a lightbulb lights above the head, holds, and
+    everything comes back down.
+
+    **The payoff of the `thinking` group.** `thinking()` shows a bubble filling with
+    "..." and retreating -- a thought that goes nowhere, which is what most of them
+    do; this is the one that arrives. That is also the whole argument for its weight:
+    at 0.5 against `thinking()`'s 1.0 the panel shows more thinking than arriving, so
+    the bulb still means something when it lights. See CLIP_METADATA.
+
+    Imported whole at the source's own 120ms, like `look_down()`. The bulb is the one
+    thing in it not resolved by the shared recolour -- see `_idea_recolour`, which
+    separates the glass from the body by green rather than by chroma or value.
+    """
+    return imported(IDEA_SRC, _idea_recolour)
+
+
 def wave_off():
     """
     Transition: goodbye wave with placeholder pixels, to be replaced by hand-drawn art.
@@ -1226,7 +1279,7 @@ def wave_off():
 
 # Both hand-authored reference sheets -- art/sources/186F7A97-...png (seated at a
 # laptop) and the thinking sheet already noted below -- stay in art/sources as
-# reference art. Nothing here imports either any more: thinking_alt() replaced
+# reference art. Nothing here imports either any more: thinking() replaced
 # the thinking sheet's clip, and working_alt(), the last clip cut from the
 # working sheet, is retired -- see [[Animation Catalogue]]'s `sitting` section.
 
@@ -1269,7 +1322,7 @@ def _thought_bubble(d, stage: int, dots: int, puffs: int) -> None:
         rect(d, x, BUBBLE_CY, 2, 1, BG)
 
 
-def thinking_alt():
+def thinking():
     """
     Thinking variant: one eye lifts, a thought bubble grows a "..." and fades.
 
@@ -1473,7 +1526,7 @@ def _paste_over(base: Image.Image, sprite: Image.Image, ox: int = 0, oy: int = 0
 def _typing_eye_lift(base: Image.Image, ex: int, *, up: int = 1) -> Image.Image:
     """
     A copy of an imported typing frame with the eye at column `ex` painted over and
-    redrawn `up` rows higher -- `thinking_alt()`'s own eye-lift technique, applied to
+    redrawn `up` rows higher -- `thinking()`'s own eye-lift technique, applied to
     the imported art instead of a `mascot()` draw. `work-look-down` already proved
     the mirror image of this (eyes authored a row LOWER in a second source GIF);
     this does it in code instead of a second source, since there is no hand-authored
@@ -1663,7 +1716,7 @@ def work_idea():
 
     Self-edge at `sitting`: opens and closes on `_sitting_anchor()` pixel-identically.
     Composited onto copies of the imported typing frames, not drawn -- see the chunk
-    11 brief. The eye lift is `_typing_eye_lift()`, `thinking_alt()`'s own
+    11 brief. The eye lift is `_typing_eye_lift()`, `thinking()`'s own
     paint-over-and-redraw technique reused for the imported art. The spark sits at
     row 17, ONE clear row above the imported head's own top row (18): the old drawn
     version sat six rows clear and was logged as known gap 5, floating -- the
@@ -1675,7 +1728,7 @@ def work_idea():
     """
     anchor = _sitting_anchor()
     typing = [im for im, _ in _typing_frames(WORK_TYPING_SRC)]
-    ex = TYPING_EYE_XS[1]  # the same eye the standing `thinking_alt()` raises
+    ex = TYPING_EYE_XS[1]  # the same eye the standing `thinking()` raises
 
     def lifted(*, spark=False):
         im = _typing_eye_lift(anchor, ex)
@@ -1766,7 +1819,7 @@ def work_look():
 def work_think():
     """
     Fidget: a thought bubble grows over the desk, fills its "...", holds, and
-    retreats the way it came -- `thinking_alt()`'s own beat, moved to the seated
+    retreats the way it came -- `thinking()`'s own beat, moved to the seated
     pose and composited onto copies of the imported anchor instead of drawn.
 
     `_thought_bubble()`'s geometry (`BUBBLE_CX/CY`, `BUBBLE_PUFFS`) is authored
@@ -1776,7 +1829,7 @@ def work_think():
     rows lower than the standing figure's row 16. Composited unmoved, the bubble
     would hang over the desk (x18-29) with its tail pointing at empty air beside
     him, reading as the laptop's thought, not his. `_thought_bubble()` and its
-    `BUBBLE_*` constants are never touched (`thinking_alt()` still depends on them
+    `BUBBLE_*` constants are never touched (`thinking()` still depends on them
     exactly as authored); instead the whole bubble is rendered onto a scratch frame
     and composited `(BUBBLE_DX, BUBBLE_DY)` over with `_paste_over()` -- both
     offsets applied at the call site.
@@ -1800,7 +1853,7 @@ def work_think():
             im = _paste_over(im, scratch, ox=BUBBLE_DX, oy=BUBBLE_DY)
         return im
 
-    # (eye lift, bubble stage, dots, puffs, ms) -- same shape as thinking_alt()'s own
+    # (eye lift, bubble stage, dots, puffs, ms) -- same shape as thinking()'s own
     # `steps`, minus its leading/trailing anchor frames (this clip gets those from
     # explicit `anchor` entries instead) and its `breath` column: the imported figure
     # is composited onto, not drawn, so there is no torso squash to apply here.
@@ -1850,7 +1903,8 @@ STATES = {
     "happy": happy,
     "sleeping": sleeping,
     "thinking": thinking,
-    "thinking-alt": thinking_alt,
+    "idea": idea,
+    "look-down": look_down,
     "workout": workout,
     "working": working,
     "stand-to-sit": stand_to_sit,
@@ -1946,13 +2000,38 @@ CLIP_METADATA = {
         "variantGroup": "idle",
         "weight": 0.4,
     },
-    "thinking-alt": {
-        # Same variantGroup as "thinking" -- imported from the sprite sheet's
-        # "..." thought-bubble beat, see thinking_alt()'s docstring.
+    "idea": {
+        # The payoff of the group: the bulb actually lights. Hand-drawn, imported
+        # whole -- see idea().
+        #
+        # Weighted at half of `thinking`, and that ordering is the point rather than a
+        # taste call: an idea is what a thought becomes, so the panel should show more
+        # thinking than it shows arriving. At 0.5 against 1.0 this runs a third of the
+        # group's turns; at parity the mascot would look like it solved something
+        # every other loop, which devalues the beat that is meant to be the reward.
         "loops": True,
         "pose": "standing",
         "variantGroup": "thinking",
         "weight": 0.5,
+    },
+    "look-down": {
+        # An idle variant, hand-drawn and imported whole -- see look_down().
+        "loops": True,
+        "pose": "standing",
+        "variantGroup": "idle",
+        # Level with `happy` and `dancing`: a quiet beat, so it should not outweigh
+        # the two variants that carry a mood, and it is characterful enough not to sit
+        # down at `workout`'s 0.4.
+        "weight": 0.5,
+        # The longest loop in the manifest at 9.24s -- half of it is the two holds
+        # that ARE the beat (see look_down()), so it cannot be shortened without
+        # losing the clip. Boundary gating would therefore make a real state change
+        # wait up to 9.24s for the mascot to react, three seconds worse than the
+        # next-longest loop. `interruptible` is what buys that back: it only lets a
+        # swap cut when it CROSSES A PHASE -- a hook event arriving -- so the hold
+        # still plays out in full against a variant rotation inside `idle`, which is
+        # every swap that is not a reaction. See `PanelController.nextBoundary`.
+        "interruptible": True,
     },
     "waiting": {
         # The only clip in its group. The flag wave and its two variants are retired
@@ -2311,6 +2390,14 @@ if __name__ == "__main__":
             # land. Absent means one, which is what every other loop wants.
             if "minCycles" in CLIP_METADATA[name]:
                 clip_entry["minCycles"] = CLIP_METADATA[name]["minCycles"]
+            # `interruptible` used to be emitted for transitions only, on the
+            # assumption that a loop has no motion worth protecting. `look-down`
+            # broke that: its two holds ARE the beat, which makes it a 9.24s loop a
+            # reaction should still be allowed to cut. It is the exact mirror of
+            # `minCycles` -- both answer "when does this clip reach a seam a swap may
+            # land on" -- so a loop may now carry either.
+            if "interruptible" in CLIP_METADATA[name]:
+                clip_entry["interruptible"] = CLIP_METADATA[name]["interruptible"]
         else:
             clip_entry["fromPose"] = CLIP_METADATA[name]["fromPose"]
             clip_entry["toPose"] = CLIP_METADATA[name]["toPose"]
@@ -2318,7 +2405,7 @@ if __name__ == "__main__":
             # need it: a group to scope fidget selection to, a weight to pick
             # within it, and the three scheduling limits -- how often a clip may
             # play per phase, how often consecutively, and whether a swap may cut
-            # into it mid-motion.
+            # into it mid-motion. `interruptible` is emitted for loops too, above.
             for key in ("fidgetGroup", "weight", "maxPerPhase", "maxRepeats", "interruptible"):
                 if key in CLIP_METADATA[name]:
                     clip_entry[key] = CLIP_METADATA[name][key]
