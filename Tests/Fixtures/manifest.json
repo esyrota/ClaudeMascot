@@ -149,6 +149,24 @@
       85
     ]
   },
+  "idea": {
+    "gif_bytes": 4215,
+    "crc32": 33740435,
+    "outer_chunks": 2,
+    "ble_packets": 10,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      509,
+      40,
+      135
+    ]
+  },
   "idle": {
     "gif_bytes": 1333,
     "crc32": 1764806760,
@@ -158,6 +176,18 @@
       509,
       509,
       331
+    ]
+  },
+  "look-down": {
+    "gif_bytes": 1610,
+    "crc32": 141815582,
+    "outer_chunks": 1,
+    "ble_packets": 4,
+    "packet_lengths": [
+      509,
+      509,
+      509,
+      99
     ]
   },
   "off": {
@@ -241,16 +271,6 @@
     ]
   },
   "thinking": {
-    "gif_bytes": 967,
-    "crc32": 1453010677,
-    "outer_chunks": 1,
-    "ble_packets": 2,
-    "packet_lengths": [
-      509,
-      474
-    ]
-  },
-  "thinking-alt": {
     "gif_bytes": 2863,
     "crc32": 2606767974,
     "outer_chunks": 1,

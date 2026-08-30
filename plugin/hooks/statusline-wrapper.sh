@@ -23,11 +23,24 @@ FIVE=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"five_hour":{\([^}]*\)}.*/\1/p' 2>/d
 USED=$(printf '%s' "$FIVE" | sed -n 's/.*"used_percentage":\([0-9.]*\).*/\1/p' 2>/dev/null)
 RESETS=$(printf '%s' "$FIVE" | sed -n 's/.*"resets_at":\([0-9]*\).*/\1/p' 2>/dev/null)
 
+# The weekly window, scoped the same way. Feeds the usage screen's second
+# pane and nothing else -- the rail draws one row and that row is the 5-hour
+# budget -- so both fields are strictly optional below, and a Claude Code
+# whose payload has no seven_day object still produces the two-field line
+# this wrapper has always sent.
+WEEK=$(printf '%s' "$PAYLOAD" | sed -n 's/.*"seven_day":{\([^}]*\)}.*/\1/p' 2>/dev/null)
+WUSED=$(printf '%s' "$WEEK" | sed -n 's/.*"used_percentage":\([0-9.]*\).*/\1/p' 2>/dev/null)
+WRESETS=$(printf '%s' "$WEEK" | sed -n 's/.*"resets_at":\([0-9]*\).*/\1/p' 2>/dev/null)
+
 # The wrapper extracts, it never forwards the raw payload — same privacy
 # rule as relay.sh: cwd, model, cost and the transcript path never cross
 # the socket.
 if [ -n "$USED" ] && [ -n "$RESETS" ]; then
-  OUT="{\"event\":\"Usage\",\"usedPercent\":${USED},\"resetsAt\":${RESETS}}"
+  OUT="{\"event\":\"Usage\",\"usedPercent\":${USED},\"resetsAt\":${RESETS}"
+  if [ -n "$WUSED" ] && [ -n "$WRESETS" ]; then
+    OUT="${OUT},\"weekUsedPercent\":${WUSED},\"weekResetsAt\":${WRESETS}"
+  fi
+  OUT="${OUT}}"
   if command -v nc >/dev/null 2>&1; then
     printf '%s\n' "$OUT" | nc -U -w 1 "$SOCK" 2>/dev/null || true
   fi

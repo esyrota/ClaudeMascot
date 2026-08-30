@@ -366,3 +366,91 @@ extension UsageProbeTests {
     #expect(snapshot == nil)
   }
 }
+
+// MARK: - The weekly window and the 7-day activity
+//
+// Both were explicitly out of scope when this probe shipped: the rail draws
+// one row and that row is the 5-hour budget. The usage screen's second and
+// third panes are what brought them in, and both are best-effort — a
+// `/usage` that stops printing either costs a pane and nothing more.
+
+@Suite("UsageProbe: weekly window and activity")
+struct UsageProbeExtendedParseTests {
+  /// The verbatim output of `claude -p "/usage" --output-format json` on a
+  /// subscription, captured 2026-08-29. Note there is no cost line anywhere
+  /// in it — that is why the usage screen has no dollars.
+  let realOutput = """
+    You are currently using your subscription to power your Claude Code usage
+
+    Current session: 4% used · resets Aug 29 at 11:50pm (Europe/Kiev)
+    Current week (all models): 66% used · resets Aug 30 at 9am (Europe/Kiev)
+
+    What's contributing to your limits usage?
+    Approximate, based on local sessions on this machine — does not include other devices or claude.ai. Behaviors are independent characteristics, not a breakdown.
+
+    Last 7d · 2485 requests · 15 sessions
+      85% of your usage came from subagent-heavy sessions
+      62% of your usage was at >150k context
+      Top skills: /plan-runner 6%, /plan-writer 5%
+    """
+
+  /// 2026-08-29 18:00:00 UTC — inside the 5-hour window that resets at
+  /// 11:50pm Kiev (20:50 UTC) and inside the week that resets Aug 30.
+  let now = Date(timeIntervalSince1970: 1_788_026_400)
+
+  @Test
+  func parsesEveryFieldOffTheRealOutput() throws {
+    let snapshot = try #require(UsageProbe.parse(result: realOutput, now: now))
+    #expect(snapshot.usedPercent == 4)
+    #expect(snapshot.weekUsedPercent == 66)
+    let week = try #require(snapshot.weekResetsAt)
+    #expect(week > now && week.timeIntervalSince(now) < 7 * 24 * 3600)
+  }
+
+  /// The weekly reset is up to seven days out, and the year search that pins
+  /// the missing year used to bound every candidate at five hours — which
+  /// rejected every weekly reset there is.
+  @Test
+  func aWeeklyResetBeyondFiveHoursStillResolves() throws {
+    let result = """
+      Current session: 4% used · resets Aug 29 at 11:50pm (Europe/Kiev)
+      Current week (all models): 66% used · resets Sep 4 at 9am (Europe/Kiev)
+      """
+    let snapshot = try #require(UsageProbe.parse(result: result, now: now))
+    let week = try #require(snapshot.weekResetsAt)
+    #expect(week.timeIntervalSince(now) > 5 * 3600)
+  }
+
+  @Test
+  func aMissingWeeklyLineCostsThatPaneAndNothingElse() throws {
+    let result = "Current session: 4% used · resets Aug 29 at 11:50pm (Europe/Kiev)"
+    let snapshot = try #require(UsageProbe.parse(result: result, now: now))
+    #expect(snapshot.usedPercent == 4)
+    #expect(snapshot.weekUsedPercent == nil)
+    #expect(snapshot.weekResetsAt == nil)
+  }
+
+  /// The parenthesised qualifier is matched loosely on purpose: Claude Code
+  /// prints `(all models)` today and has printed an Opus-specific variant.
+  @Test
+  func aDifferentWeeklyQualifierStillParses() throws {
+    let result = """
+      Current session: 4% used · resets Aug 29 at 11:50pm (Europe/Kiev)
+      Current week (Opus): 12% used · resets Aug 30 at 9am (Europe/Kiev)
+      """
+    let snapshot = try #require(UsageProbe.parse(result: result, now: now))
+    #expect(snapshot.weekUsedPercent == 12)
+  }
+
+  /// A missing session line is still fatal — that is the one window this
+  /// probe exists to read, and a partial snapshot must never replace a good
+  /// one.
+  @Test
+  func aMissingSessionLineIsStillNil() {
+    let result = """
+      Current week (all models): 66% used · resets Aug 30 at 9am (Europe/Kiev)
+      Last 7d · 2485 requests · 15 sessions
+      """
+    #expect(UsageProbe.parse(result: result, now: now) == nil)
+  }
+}

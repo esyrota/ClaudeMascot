@@ -38,6 +38,19 @@ struct PanelTimings: Sendable {
   /// `0` (the default) disables the entrance outright, which is what every
   /// existing test relies on to see its expected state upload immediately.
   var startingHold: TimeInterval = 0
+  /// How long a usage screen the *user asked for* stays up before the mascot
+  /// comes back, independent of `usageFor`.
+  ///
+  /// Short and fixed, because this one is a look rather than a state: the
+  /// screen loops in about nine seconds, so a minute is several passes, and a
+  /// bound this tight means there is no way to leave the mascot stuck behind
+  /// it — including when `usageFor` is set to "Never".
+  var requestedUsageHold: TimeInterval = 60
+  /// How long the usage screen holds after the mascot has left, before the
+  /// power is cut. `0` disables it outright — the panel goes dark the moment
+  /// he is off, which is what this machine did before the screen existed and
+  /// what every test that does not opt in still gets.
+  var usageFor: TimeInterval = 0
   /// How long the mascot gets to walk off the panel before the power is cut
   /// regardless. Generous next to the ~0.6s walk, because it exists to bound
   /// a departure that is *failing* (upload retries at 2s apiece), not to pace
@@ -106,6 +119,18 @@ final class PanelController: ObservableObject {
   /// own rather than overloading `resolve`. `nil` in every existing test,
   /// which is how they construct unchanged.
   private let clipByID: (String) -> Clip?
+  /// The usage screen to show once the mascot is off the panel, given the
+  /// pose he left at. `nil` — the default, and what every existing test gets
+  /// — means there is no screen and a finished departure goes straight to
+  /// dark.
+  ///
+  /// A closure for the same reason `resolve` is one: this machine does not
+  /// know what a usage screen *is*. It knows only that something wants to be
+  /// on the panel after the mascot has gone, that it has an id it can compare
+  /// and a duration it can gate on, and that the pose argument is what lets
+  /// the returned clip claim the mascot is still off to the left — so the
+  /// choreographer walks him back in from the correct side when work resumes.
+  private let usageClip: (Pose?) -> Clip?
   private let timings: PanelTimings
   private let brightness: () -> Int
   private let clock: () -> TimeInterval
@@ -139,6 +164,48 @@ final class PanelController: ObservableObject {
   private var idleSince: TimeInterval?
   /// Backoff gate: `tick()` performs no new I/O attempt before this time.
   private var nextRetryAt: TimeInterval?
+
+  /// Whether the usage screen is what is currently on the panel.
+  ///
+  /// Tracked as its own flag rather than inferred from `displayed`, because
+  /// the two questions "has the mascot left?" and "is the screen up?" have
+  /// the same answer for `hasLeftScreen` and opposite consequences. The
+  /// usage clip claims an offscreen pose (that is the point — the mascot
+  /// really is gone), and it loops, so `hasLeftScreen` reads `false` for its
+  /// first cycle. Without this flag the off path would see an unfinished
+  /// departure and walk a mascot off the panel who was never on it.
+  private var showingUsage = false
+
+  /// When the usage screen first reached the panel, so its hold can be
+  /// timed. Cleared together with `showingUsage` on power-off and whenever
+  /// activity pulls the machine back off the "should be off" path.
+  private var usageSince: TimeInterval?
+
+  /// Whether the user has asked for the usage screen from the menu, and when.
+  ///
+  /// A request is not a `PanelState`: the mascot is not "away", the session is
+  /// not over, and nothing about the world has changed — someone just wants to
+  /// read the numbers. So it rides beside the state machine rather than
+  /// through it, forcing `shouldBeOff` for as long as it lasts and letting the
+  /// ordinary departure path do the rest: he walks off at the next seam, the
+  /// screen comes up, and when the request lapses he walks back in. No new
+  /// route to the panel, and no new way to be stranded.
+  private var usageRequestedAt: TimeInterval?
+
+  /// Whether the usage screen is what is on the panel right now, published so
+  /// the menu can offer to dismiss it. True whether the screen arrived by idle
+  /// escalation or by request.
+  @Published private(set) var isShowingUsage: Bool = false
+
+  /// Set by `depart` to make this one departure skip the usage screen.
+  ///
+  /// System sleep and app quit are both holding a scarce OS resource open
+  /// and spinning on `isPanelOff`; a screen that kept the panel lit for
+  /// fifteen minutes would spend the whole deadline and then be cut off
+  /// mid-frame by the hardware anyway. Cleared by the next `handle` of
+  /// anything that is not `.off`, so a machine that wakes back up gets its
+  /// screen again.
+  private var suppressUsage = false
 
   /// When the current departure began, so it can be bounded. `nil` whenever
   /// the panel is not on its way off, which is also what makes a departure
@@ -203,6 +270,7 @@ final class PanelController: ObservableObject {
     panel: any PanelDriving,
     resolve: @escaping (PanelState, Clip?, PhaseLedger) -> Clip?,
     clipByID: @escaping (String) -> Clip? = { _ in nil },
+    usageClip: @escaping (Pose?) -> Clip? = { _ in nil },
     timings: PanelTimings = PanelTimings(),
     brightness: @escaping () -> Int = { 35 },
     clock: @escaping () -> TimeInterval = { Date().timeIntervalSince1970 },
@@ -215,6 +283,7 @@ final class PanelController: ObservableObject {
     self.panel = panel
     self.resolve = resolve
     self.clipByID = clipByID
+    self.usageClip = usageClip
     self.timings = timings
     self.brightness = brightness
     self.clock = clock
@@ -284,6 +353,10 @@ final class PanelController: ObservableObject {
     doneEnteredAt = nil
     idleSince = newState == .idle ? now : nil
     nextRetryAt = nil
+    // A departure that suppressed the usage screen was for a sleeping or
+    // quitting Mac. Anything else arriving means neither happened (or the
+    // machine woke back up), so the next departure gets its screen.
+    if newState != .off { suppressUsage = false }
   }
 
   /// Advances the machine: expires the `done` hold if due, escalates or
@@ -305,11 +378,29 @@ final class PanelController: ObservableObject {
 
     if shouldBeOff(now: now) {
       if isPanelOff { return }
-      // The mascot walks off before the panel goes dark. Only once it has
-      // actually left (or the departure has run out of time) is there nothing
-      // left on screen worth keeping lit.
+      // Already showing the numbers: hold them for `usageFor`, refreshing at
+      // a loop boundary if they have changed, then go dark.
+      if showingUsage {
+        // A requested screen is bounded by `requestedUsageHold` in
+        // `shouldBeOff` above, which releases it by returning false — so
+        // reaching here with a request live means the look is still running,
+        // and `usageFor` (which may be "Never") must not cut it short.
+        if usageRequestedAt == nil, let usageSince, now - usageSince >= timings.usageFor {
+          await attemptPowerOff()
+        } else {
+          await driveUsage(now: now)
+        }
+        return
+      }
+      // The mascot walks off before anything replaces him. Only once he has
+      // actually left (or the departure has run out of time) is the stage
+      // free for the usage screen — or, with none to show, for the dark.
       if hasLeftScreen(now: now) || departureExpired(now: now) {
-        await attemptPowerOff()
+        if !suppressUsage, timings.usageFor > 0 {
+          await driveUsage(now: now)
+        } else {
+          await attemptPowerOff()
+        }
         return
       }
       if leavingSince == nil { leavingSince = now }
@@ -317,6 +408,13 @@ final class PanelController: ObservableObject {
       return
     }
     leavingSince = nil
+    // Off the off-path entirely: whatever the screen was holding is over.
+    // Cleared here rather than in `handle` so it covers every route back —
+    // a hook event, a `done` hold expiring, the idle timer being pushed out
+    // by a settings change — not just the ones that arrive as a state.
+    showingUsage = false
+    isShowingUsage = false
+    usageSince = nil
 
     if isPanelOff {
       await attemptWake(now: now)
@@ -363,6 +461,12 @@ final class PanelController: ObservableObject {
       }
     }
 
+    // Both callers hold an OS resource open and wait on `isPanelOff`; see
+    // `suppressUsage`. A look the user asked for is cancelled with it — the
+    // lid is closing, and `shouldBeOff` would otherwise keep returning true
+    // for the rest of the request and spend the whole deadline.
+    suppressUsage = true
+    usageRequestedAt = nil
     handle(.off)
     while !isPanelOff, clock() < deadline {
       await tick()
@@ -444,7 +548,44 @@ final class PanelController: ObservableObject {
 
   // MARK: - Target derivation
 
+  /// Puts the usage screen on the panel now: the mascot walks off at the next
+  /// seam and the numbers come up, for `requestedUsageHold`.
+  ///
+  /// Returns without doing anything if there is no screen to show — no
+  /// snapshot has arrived yet, or every window it would draw has turned over.
+  /// Walking the mascot off to reveal nothing would be strictly worse than
+  /// ignoring the click.
+  @discardableResult
+  func showUsageNow() -> Bool {
+    guard usageClip(displayed?.endPose) != nil else {
+      logDecision(
+        target: nil, displayed: displayed?.id, action: "showUsage", outcome: "skipped",
+        detail: "no usage screen available")
+      return false
+    }
+    usageRequestedAt = clock()
+    suppressUsage = false
+    nextRetryAt = nil
+    return true
+  }
+
+  /// Ends a requested usage screen early; the mascot walks back in on the next
+  /// tick. A no-op when the screen is up for any other reason.
+  func endRequestedUsage() {
+    usageRequestedAt = nil
+  }
+
   private func shouldBeOff(now: TimeInterval) -> Bool {
+    // A request outranks the idle timers in both directions: it brings the
+    // screen up early, and while it lasts it holds the panel there even though
+    // the session may be wide awake.
+    if let usageRequestedAt {
+      guard now - usageRequestedAt < timings.requestedUsageHold else {
+        self.usageRequestedAt = nil
+        return false
+      }
+      return true
+    }
     // `.off` (SessionEnd) skips the idle timers; idle escalation reaches the
     // same place only after sitting idle for `offAfter`. Neither cuts power
     // on the spot any more — both walk the mascot off first (`.away`).
@@ -508,6 +649,13 @@ final class PanelController: ObservableObject {
   )
     -> TimeInterval
   {
+    // Hoisted above the `loops` guard so it covers a looping clip too. The
+    // only one that sets `interruptible` and loops is the usage screen, and
+    // it has to: it runs ~14s a cycle with nobody on the panel, so a user who
+    // starts typing would otherwise watch the numbers finish their round
+    // before the mascot walked back in. No authored loop clip sets the flag,
+    // so nothing else changes shape here.
+    if clip.loops && clip.interruptible && crossesPhase { return now }
     guard clip.loops else {
       // An interruptible clip has no seam worth waiting for *when something
       // has actually happened*: making the user watch out a set piece before
@@ -540,7 +688,7 @@ final class PanelController: ObservableObject {
     // clock essentially never lands there, so a looping clip could never be
     // swapped for another looping clip: the panel locked onto whatever loop
     // reached it first. Found on hardware, where the mascot stuck on
-    // `thinking-alt` and never reached `done`; missed by the tests because
+    // a `thinking` variant and never reached `done`; missed by the tests because
     // their fixture used a 1s duration with whole-second advances, making
     // every elapsed value an exact multiple.
     //
@@ -573,6 +721,9 @@ final class PanelController: ObservableObject {
       clipStartedAt = nil
       displayedOverlayKey = nil
       displayedPhase = nil
+      showingUsage = false
+      isShowingUsage = false
+      usageSince = nil
       nextRetryAt = nil
       Self.log.notice("panel off (desired \(self.desired.rawValue, privacy: .public))")
       logDecision(
@@ -651,6 +802,86 @@ final class PanelController: ObservableObject {
     clipStartedAt = nil
     displayedOverlayKey = nil
     displayedPhase = nil
+  }
+
+  /// One boundary-gated step towards having the usage screen on the panel.
+  ///
+  /// Deliberately **not** routed through `driveTowards`: that resolves a
+  /// `PanelState` through the choreographer's pose graph, and the usage
+  /// screen is not a place the mascot can be. It is the same shape as
+  /// `wave-off` — something the machine reaches for directly, belonging to no
+  /// phase — and it keeps the same two rules that matter: never cut into a
+  /// loop mid-cycle, and never upload what is already showing.
+  ///
+  /// A changed screen has a changed `id` (`UsageScreen.contentKey` rides in
+  /// it), so a number that actually moved re-uploads at the next boundary and
+  /// one that did not costs nothing at all.
+  private func driveUsage(now: TimeInterval) async {
+    // The pose the departing clip left him at, so the screen can carry it
+    // forward and the walk back on comes from the right side. Once the screen
+    // is up, `displayed` is the screen itself and reports the same pose.
+    guard let target = usageClip(displayed?.endPose) else {
+      // Nothing to show — no snapshot yet, or a window that has turned over.
+      // Dark is the honest answer, and the machine's original behaviour.
+      await attemptPowerOff()
+      return
+    }
+
+    guard let currentlyDisplayed = displayed, let clipStartedAt else {
+      await attemptUsageUpload(target, now: now)
+      return
+    }
+    if currentlyDisplayed.id == target.id { return }
+
+    // `crossesPhase: false` deliberately. The screen is interruptible so the
+    // mascot can walk back in the instant work resumes; a refresh of its own
+    // numbers is not that, and cutting a loop short for a digit that moved is
+    // exactly the "pure loss" `nextBoundary` describes.
+    let boundary = nextBoundary(
+      after: currentlyDisplayed, startedAt: clipStartedAt, now: now, crossesPhase: false)
+    if now >= boundary {
+      await attemptUsageUpload(target, now: now)
+    } else {
+      logDecision(
+        target: target.id, displayed: currentlyDisplayed.id, action: "noop", outcome: "skipped",
+        detail: "usage screen deferred to boundary at \(boundary)")
+    }
+  }
+
+  private func attemptUsageUpload(_ target: Clip, now: TimeInterval) async {
+    let displayedBefore = displayed?.id
+    do {
+      try await panel.upload(target)
+      displayed = target
+      // Belongs to no phase, exactly as `wave-off` does: no `PanelState`
+      // resolves to it, so there is no group for the ledger to count it
+      // against and nothing here may advance the ledger.
+      displayedPhase = nil
+      clipStartedAt = now
+      // The screen owns all 32 rows, including the two the rail reserves, so
+      // `PanelAdapter` composites nothing behind it and there is no overlay
+      // key to record. Leaving it nil is also what makes the mascot's return
+      // re-upload with whatever rail is current by then.
+      displayedOverlayKey = nil
+      showingUsage = true
+      isShowingUsage = true
+      // Set once and then left alone: a refresh mid-hold must not restart
+      // the clock, or a screen whose numbers move every few minutes would
+      // never reach its own deadline and the panel would never go dark.
+      if usageSince == nil { usageSince = now }
+      nextRetryAt = nil
+      Self.log.notice("usage screen showing \(target.id, privacy: .public)")
+      logDecision(
+        target: target.id, displayed: displayedBefore, action: "upload", outcome: "ok",
+        detail: "usage screen")
+    } catch {
+      let reason = error.localizedDescription
+      Self.log.error("usage screen upload failed: \(reason, privacy: .public)")
+      scheduleRetry()
+      logDecision(
+        target: target.id, displayed: displayedBefore, action: "upload", outcome: "failed",
+        detail: reason)
+    }
   }
 
   private func attemptUpload(_ target: Clip, overlayKey: Int?) async {

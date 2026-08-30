@@ -18,13 +18,21 @@ final class PanelAdapter: PanelDriving {
   private let library: AnimationLibrary
   private let ble: BLEClient
   private let overlayProvider: () -> Overlay?
+  /// Bytes for a clip that has no file behind it — today, only the usage
+  /// screen. A closure, like `overlayProvider`, so this type still knows
+  /// only about the library and the BLE client and never about
+  /// `UsageScreenSource`. Defaults to "there are no such clips", which is
+  /// what every existing call site gets.
+  private let generatedProvider: (String) -> Data?
 
   init(
-    library: AnimationLibrary, ble: BLEClient, overlayProvider: @escaping () -> Overlay? = { nil }
+    library: AnimationLibrary, ble: BLEClient, overlayProvider: @escaping () -> Overlay? = { nil },
+    generatedProvider: @escaping (String) -> Data? = { _ in nil }
   ) {
     self.library = library
     self.ble = ble
     self.overlayProvider = overlayProvider
+    self.generatedProvider = generatedProvider
   }
 
   func setPower(on: Bool) async throws {
@@ -36,6 +44,17 @@ final class PanelAdapter: PanelDriving {
   }
 
   func upload(_ clip: Clip) async throws {
+    // A generated clip goes up exactly as rendered, with **no overlay**: the
+    // usage screen owns all 32 rows, including the two the rail reserves, and
+    // compositing a bar of the same number behind itself would be both
+    // redundant and wrong.
+    if UsageScreenSource.isUsageClip(clip.id) {
+      guard let data = generatedProvider(clip.id) else {
+        throw AnimationLibraryError.clipNotFound(clip.id)
+      }
+      try await ble.send(gif: data)
+      return
+    }
     let data = try Self.render(clip, library: library, overlay: overlayProvider())
     try await ble.send(gif: data)
   }

@@ -108,6 +108,12 @@ final class AppModel: ObservableObject {
   /// `UsageBox`'s doc comment above.
   private let usageBox = UsageBox()
 
+  /// Renders and caches the usage screen. Held here so it outlives `init`;
+  /// the closures wired into `PanelAdapter` and `PanelController` capture it
+  /// rather than `self`, keeping the same no-self-capture discipline
+  /// `usageBox` exists for.
+  private var usageScreenSource: UsageScreenSource!
+
   /// Where the usage snapshot is loaded from at launch and saved to on every
   /// new one. Defaults to `UsageSnapshotCache.defaultFileURL`; overridable
   /// so tests can point it at a temp directory instead of the real
@@ -183,11 +189,16 @@ final class AppModel: ObservableObject {
     )
 
     let usageBox = self.usageBox
+    // Reads the same box the overlay does, so the screen the mascot walks off
+    // to can never disagree with the rail he was standing on.
+    let usageScreenSource = UsageScreenSource(snapshot: { [usageBox] in usageBox.snapshot })
+    self.usageScreenSource = usageScreenSource
     let adapter: PanelDriving =
       panel
       ?? PanelAdapter(
         library: animationLibrary, ble: bleClient,
-        overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) }
+        overlayProvider: { [usageBox] in renderCurrentOverlay(usageBox) },
+        generatedProvider: { [usageScreenSource] id in usageScreenSource.data(forClipID: id) }
       )
     // Walks the pose graph instead of looking states up 1:1. Built from
     // whatever manifest the library loaded (an empty one when none did, so
@@ -207,13 +218,19 @@ final class AppModel: ObservableObject {
       // route to `wave-off`, which no `PanelState` ever resolves to. Sourced
       // from the same `AnimationLibrary` as `resolve` above.
       clipByID: { [animationLibrary] id in animationLibrary.clip(id: id) },
+      usageClip: { [usageScreenSource] pose in usageScreenSource.clip(pose: pose) },
       timings: PanelTimings(
         sleepAfter: TimeInterval(settings.sleepAfterMinutes * 60),
         offAfter: TimeInterval(settings.offAfterMinutes * 60),
         // Read from the manifest rather than hand-synced, so the entrance
         // plays exactly once before handing off. `0` (manifest absent) means
         // the entrance is disabled, matching PanelTimings' documented default.
-        startingHold: animationLibrary.clip(id: "starting")?.motion ?? 0
+        startingHold: animationLibrary.clip(id: "starting")?.motion ?? 0,
+        // `0` ("Never" in Settings) means the screen holds until something
+        // happens, which is `.greatestFiniteMagnitude` to the state machine —
+        // not `0`, which is how that machine spells "no screen at all".
+        usageFor: settings.usageForMinutes == 0
+          ? .greatestFiniteMagnitude : TimeInterval(settings.usageForMinutes * 60)
       ),
       brightness: { settings.brightness },
       eventLog: eventLog,
@@ -250,6 +267,12 @@ final class AppModel: ObservableObject {
     // Forward PluginInstaller changes (Settings' Plugin section reads
     // `pluginInstaller.outcome` through `appModel`).
     pluginInstaller.objectWillChange
+      .sink { [weak self] in self?.objectWillChange.send() }
+      .store(in: &cancellables)
+
+    // Forward PanelController changes (the menu's usage row reads
+    // `panelController.isShowingUsage` through `appModel`).
+    panelController.objectWillChange
       .sink { [weak self] in self?.objectWillChange.send() }
       .store(in: &cancellables)
 
@@ -507,8 +530,15 @@ final class AppModel: ObservableObject {
   /// the usage cycle and the upload cycle; a tick here would let probe
   /// cadence drive panel traffic, which this design must not do.
   private func applyUsage(_ usage: UsageSnapshot) {
-    currentUsage = usage
-    UsageSnapshotCache.save(usage, to: usageCacheURL)
+    // Merged, not assigned. Not every source carries every field — a wrapper
+    // from before the weekly fields existed, or a payload with no `seven_day`
+    // object, reports the 5-hour window alone. Such a line landing on top of a
+    // fuller snapshot would otherwise blank the usage screen's second pane
+    // every time the user's status line redrew. See
+    // `UsageSnapshot.carryingForward(from:)`.
+    let merged = usage.carryingForward(from: currentUsage)
+    currentUsage = merged
+    UsageSnapshotCache.save(merged, to: usageCacheURL)
   }
 
   /// How old `currentUsage` must be, for the panel's current state, before a
@@ -550,6 +580,24 @@ final class AppModel: ObservableObject {
   func refreshUsageNow() {
     guard !probeInFlight else { return }
     spawnProbe()
+  }
+
+  /// Whether the usage screen is on the panel, so the menu can offer to
+  /// dismiss it. Republished off `PanelController` rather than duplicated.
+  var isShowingUsage: Bool { panelController.isShowingUsage }
+
+  /// Menu action: put the usage screen on the panel now. The mascot walks off
+  /// at the next seam, the numbers come up, and he walks back in a minute
+  /// later — see `PanelController.showUsageNow`.
+  func showUsageNow() {
+    panelController.showUsageNow()
+    Task { await panelController.tick() }
+  }
+
+  /// Menu action: end a requested usage screen early.
+  func endUsageNow() {
+    panelController.endRequestedUsage()
+    Task { await panelController.tick() }
   }
 
   /// The one place a `UsageProbe.run` subprocess is started, shared by

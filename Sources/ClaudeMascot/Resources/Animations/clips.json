@@ -90,6 +90,16 @@
       "weight": 0.5,
       "minCycles": 8
     },
+    "idea": {
+      "file": "idea.gif",
+      "frameCount": 19,
+      "durationMs": 2280,
+      "motionMs": 2280,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "thinking",
+      "weight": 0.5
+    },
     "idle": {
       "file": "idle.gif",
       "frameCount": 7,
@@ -99,6 +109,17 @@
       "pose": "standing",
       "variantGroup": "idle",
       "weight": 1.0
+    },
+    "look-down": {
+      "file": "look-down.gif",
+      "frameCount": 8,
+      "durationMs": 9240,
+      "motionMs": 9240,
+      "loops": true,
+      "pose": "standing",
+      "variantGroup": "idle",
+      "weight": 0.5,
+      "interruptible": true
     },
     "off": {
       "file": "off.gif",
@@ -167,23 +188,13 @@
     },
     "thinking": {
       "file": "thinking.gif",
-      "frameCount": 5,
-      "durationMs": 3600,
-      "motionMs": 3600,
-      "loops": true,
-      "pose": "standing",
-      "variantGroup": "thinking",
-      "weight": 1.0
-    },
-    "thinking-alt": {
-      "file": "thinking-alt.gif",
       "frameCount": 14,
       "durationMs": 6060,
       "motionMs": 6060,
       "loops": true,
       "pose": "standing",
       "variantGroup": "thinking",
-      "weight": 0.5
+      "weight": 1.0
     },
     "waiting": {
       "file": "waiting.gif",

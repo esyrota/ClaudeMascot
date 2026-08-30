@@ -19,8 +19,17 @@ struct SettingsView: View {
   /// value that reads singular ("For 1 minute").
   private static let dimOptions: [Int] = [1, 2, 3, 5, 10, 20, 30, 45, 60]
 
-  /// Minute options for "Turn the panel off", in menu order.
-  private static let offOptions: [Int] = [5, 10, 20, 30, 45, 60, 90, 120]
+  /// Minute options for "Send the mascot away", in menu order. **3 and 4 are
+  /// new and load-bearing**: the shipped default is 4, and `nearestOption`
+  /// below snaps any stored value onto this list, so a list starting at 5
+  /// would silently move every install's 4 to 5 on the first time Settings
+  /// was opened.
+  private static let offOptions: [Int] = [3, 4, 5, 10, 20, 30, 45, 60, 90, 120]
+
+  /// Minute options for "Show usage for", in menu order. `0` is "Never",
+  /// meaning the screen holds until something happens rather than until a
+  /// clock runs out.
+  private static let usageOptions: [Int] = [0, 5, 10, 15, 30, 60, 120]
 
   init(appModel: AppModel) {
     self.appModel = appModel
@@ -65,10 +74,25 @@ struct SettingsView: View {
           .pickerStyle(.menu)
         }
 
-        LabeledContent("Turn the panel off when inactive") {
+        LabeledContent("Send the mascot away when inactive") {
           Picker("", selection: $settings.offAfterMinutes) {
-            ForEach(Self.offOptions, id: \.self) { minutes in
+            // Never offer a departure earlier than the doze it follows: the
+            // three timings are a sequence, and a menu that can express
+            // "leave before you have nodded off" is a menu that invites a
+            // configuration this app has no behaviour for.
+            ForEach(Self.offOptions.filter { $0 > settings.sleepAfterMinutes }, id: \.self) {
+              minutes in
               Text(pickerLabel(minutes)).tag(minutes)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.menu)
+        }
+
+        LabeledContent("Then show usage before going dark") {
+          Picker("", selection: $settings.usageForMinutes) {
+            ForEach(Self.usageOptions, id: \.self) { minutes in
+              Text(minutes == 0 ? "Never" : pickerLabel(minutes)).tag(minutes)
             }
           }
           .labelsHidden()
@@ -147,7 +171,10 @@ struct SettingsView: View {
     .frame(width: 500, height: 600)
     .task {
       settings.sleepAfterMinutes = nearestOption(settings.sleepAfterMinutes, in: Self.dimOptions)
-      settings.offAfterMinutes = nearestOption(settings.offAfterMinutes, in: Self.offOptions)
+      settings.offAfterMinutes = nearestOption(
+        settings.offAfterMinutes,
+        in: Self.offOptions.filter { $0 > settings.sleepAfterMinutes })
+      settings.usageForMinutes = nearestOption(settings.usageForMinutes, in: Self.usageOptions)
       appModel.pluginInstaller.refreshOutcome()
       statuslineInstaller.refreshOutcome()
     }

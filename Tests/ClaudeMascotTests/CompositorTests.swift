@@ -68,7 +68,7 @@ private func solidOverlay() -> Overlay {
 @MainActor
 func passthroughIsByteIdenticalForEveryBundledClip() throws {
   let manifest = try loadClipsManifest()
-  #expect(manifest.clips.count == 41)
+  #expect(manifest.clips.count == 42)
   let library = makeLibrary()
 
   for (id, entry) in manifest.clips {

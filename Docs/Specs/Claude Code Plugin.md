@@ -121,17 +121,26 @@ user's own statusline command and tees the numbers it needs to the same socket.
 It reads Claude Code's statusline JSON from stdin once. The payload carries four rate
 limit periods nested under `rate_limits`: `five_hour`, `seven_day`, `seven_day_sonnet`,
 and `seven_day_opus`, each with identical field names. The wrapper extracts
-`rate_limits.five_hour.used_percentage` and `rate_limits.five_hour.resets_at`
-(epoch seconds, not an ISO 8601 string), and writes one line to
-`~/Library/Application Support/ClaudeMascot/hook.sock`:
+`used_percentage` and `resets_at` (epoch seconds, not an ISO 8601 string) from **two** of
+them — `five_hour` for the rail, `seven_day` for [[Menu Bar App]]'s usage screen — and
+writes one line to `~/Library/Application Support/ClaudeMascot/hook.sock`:
 
 ```json
-{"event":"Usage","usedPercent":42.5,"resetsAt":1756270800}
+{"event":"Usage","usedPercent":42.5,"resetsAt":1756270800,"weekUsedPercent":66,"weekResetsAt":1756900000}
 ```
+
+**The two weekly fields are optional on the wire, not merely optional in Swift.** A
+payload with no `seven_day` object produces the two-field line this event has always
+been, which an older app decodes unchanged; a newer app reads a missing weekly field as
+"this source doesn't know" and keeps whatever it already had. Losing them costs one pane
+of the usage screen and nothing else — the rail draws one row and that row is the 5-hour
+budget.
 
 The same privacy rule that keeps `tool_input` off the wire above applies here: the
 wrapper **extracts rather than forwards**. The statusline payload carries far more than
-those two fields, and only they cross the socket.
+these four fields, and only they cross the socket. **`cost.total_cost_usd` is
+specifically among what does not**, which is why the usage screen has no money on it
+where its design mockup did.
 
 It then `exec`s the user's actual configured statusline command with the same stdin, so
 the terminal's status line reads exactly as it would without the wrapper installed. That
@@ -173,11 +182,37 @@ claude -p "/usage" --output-format json
 no model call. It is not costless in every other sense: each run is a ~600ms process spawn
 that leaves ~3.3KB of transcript and a `session-env` directory under `~/.claude`.
 `UsageProbe` parses the result into the same `UsageSnapshot` the statusline wrapper
-produces. Only the "Current session" line is read: the 5-hour window is the one the rail
-shows, the weekly window is out of scope, and the breakdown beneath them is explicitly
-approximate ("local sessions on this machine"). The reset instant is parsed rather than
-computed — the string names an IANA zone but carries no year, so the year is the one that
-places the reset inside the next five hours.
+produces. Two lines are read:
+
+| Line | Feeds | If absent |
+|---|---|---|
+| `Current session: N% used · resets …` | the rail, and pane 1 | the whole parse returns `nil` |
+| `Current week (all models): N% used · resets …` | pane 2 | that pane is dropped |
+
+**The weekly window used to be out of scope and is not any more.** The rail draws one row
+and that row is the 5-hour budget, which is why it was ruled out; the usage screen's
+second pane is what brought it back.
+
+**The `What's contributing to your limits usage?` breakdown beneath them is still out of
+scope**, and now deliberately so rather than by omission. It was parsed for one build —
+`Last 7d · N requests · M sessions` fed a third pane — and removed with that pane: Claude
+Code documents it as approximate and local-only ("does not include other devices or
+claude.ai"), and a request count has no quota to draw a bar against. Nothing here should
+read it again without a use that survives both facts.
+
+Only the session line is required. A malformed or missing weekly line costs a pane; a
+malformed session line means the caller keeps whatever it already has, since a partial
+snapshot must never replace a good one.
+
+The reset instant is parsed rather than computed — the string names an IANA zone but
+carries no year, so the year is the one that places the reset inside the window's own
+length. **That bound is the window's, not a constant five hours**: the weekly reset is up
+to seven days out, and a five-hour bound rejected every one of them.
+
+**There is no cost anywhere in this output on a subscription.** Captured verbatim
+2026-08-29, `/usage` prints the plan, the two windows, and the approximate breakdown —
+and no dollar figure at all. That, with the wrapper's privacy rule above, is the whole
+reason the usage screen has no money on it.
 
 **The probe runs in a directory of its own** — `…/Application Support/ClaudeMascot/probe` —
 and never inherits the app's. A menu-bar app's cwd is `/`, and `claude` does its
